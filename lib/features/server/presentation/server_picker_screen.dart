@@ -1,26 +1,24 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/network/dio_client.dart';
+import '../../../core/storage/server_store.dart';
+import '../../../core/utils/safe_text.dart';
 import '../../../shared/widgets/empty_state_view.dart';
 import '../../../shared/widgets/primary_button.dart';
 
-// TODO(wire): replace with riverpod controller
-class _ServerEntry {
-  final String name;
-  final String url;
-  final String? logoUrl;
-  _ServerEntry({required this.name, required this.url, this.logoUrl});
-}
-
-class ServerPickerScreen extends StatefulWidget {
+class ServerPickerScreen extends ConsumerStatefulWidget {
   const ServerPickerScreen({super.key});
 
   @override
-  State<ServerPickerScreen> createState() => _ServerPickerScreenState();
+  ConsumerState<ServerPickerScreen> createState() =>
+      _ServerPickerScreenState();
 }
 
-class _ServerPickerScreenState extends State<ServerPickerScreen> {
-  // TODO(wire): replace with riverpod controller
-  final _servers = ValueNotifier<List<_ServerEntry>>([]);
-  int _selectedIndex = 0;
+class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
+  String? _selectedId;
 
   void _showAddSheet() {
     showModalBottomSheet(
@@ -31,10 +29,12 @@ class _ServerPickerScreenState extends State<ServerPickerScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => _AddServerSheet(
-        onSaved: (entry) {
-          setState(() {
-            _servers.value = [..._servers.value, entry];
-          });
+        onSaved: (config) async {
+          final notifier = ref.read(serverStoreProvider.notifier);
+          await notifier.addServer(config);
+          await notifier.selectServer(config.id);
+          VoceDioClient.setBaseUrl(config.baseUrl);
+          if (mounted) context.go('/login');
         },
       ),
     );
@@ -43,157 +43,219 @@ class _ServerPickerScreenState extends State<ServerPickerScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final serverState = ref.watch(serverStoreProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Select Server'),
-        centerTitle: false,
-      ),
-      body: ValueListenableBuilder<List<_ServerEntry>>(
-        valueListenable: _servers,
-        builder: (context, servers, _) {
-          if (servers.isEmpty) {
-            return EmptyStateView(
-              icon: Icons.dns_outlined,
-              title: 'Connect to a VoceChat server',
-              subtitle: 'Add a server to get started chatting with your team.',
-              actionLabel: 'Add your first server',
-              onAction: _showAddSheet,
-            );
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            itemCount: servers.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 4),
-            itemBuilder: (context, i) {
-              final server = servers[i];
-              final selected = _selectedIndex == i;
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Material(
-                  color: selected
-                      ? theme.colorScheme.primaryContainer
-                      : theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(16),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => setState(() => _selectedIndex = i),
-                    child: Padding(
+    return serverState.when(
+      loading: () => const Scaffold(
+          body: Center(child: CircularProgressIndicator())),
+      error: (e, _) =>
+          Scaffold(body: Center(child: Text(safeText('Error: $e')))),
+      data: (state) {
+        final servers = state.servers;
+        final selectedIndex = _selectedId != null
+            ? servers.indexWhere((s) => s.id == _selectedId)
+            : servers.indexWhere((s) => s.id == state.currentServerId);
+        final effectiveIndex = selectedIndex == -1 ? 0 : selectedIndex;
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Select Server'),
+            centerTitle: false,
+          ),
+          body: servers.isEmpty
+              ? EmptyStateView(
+                  icon: Icons.dns_outlined,
+                  title: 'Connect to a VoceChat server',
+                  subtitle:
+                      'Add a server to get started chatting with your team.',
+                  actionLabel: 'Add your first server',
+                  onAction: _showAddSheet,
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  itemCount: servers.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 4),
+                  itemBuilder: (context, i) {
+                    final server = servers[i];
+                    final selected = effectiveIndex == i;
+                    return Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 22,
-                            backgroundColor: theme.colorScheme.primary,
-                            child: Text(
-                              server.name.isNotEmpty
-                                  ? server.name[0].toUpperCase()
-                                  : 'V',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          horizontal: 16, vertical: 4),
+                      child: Material(
+                        color: selected
+                            ? theme.colorScheme.primaryContainer
+                            : theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () =>
+                              setState(() => _selectedId = server.id),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            child: Row(
                               children: [
-                                Text(
-                                  server.name,
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: selected
-                                        ? theme.colorScheme.onPrimaryContainer
-                                        : null,
+                                CircleAvatar(
+                                  radius: 22,
+                                  backgroundColor:
+                                      theme.colorScheme.primary,
+                                  child: Text(
+                                    safeText(server.name.isNotEmpty
+                                        ? server.name[0].toUpperCase()
+                                        : 'V'),
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w700),
                                   ),
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  server.url,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: selected
-                                        ? theme.colorScheme.onPrimaryContainer
-                                            .withAlpha(180)
-                                        : theme.colorScheme.onSurfaceVariant,
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        safeText(server.name),
+                                        style: theme.textTheme.titleSmall
+                                            ?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: selected
+                                              ? theme.colorScheme
+                                                  .onPrimaryContainer
+                                              : null,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        safeText(server.baseUrl),
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                          color: selected
+                                              ? theme.colorScheme
+                                                  .onPrimaryContainer
+                                                  .withAlpha(180)
+                                              : theme.colorScheme
+                                                  .onSurfaceVariant,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Radio<int>(
+                                  value: i,
+                                  groupValue: effectiveIndex,
+                                  onChanged: (v) => setState(
+                                      () => _selectedId = servers[v!].id),
                                 ),
                               ],
                             ),
                           ),
-                          Radio<int>(
-                            value: i,
-                            groupValue: _selectedIndex,
-                            onChanged: (v) =>
-                                setState(() => _selectedIndex = v!),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
-              );
-            },
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddSheet,
-        icon: const Icon(Icons.add),
-        label: const Text('Add server'),
-      ),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: _showAddSheet,
+            icon: const Icon(Icons.add),
+            label: const Text('Add server'),
+          ),
+        );
+      },
     );
   }
 }
 
-class _AddServerSheet extends StatefulWidget {
-  final void Function(_ServerEntry) onSaved;
+class _AddServerSheet extends ConsumerStatefulWidget {
+  final Future<void> Function(ServerConfig) onSaved;
   const _AddServerSheet({required this.onSaved});
 
   @override
-  State<_AddServerSheet> createState() => _AddServerSheetState();
+  ConsumerState<_AddServerSheet> createState() => _AddServerSheetState();
 }
 
-class _AddServerSheetState extends State<_AddServerSheet> {
+class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
   final _formKey = GlobalKey<FormState>();
   final _urlCtrl = TextEditingController(text: 'https://');
   final _aliasCtrl = TextEditingController();
   bool _testing = false;
   bool _tested = false;
+  bool _saving = false;
+  bool _showHttpLocalhostWarning = false;
 
   @override
-  void dispose() {
-    _urlCtrl.dispose();
-    _aliasCtrl.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _urlCtrl.addListener(_onUrlChanged);
+  }
+
+  void _onUrlChanged() {
+    final uri = Uri.tryParse(_urlCtrl.text.trim());
+    final isHttpLocalhost = uri != null &&
+        uri.scheme == 'http' &&
+        (uri.host == 'localhost' || uri.host == '127.0.0.1');
+    if (isHttpLocalhost != _showHttpLocalhostWarning) {
+      setState(() => _showHttpLocalhostWarning = isHttpLocalhost);
+    }
   }
 
   Future<void> _testConnection() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _testing = true);
-    // TODO(wire): replace with real network check
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() {
-      _testing = false;
-      _tested = true;
-    });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Connection successful (stub)')),
-      );
+    final url = _urlCtrl.text.trim().replaceAll(RegExp(r'/+$'), '');
+    try {
+      final testDio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+      ));
+      await testDio.get('$url/api/admin/system/organization');
+      setState(() {
+        _testing = false;
+        _tested = true;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Connection successful')),
+        );
+      }
+    } catch (_) {
+      setState(() {
+        _testing = false;
+        _tested = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not connect to server')),
+        );
+      }
     }
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    final url = _urlCtrl.text.trim();
+    final url = _urlCtrl.text.trim().replaceAll(RegExp(r'/+$'), '');
     final alias = _aliasCtrl.text.trim();
-    final name = alias.isNotEmpty ? alias : Uri.tryParse(url)?.host ?? url;
-    widget.onSaved(_ServerEntry(name: name, url: url));
-    Navigator.of(context).pop();
+    final name =
+        alias.isNotEmpty ? alias : Uri.tryParse(url)?.host ?? url;
+    final config = ServerConfig(
+      id: '${Uri.parse(url).host.replaceAll('.', '_')}_${DateTime.now().millisecondsSinceEpoch}',
+      baseUrl: url,
+      name: name,
+    );
+    setState(() => _saving = true);
+    try {
+      await widget.onSaved(config);
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(safeText('Error: $e'))),
+        );
+      }
+    }
   }
 
   @override
@@ -242,10 +304,16 @@ class _AddServerSheetState extends State<_AddServerSheet> {
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'URL is required';
                 final uri = Uri.tryParse(v.trim());
-                if (uri == null ||
-                    !uri.hasScheme ||
-                    (!uri.scheme.startsWith('https') &&
-                        !uri.scheme.startsWith('http'))) {
+                if (uri == null || !uri.hasScheme) {
+                  return 'Must start with https://';
+                }
+                final host = uri.host.toLowerCase();
+                final isLocalhost =
+                    host == 'localhost' || host == '127.0.0.1';
+                if (uri.scheme == 'http' && !isLocalhost) {
+                  return 'Only https:// is allowed (http not permitted for remote servers)';
+                }
+                if (uri.scheme != 'https' && uri.scheme != 'http') {
                   return 'Must start with https://';
                 }
                 return null;
@@ -272,8 +340,10 @@ class _AddServerSheetState extends State<_AddServerSheet> {
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Icon(_tested ? Icons.check_circle_outline : Icons.wifi),
-              label: Text(_testing ? 'Testing…' : 'Test connection'),
+                  : Icon(_tested
+                      ? Icons.check_circle_outline
+                      : Icons.wifi),
+              label: Text(safeText(_testing ? 'Testing…' : 'Test connection')),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 48),
                 shape: RoundedRectangleBorder(
@@ -281,7 +351,11 @@ class _AddServerSheetState extends State<_AddServerSheet> {
               ),
             ),
             const SizedBox(height: 12),
-            PrimaryButton(label: 'Save & Continue', onPressed: _save),
+            PrimaryButton(
+              label: 'Save & Continue',
+              isLoading: _saving,
+              onPressed: _saving ? null : _save,
+            ),
           ],
         ),
       ),

@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -77,9 +76,27 @@ class ServerStore extends _$ServerStore {
 
   Future<void> selectServer(String id) async {
     final current = await future;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kCurrentServerKey, id);
+    await _persist(current.servers, id);
     state = AsyncData(current.copyWith(currentServerId: id));
+  }
+
+  /// Replace the id of an existing server (and currentServerId if it matches),
+  /// preserving baseUrl/name. Used after login/register to align the local
+  /// server entry with the server-issued id without creating a duplicate.
+  Future<void> replaceServerId({
+    required String oldId,
+    required String newId,
+  }) async {
+    if (oldId == newId) return;
+    final current = await future;
+    final updated = current.servers
+        .map((s) => s.id == oldId ? s.copyWith(id: newId) : s)
+        .toList();
+    final newCurrent =
+        current.currentServerId == oldId ? newId : current.currentServerId;
+    await _persist(updated, newCurrent);
+    state = AsyncData(
+        current.copyWith(servers: updated, currentServerId: newCurrent));
   }
 
   List<ServerConfig> get list => state.valueOrNull?.servers ?? [];

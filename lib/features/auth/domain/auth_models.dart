@@ -1,3 +1,4 @@
+// ignore_for_file: invalid_annotation_target
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'auth_models.freezed.dart';
@@ -7,13 +8,14 @@ part 'auth_models.g.dart';
 // Credential (sealed)
 // ---------------------------------------------------------------------------
 
-@freezed
+@Freezed(unionKey: 'type', unionValueCase: FreezedUnionCase.snake)
 sealed class Credential with _$Credential {
   const factory Credential.password({
     required String email,
     required String password,
   }) = PasswordCredential;
 
+  @FreezedUnionValue('magiclink')
   const factory Credential.magicLink({
     required String email,
   }) = MagicLinkCredential;
@@ -36,7 +38,7 @@ class VoceUser with _$VoceUser {
     required String name,
     String? email,
     @JsonKey(name: 'is_admin') @Default(false) bool isAdmin,
-    @JsonKey(name: 'avatar_updated_at') String? avatarUpdatedAt,
+    @JsonKey(name: 'avatar_updated_at') int? avatarUpdatedAt,
   }) = _VoceUser;
 
   factory VoceUser.fromJson(Map<String, dynamic> json) =>

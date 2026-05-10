@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:dio_smart_retry/dio_smart_retry.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:logger/logger.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../storage/secure_token_store.dart';
 import '../storage/server_store.dart';
+import '../utils/app_log.dart';
+import '../utils/safe_text.dart';
 
 part 'dio_client.g.dart';
 
@@ -32,12 +32,46 @@ class ApiException implements Exception {
 }
 
 // ---------------------------------------------------------------------------
+// Redacting log printer — strips sensitive headers/fields
+// ---------------------------------------------------------------------------
+
+void _redactingLogPrint(Object msg) {
+  if (!AppLog.isEnabled(LogTag.network)) return;
+  final s = msg.toString();
+  const sensitive = ['X-API-Key', 'password', 'refresh_token'];
+  for (final keyword in sensitive) {
+    if (s.contains(keyword)) {
+      AppLog.d(LogTag.network, () => '[REDACTED — contains $keyword]');
+      return;
+    }
+  }
+  AppLog.d(LogTag.network, () => s);
+}
+
+// ---------------------------------------------------------------------------
+// Recursive JSON UTF-16 sanitizer
+// ---------------------------------------------------------------------------
+
+Object? _sanitize(Object? node) {
+  if (node is String) return safeText(node);
+  if (node is List) return node.map(_sanitize).toList();
+  if (node is Map) {
+    return <String, dynamic>{
+      for (final entry in node.entries)
+        entry.key.toString(): _sanitize(entry.value),
+    };
+  }
+  return node;
+}
+
+// ---------------------------------------------------------------------------
 // VoceDioClient — wraps a Dio instance with interceptors
 // ---------------------------------------------------------------------------
 
 class VoceDioClient {
-  VoceDioClient({required String baseUrl, required this._ref})
-      : _dio = Dio(
+  VoceDioClient({required String baseUrl, required Ref ref})
+      : _ref = ref,
+        _dio = Dio(
           BaseOptions(
             baseUrl: baseUrl,
             connectTimeout: const Duration(seconds: 15),
@@ -64,7 +98,7 @@ class VoceDioClient {
     _dio.interceptors.add(
       RetryInterceptor(
         dio: _dio,
-        logPrint: (msg) => Logger().d(msg),
+        logPrint: _redactingLogPrint,
         retries: 2,
         retryDelays: const [
           Duration(milliseconds: 500),
@@ -77,12 +111,15 @@ class VoceDioClient {
                 error.response!.statusCode! >= 500),
       ),
     );
-    if (kDebugMode) {
+    // The full request/response body dump is the single biggest source of
+    // log spam during message sync. Only attach it when the user explicitly
+    // turns the network tag on (AppLog.enable(LogTag.network)).
+    if (AppLog.isEnabled(LogTag.network)) {
       _dio.interceptors.add(
         LogInterceptor(
           requestBody: true,
           responseBody: true,
-          logPrint: (o) => Logger().d(o.toString()),
+          logPrint: _redactingLogPrint,
         ),
       );
     }
@@ -98,13 +135,29 @@ class _AuthInterceptor extends Interceptor {
 
   final Dio _dio;
   final Ref _ref;
-  bool _isRefreshing = false;
+  Completer<void>? _refreshing;
 
   @override
   Future<void> onRequest(
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
+    // The server's license check rejects requests with an empty Referer
+    // (HTTP 451 "License error: Referer is empty."). Browsers normally
+    // populate this from window.location, but on non-web platforms (and on
+    // some web builds) Dio sends no Referer at all. Inject one derived from
+    // the configured baseUrl so the server accepts the request.
+    if (options.headers['Referer'] == null &&
+        options.headers['referer'] == null) {
+      final baseUrl = options.baseUrl;
+      if (baseUrl.isNotEmpty) {
+        final uri = Uri.tryParse(baseUrl);
+        if (uri != null && uri.host.isNotEmpty) {
+          options.headers['Referer'] = '${uri.scheme}://${uri.authority}/';
+        }
+      }
+    }
+
     final serverId = _ref.read(serverStoreProvider).valueOrNull?.currentServerId;
     if (serverId != null) {
       final store = _ref.read(secureTokenStoreProvider(serverId));
@@ -112,8 +165,35 @@ class _AuthInterceptor extends Interceptor {
       if (tokens != null) {
         options.headers['X-API-Key'] = tokens.accessToken;
       }
+      AppLog.d(
+        LogTag.network,
+        () =>
+            '🌐 ${options.method} ${options.path} hasToken=${tokens != null} tokenLen=${tokens?.accessToken.length ?? 0}',
+      );
+    } else {
+      AppLog.d(
+        LogTag.network,
+        () => '🌐 ${options.method} ${options.path} NO_SERVER',
+      );
     }
     handler.next(options);
+  }
+
+  @override
+  Future<void> onResponse(
+    Response response,
+    ResponseInterceptorHandler handler,
+  ) async {
+    AppLog.d(
+      LogTag.network,
+      () =>
+          '✅ ${response.requestOptions.method} ${response.requestOptions.path} → ${response.statusCode}',
+    );
+    // Sanitize any String anywhere in the JSON body to be valid UTF-16, so
+    // TextPainter doesn't throw on user-generated content with broken
+    // surrogate pairs (broken emoji, control chars, etc).
+    response.data = _sanitize(response.data);
+    handler.next(response);
   }
 
   @override
@@ -122,8 +202,13 @@ class _AuthInterceptor extends Interceptor {
     ErrorInterceptorHandler handler,
   ) async {
     final statusCode = err.response?.statusCode;
+    AppLog.d(
+      LogTag.network,
+      () =>
+          '❌ ${err.requestOptions.method} ${err.requestOptions.path} → ${err.type} status=$statusCode body=${err.response?.data}',
+    );
 
-    if (statusCode == 401 && !_isRefreshing) {
+    if (statusCode == 401) {
       final serverId =
           _ref.read(serverStoreProvider).valueOrNull?.currentServerId;
       if (serverId == null) {
@@ -131,13 +216,33 @@ class _AuthInterceptor extends Interceptor {
         return;
       }
       final store = _ref.read(secureTokenStoreProvider(serverId));
+
+      // If a refresh is already in progress, await it then retry
+      if (_refreshing != null) {
+        try {
+          await _refreshing!.future;
+          final tokens = await store.readTokens();
+          if (tokens != null) {
+            final retryOptions = err.requestOptions;
+            retryOptions.headers['X-API-Key'] = tokens.accessToken;
+            final retryResponse = await _dio.fetch(retryOptions);
+            handler.resolve(retryResponse);
+            return;
+          }
+        } catch (_) {
+          // refresh failed; fall through to reject
+        }
+        handler.next(err);
+        return;
+      }
+
       final tokens = await store.readTokens();
       if (tokens == null) {
         handler.next(err);
         return;
       }
 
-      _isRefreshing = true;
+      _refreshing = Completer<void>();
       try {
         final renewResp = await _dio.post(
           '/api/token/renew',
@@ -152,16 +257,18 @@ class _AuthInterceptor extends Interceptor {
           refresh: newRefresh,
           expiresAt: DateTime.now().add(Duration(seconds: expiredIn)),
         );
+        _refreshing!.complete();
+        _refreshing = null;
 
         // Retry original request with new token
         final retryOptions = err.requestOptions;
         retryOptions.headers['X-API-Key'] = newAccess;
         final retryResponse = await _dio.fetch(retryOptions);
-        _isRefreshing = false;
         handler.resolve(retryResponse);
         return;
       } on DioException catch (retryErr) {
-        _isRefreshing = false;
+        _refreshing!.completeError(retryErr);
+        _refreshing = null;
         if (retryErr.response?.statusCode == 401) {
           // Second 401 – clear auth
           await store.clear();
@@ -174,14 +281,23 @@ class _AuthInterceptor extends Interceptor {
     // Convert non-2xx to ApiException
     if (statusCode != null && statusCode >= 400) {
       final data = err.response?.data;
-      final message = (data is Map<String, dynamic>)
-          ? (data['error'] as String? ?? 'Unknown error')
-          : 'HTTP $statusCode';
+      String message = 'HTTP $statusCode';
+      String? code;
+      if (data is Map<String, dynamic>) {
+        message = (data['msg'] as String?) ??
+            (data['message'] as String?) ??
+            (data['error'] as String?) ??
+            message;
+        code = data['code'] as String?;
+      } else if (data is String && data.isNotEmpty) {
+        message = data;
+      }
       handler.reject(
         DioException(
           requestOptions: err.requestOptions,
           error: ApiException(
             status: statusCode,
+            code: code,
             message: message,
           ),
           response: err.response,
@@ -191,7 +307,25 @@ class _AuthInterceptor extends Interceptor {
       return;
     }
 
-    handler.next(err);
+    // Network/timeout/cancel errors — surface a friendly message
+    final friendly = switch (err.type) {
+      DioExceptionType.connectionTimeout =>
+        'Connection timed out. Check your network or server URL.',
+      DioExceptionType.receiveTimeout =>
+        'Server took too long to respond.',
+      DioExceptionType.connectionError =>
+        'Cannot reach server. Verify the URL is correct and reachable.',
+      DioExceptionType.badCertificate =>
+        'TLS certificate is invalid for this server.',
+      _ => err.message ?? 'Network error',
+    };
+    handler.reject(
+      DioException(
+        requestOptions: err.requestOptions,
+        error: ApiException(status: 0, message: friendly),
+        type: err.type,
+      ),
+    );
   }
 }
 
@@ -199,17 +333,24 @@ class _AuthInterceptor extends Interceptor {
 // Riverpod provider
 // ---------------------------------------------------------------------------
 
-@riverpod
+@Riverpod(keepAlive: true)
 VoceDioClient dioClient(Ref ref) {
-  final serverState = ref.watch(serverStoreProvider).valueOrNull;
-  final currentServer = serverState?.servers
-      .where((s) => s.id == serverState.currentServerId)
-      .firstOrNull;
-  final baseUrl = currentServer?.baseUrl ?? VoceDioClient._baseUrl;
+  // Only rebuild the client when the resolved baseUrl actually changes.
+  // Watching the whole serverStoreProvider would tear down the Dio instance
+  // (and any in-flight requests / refresh lock) on unrelated state edits.
+  final baseUrl = ref.watch(
+    serverStoreProvider.select((async) {
+      final state = async.valueOrNull;
+      final current = state?.servers
+          .where((s) => s.id == state.currentServerId)
+          .firstOrNull;
+      return current?.baseUrl ?? VoceDioClient._baseUrl;
+    }),
+  );
   return VoceDioClient(baseUrl: baseUrl, ref: ref);
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 Dio dio(Ref ref) {
   return ref.watch(dioClientProvider).dio;
 }

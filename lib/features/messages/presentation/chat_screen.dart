@@ -1,0 +1,833 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+
+import '../../../core/storage/server_store.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/safe_text.dart';
+import '../../../features/auth/application/auth_controller.dart';
+import '../../../features/contacts/application/presence_provider.dart';
+import '../../../features/contacts/application/user_directory_provider.dart';
+import '../../../shared/widgets/loading_capsule.dart';
+import '../../../shared/widgets/voce_avatar.dart';
+import '../application/chat_controller.dart';
+import '../domain/message_models.dart';
+import '../domain/message_status.dart';
+
+class ChatScreen extends ConsumerStatefulWidget {
+  final String id;
+  const ChatScreen({super.key, required this.id});
+
+  @override
+  ConsumerState<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends ConsumerState<ChatScreen> {
+  final _textCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController();
+  bool _canSend = false;
+
+  late MessageTarget _target;
+
+  @override
+  void initState() {
+    super.initState();
+    _target = _parseTarget(widget.id);
+
+    _textCtrl.addListener(() {
+      final hasText = _textCtrl.text.trim().isNotEmpty;
+      if (hasText != _canSend) setState(() => _canSend = hasText);
+    });
+
+    _scrollCtrl.addListener(_onScroll);
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.id != widget.id) {
+      setState(() {
+        _target = _parseTarget(widget.id);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _textCtrl.dispose();
+    _scrollCtrl.removeListener(_onScroll);
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollCtrl.position.pixels >=
+        _scrollCtrl.position.maxScrollExtent - 200) {
+      ref.read(chatControllerProvider(_target).notifier).loadMore();
+    }
+  }
+
+  static MessageTarget _parseTarget(String id) {
+    if (id.startsWith('u-')) {
+      final uid = int.tryParse(id.substring(2)) ?? 0;
+      return MessageTarget.user(uid: uid);
+    } else if (id.startsWith('g-')) {
+      final gid = int.tryParse(id.substring(2)) ?? 0;
+      return MessageTarget.group(gid: gid);
+    }
+    final gid = int.tryParse(id) ?? 0;
+    return MessageTarget.group(gid: gid);
+  }
+
+  Future<void> _sendMessage() async {
+    if (!_canSend) return;
+    final text = _textCtrl.text.trim();
+    _textCtrl.clear();
+    setState(() => _canSend = false);
+    try {
+      await ref
+          .read(chatControllerProvider(_target).notifier)
+          .sendText(text);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(safeText('Send failed: $e'))));
+      }
+    }
+  }
+
+  bool _showDateSeparator(List<ChatMessage> msgs, int index) {
+    if (index == msgs.length - 1) return true;
+    final current = msgs[index];
+    final older = msgs[index + 1];
+    final currentDate =
+        DateTime.fromMillisecondsSinceEpoch(current.createdAt, isUtc: true);
+    final olderDate =
+        DateTime.fromMillisecondsSinceEpoch(older.createdAt, isUtc: true);
+    return currentDate.day != olderDate.day;
+  }
+
+  String? _avatarUrl(int uid, int? avatarUpdatedAt) {
+    if ((avatarUpdatedAt ?? 0) == 0) return null;
+    final serverState = ref.read(serverStoreProvider).valueOrNull;
+    final server = serverState?.servers
+        .where((s) => s.id == serverState.currentServerId)
+        .firstOrNull;
+    final base = server?.baseUrl ?? '';
+    if (base.isEmpty) return null;
+    return '$base/api/resource/avatar?uid=$uid';
+  }
+
+  String? _groupAvatarUrl(int gid, int? avatarUpdatedAt) {
+    if ((avatarUpdatedAt ?? 0) == 0) return null;
+    final serverState = ref.read(serverStoreProvider).valueOrNull;
+    final server = serverState?.servers
+        .where((s) => s.id == serverState.currentServerId)
+        .firstOrNull;
+    final base = server?.baseUrl ?? '';
+    if (base.isEmpty) return null;
+    return '$base/api/resource/group_avatar?gid=$gid';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final messagesAsync = ref.watch(chatControllerProvider(_target));
+
+    final authState = ref.watch(authControllerProvider).valueOrNull;
+    final currentUid =
+        authState is AuthStateAuthenticated ? authState.user.uid : -1;
+
+    final userDir = ref.watch(userDirectoryProvider).valueOrNull ?? {};
+    final groupDir = ref.watch(groupDirectoryProvider).valueOrNull ?? {};
+
+    final showStatus = ref.watch(showOnlineStatusProvider);
+    final presence = ref.watch(presenceProvider);
+    final int? dmUid = _target.maybeMap<int?>(
+      user: (t) => t.uid,
+      orElse: () => null,
+    );
+    final dmOnline = dmUid != null && (presence[dmUid] ?? false);
+
+    final (
+      String title,
+      String? subtitle,
+      String? avatarUrl,
+      bool isChannel
+    ) = _target.map(
+      user: (t) {
+        final u = userDir[t.uid];
+        final name = u?.name ?? 'User ${t.uid}';
+        return (
+          name,
+          showStatus ? (dmOnline ? 'Online' : 'Offline') : null,
+          u != null ? _avatarUrl(t.uid, u.avatarUpdatedAt) : null,
+          false,
+        );
+      },
+      group: (t) {
+        final g = groupDir[t.gid];
+        final name = g?.name ?? 'Group ${t.gid}';
+        return (
+          name,
+          'Introduce yourself to the community!',
+          g != null ? _groupAvatarUrl(t.gid, g.avatarUpdatedAt) : null,
+          true,
+        );
+      },
+    );
+
+    final statuses =
+        ref.watch(chatControllerProvider(_target).notifier).statuses;
+
+    return Container(
+      color: AppTokens.surface,
+      child: Column(
+        children: [
+          _ChatHeader(
+            title: title,
+            subtitle: subtitle,
+            avatarUrl: avatarUrl,
+            isChannel: isChannel,
+            canPop: Navigator.of(context).canPop(),
+            isOnline: dmOnline,
+            showStatus: showStatus,
+          ),
+          Expanded(
+            child: messagesAsync.when(
+              loading: () => const Center(
+                child: LoadingCapsule(label: 'Loading messages…'),
+              ),
+              error: (e, _) =>
+                  Center(child: Text(safeText('Error: $e'))),
+              data: (messages) => messages.isEmpty
+                  ? const _EmptyConversation()
+                  : ListView.builder(
+                      controller: _scrollCtrl,
+                      reverse: true,
+                      padding:
+                          const EdgeInsets.fromLTRB(8, 16, 8, 16),
+                      itemCount: messages.length,
+                      findChildIndexCallback: (key) {
+                        if (key is ValueKey<int>) {
+                          final idx = messages
+                              .indexWhere((m) => m.mid == key.value);
+                          return idx >= 0 ? idx : null;
+                        }
+                        return null;
+                      },
+                      itemBuilder: (context, index) {
+                        final msg = messages[index];
+                        final showSep =
+                            _showDateSeparator(messages, index);
+                        // Stack newest message at bottom; the older
+                        // separator must appear above it visually,
+                        // which in reverse:true means below in the list.
+                        return KeyedSubtree(
+                          key: ValueKey<int>(msg.mid),
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.stretch,
+                            children: [
+                              _MessageRow(
+                                message: msg,
+                                currentUid: currentUid,
+                                status: statuses[msg.mid],
+                                userDir: userDir,
+                                avatarUrlBuilder: _avatarUrl,
+                                onRetry: msg.mid < 0 &&
+                                        statuses[msg.mid] ==
+                                            MessageSendStatus.failed
+                                    ? () => ref
+                                        .read(chatControllerProvider(
+                                                _target)
+                                            .notifier)
+                                        .retrySend(msg.mid)
+                                    : null,
+                              ),
+                              if (showSep)
+                                _DateSeparator(
+                                    createdAt: msg.createdAt),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ),
+          _SendBox(
+            controller: _textCtrl,
+            canSend: _canSend,
+            onSend: _sendMessage,
+            placeholder: isChannel ? 'Message #$title' : 'Message $title',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _ChatHeader — channel/dm header (Figma "Main / Header"). 52px tall, white
+// background, bottom border #EAECF0, Inter Bold 16 title + Inter 16 subtitle.
+// ---------------------------------------------------------------------------
+
+class _ChatHeader extends StatelessWidget {
+  const _ChatHeader({
+    required this.title,
+    required this.subtitle,
+    required this.avatarUrl,
+    required this.isChannel,
+    required this.canPop,
+    this.isOnline = false,
+    this.showStatus = true,
+  });
+
+  final String title;
+  final String? subtitle;
+  final String? avatarUrl;
+  final bool isChannel;
+  final bool canPop;
+  final bool isOnline;
+  final bool showStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 52,
+      decoration: const BoxDecoration(
+        color: AppTokens.surface,
+        border: Border(
+          bottom: BorderSide(color: AppTokens.gray200, width: 1),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          if (canPop)
+            IconButton(
+              icon: const Icon(Icons.arrow_back,
+                  size: 20, color: AppTokens.gray700),
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
+          if (isChannel)
+            const Padding(
+              padding: EdgeInsets.only(right: 4),
+              child: Icon(Icons.tag,
+                  size: 20, color: Color(0xFF1C1C1E)),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Stack(
+                children: [
+                  VoceAvatar(
+                      name: title, imageUrl: avatarUrl, size: 28),
+                  if (showStatus)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: isOnline
+                              ? AppTokens.successDot
+                              : AppTokens.gray400,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: AppTokens.surface, width: 1.5),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          Flexible(
+            child: Text(
+              safeText(title),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1C1C1E),
+                height: 24 / 16,
+              ),
+            ),
+          ),
+          if (subtitle != null && subtitle!.isNotEmpty) ...[
+            const SizedBox(width: 16),
+            Flexible(
+              child: Text(
+                safeText(subtitle!),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF616161),
+                  height: 24 / 16,
+                ),
+              ),
+            ),
+          ],
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.search,
+                size: 20, color: AppTokens.gray500),
+            onPressed: () {},
+            tooltip: 'Search',
+          ),
+          IconButton(
+            icon: const Icon(Icons.more_horiz,
+                size: 20, color: AppTokens.gray500),
+            onPressed: () {},
+            tooltip: 'More',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _DateSeparator — Figma "Timestamp": horizontal line with centered white
+// pill carrying the date.
+// ---------------------------------------------------------------------------
+
+class _DateSeparator extends StatelessWidget {
+  const _DateSeparator({required this.createdAt});
+  final int createdAt;
+
+  String _formatDate() {
+    final date = DateTime.fromMillisecondsSinceEpoch(createdAt, isUtc: true)
+        .toLocal();
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y/$m/$d';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            height: 1,
+            color: const Color(0xFFE3E5E8),
+          ),
+          Container(
+            color: AppTokens.surface,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            child: Text(
+              _formatDate(),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF78787C),
+                height: 18 / 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _MessageRow — Figma "Main / Comment". 40px avatar, cyan name + gray time
+// header, body text in #374151. Hovering reveals a reply-actions cluster on
+// the right of the row (Emoji / Reply / Bookmark / More).
+// ---------------------------------------------------------------------------
+
+class _MessageRow extends StatefulWidget {
+  const _MessageRow({
+    required this.message,
+    required this.currentUid,
+    required this.userDir,
+    required this.avatarUrlBuilder,
+    this.status,
+    this.onRetry,
+  });
+
+  final ChatMessage message;
+  final int currentUid;
+  final MessageSendStatus? status;
+  final Map<int, UserSummary> userDir;
+  final String? Function(int uid, int? avatarUpdatedAt) avatarUrlBuilder;
+  final VoidCallback? onRetry;
+
+  @override
+  State<_MessageRow> createState() => _MessageRowState();
+}
+
+class _MessageRowState extends State<_MessageRow> {
+  bool _hovered = false;
+
+  bool get _isPinned {
+    final p = (widget.message.detail is NormalMessageDetail)
+        ? (widget.message.detail as NormalMessageDetail).properties
+        : null;
+    return p != null && (p['pinned'] == true || p['is_pinned'] == true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final msg = widget.message;
+    final sender = widget.userDir[msg.fromUid];
+    final senderName = sender?.name ?? 'uid:${msg.fromUid}';
+    final senderAvatarUrl = sender != null
+        ? widget.avatarUrlBuilder(msg.fromUid, sender.avatarUpdatedAt)
+        : null;
+
+    final date =
+        DateTime.fromMillisecondsSinceEpoch(msg.createdAt, isUtc: true)
+            .toLocal();
+    final dateLabel =
+        '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+
+    final detail = msg.detail;
+    Widget content;
+    if (detail is NormalMessageDetail) {
+      if (detail.contentType == 'text/markdown') {
+        content = MarkdownBody(
+          data: safeText(detail.content),
+          styleSheet: MarkdownStyleSheet(
+            p: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF374151),
+              height: 20 / 14,
+            ),
+          ),
+        );
+      } else {
+        content = Text(
+          safeText(detail.content),
+          style: const TextStyle(
+            fontSize: 14,
+            color: Color(0xFF374151),
+            height: 20 / 14,
+          ),
+        );
+      }
+    } else if (detail is ReplyMessageDetail) {
+      content = Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: AppTokens.gray50,
+          borderRadius: BorderRadius.circular(6),
+          border: const Border(
+            left: BorderSide(color: AppTokens.primary500, width: 3),
+          ),
+        ),
+        child: Text(
+          safeText(detail.content),
+          style: const TextStyle(
+            fontSize: 14,
+            color: Color(0xFF374151),
+            height: 20 / 14,
+          ),
+        ),
+      );
+    } else {
+      content = const Text(
+        '[unsupported message]',
+        style: TextStyle(fontSize: 13, color: AppTokens.gray500),
+      );
+    }
+
+    final pinned = _isPinned;
+    final rowBg = pinned ? AppTokens.primary50 : Colors.transparent;
+
+    final mainRow = Container(
+      decoration: BoxDecoration(
+        color: rowBg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: pinned
+          ? const EdgeInsets.symmetric(horizontal: 8, vertical: 4)
+          : const EdgeInsets.all(8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (pinned)
+            Padding(
+              padding: const EdgeInsets.only(left: 56, bottom: 4),
+              child: Row(
+                children: const [
+                  Icon(Icons.push_pin,
+                      size: 12, color: AppTokens.gray400),
+                  SizedBox(width: 4),
+                  Text(
+                    'pinned',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTokens.gray400,
+                      height: 18 / 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              VoceAvatar(
+                  name: senderName,
+                  imageUrl: senderAvatarUrl,
+                  size: 40),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          safeText(senderName),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF06B6D4),
+                            height: 20 / 14,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          dateLabel,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFFBFBFBF),
+                            height: 18 / 12,
+                          ),
+                        ),
+                        if (widget.status ==
+                            MessageSendStatus.sending) ...[
+                          const SizedBox(width: 8),
+                          const Icon(Icons.access_time,
+                              size: 12, color: AppTokens.gray400),
+                        ] else if (widget.status ==
+                            MessageSendStatus.failed) ...[
+                          const SizedBox(width: 8),
+                          const Icon(Icons.error_outline,
+                              size: 12, color: AppTokens.error),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    content,
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    Widget row = MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          mainRow,
+          if (_hovered)
+            Positioned(
+              top: -16,
+              right: 10,
+              child: const _ReplyActionsBar(),
+            ),
+        ],
+      ),
+    );
+
+    if (widget.onRetry != null) {
+      row = GestureDetector(onTap: widget.onRetry, child: row);
+    }
+    return row;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _ReplyActionsBar — Figma "Replies / Icons" cluster.
+// ---------------------------------------------------------------------------
+
+class _ReplyActionsBar extends StatelessWidget {
+  const _ReplyActionsBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTokens.surface,
+        border: Border.all(color: const Color(0x14000000)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          _ReplyIcon(icon: Icons.emoji_emotions_outlined),
+          _ReplyIcon(icon: Icons.reply_outlined),
+          _ReplyIcon(icon: Icons.bookmark_add_outlined),
+          _ReplyIcon(icon: Icons.more_horiz),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReplyIcon extends StatelessWidget {
+  const _ReplyIcon({required this.icon});
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () {},
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Icon(icon, size: 20, color: AppTokens.gray500),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _SendBox — Figma "Send / Input / Send". gray-200 bg, 16px radius,
+// emoji left, placeholder, markdown + attach actions right.
+// ---------------------------------------------------------------------------
+
+class _SendBox extends StatelessWidget {
+  const _SendBox({
+    required this.controller,
+    required this.canSend,
+    required this.onSend,
+    required this.placeholder,
+  });
+
+  final TextEditingController controller;
+  final bool canSend;
+  final VoidCallback onSend;
+  final String placeholder;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppTokens.surface,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE5E7EB),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Icon(Icons.emoji_emotions_outlined,
+                size: 22, color: AppTokens.gray500),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: controller,
+                minLines: 1,
+                maxLines: 5,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF374151),
+                  height: 20 / 14,
+                ),
+                onSubmitted: (_) => onSend(),
+                decoration: InputDecoration(
+                  hintText: placeholder,
+                  hintStyle: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppTokens.gray400,
+                    height: 20 / 14,
+                  ),
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(vertical: 8),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.code,
+                  size: 22, color: AppTokens.gray500),
+              onPressed: () {},
+              tooltip: 'Markdown',
+              visualDensity: VisualDensity.compact,
+            ),
+            IconButton(
+              icon: const Icon(Icons.attach_file_outlined,
+                  size: 22, color: AppTokens.gray500),
+              onPressed: () {},
+              tooltip: 'Attach',
+              visualDensity: VisualDensity.compact,
+            ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 150),
+              child: canSend
+                  ? IconButton(
+                      key: const ValueKey('send'),
+                      icon: const Icon(Icons.send_rounded,
+                          size: 20, color: AppTokens.primary500),
+                      onPressed: onSend,
+                      tooltip: 'Send',
+                      visualDensity: VisualDensity.compact,
+                    )
+                  : const SizedBox(width: 0),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _EmptyConversation — placeholder when there are no messages yet.
+// ---------------------------------------------------------------------------
+
+class _EmptyConversation extends StatelessWidget {
+  const _EmptyConversation();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: const BoxDecoration(
+              color: AppTokens.primary50,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.chat_bubble_outline,
+                size: 24, color: AppTokens.primary500),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'No messages yet',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppTokens.gray500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

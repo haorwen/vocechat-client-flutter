@@ -1,24 +1,26 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../shared/widgets/primary_button.dart';
 
-// TODO(wire): replace with riverpod controller
-class LoginScreen extends StatefulWidget {
+import '../../../core/network/dio_client.dart';
+import '../../../core/storage/server_store.dart';
+import '../../../core/utils/safe_text.dart';
+import '../../../shared/widgets/primary_button.dart';
+import '../application/auth_controller.dart';
+
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _obscurePassword = true;
-  bool _isLoading = false;
-
-  // TODO(wire): replace with riverpod controller — get server name from state
-  static const String _stubServerName = 'demo.vocechat.com';
 
   @override
   void dispose() {
@@ -27,12 +29,39 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  String get _serverName {
+    final state = ref.read(serverStoreProvider).valueOrNull;
+    if (state == null) return '';
+    final current = state.servers
+        .where((s) => s.id == state.currentServerId)
+        .firstOrNull;
+    return current?.name ?? current?.baseUrl ?? '';
+  }
+
   Future<void> _signIn() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    setState(() => _isLoading = true);
-    // TODO(wire): replace with riverpod controller
-    await Future.delayed(const Duration(seconds: 1));
-    if (mounted) setState(() => _isLoading = false);
+
+    await ref
+        .read(authControllerProvider.notifier)
+        .login(_emailCtrl.text.trim(), _passwordCtrl.text);
+
+    if (!mounted) return;
+
+    final authState = ref.read(authControllerProvider);
+    authState.whenOrNull(
+      data: (state) {
+        if (state is AuthStateAuthenticated) {
+          context.go('/home');
+        }
+      },
+      error: (e, _) {
+        final msg = e is DioException && e.error is ApiException
+            ? (e.error as ApiException).message
+            : e.toString();
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(safeText(msg))));
+      },
+    );
   }
 
   @override
@@ -40,10 +69,33 @@ class _LoginScreenState extends State<LoginScreen> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
+    // Listen for auth state changes to navigate
+    ref.listen(authControllerProvider, (_, next) {
+      next.whenOrNull(
+        data: (state) {
+          if (state is AuthStateAuthenticated && mounted) {
+            context.go('/home');
+          }
+        },
+        error: (e, _) {
+          if (!mounted) return;
+          final msg = e is DioException && e.error is ApiException
+              ? (e.error as ApiException).message
+              : e.toString();
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(safeText(msg))));
+        },
+      );
+    });
+
+    final isLoading =
+        ref.watch(authControllerProvider).isLoading;
+
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
           child: Form(
             key: _formKey,
             child: Column(
@@ -76,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  _stubServerName,
+                  safeText(_serverName),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),
@@ -89,13 +141,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     labelText: 'Email',
                     prefixIcon: Icon(Icons.email_outlined),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                      borderRadius:
+                          BorderRadius.all(Radius.circular(12)),
                     ),
                   ),
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Email is required';
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Email is required';
+                    }
                     final emailRegex =
                         RegExp(r'^[\w\.\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
                     if (!emailRegex.hasMatch(v.trim())) {
@@ -111,22 +166,27 @@ class _LoginScreenState extends State<LoginScreen> {
                     labelText: 'Password',
                     prefixIcon: const Icon(Icons.lock_outline),
                     border: const OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                      borderRadius:
+                          BorderRadius.all(Radius.circular(12)),
                     ),
                     suffixIcon: IconButton(
                       icon: Icon(_obscurePassword
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                   obscureText: _obscurePassword,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _signIn(),
                   validator: (v) {
-                    if (v == null || v.isEmpty) return 'Password is required';
-                    if (v.length < 6) return 'Password must be at least 6 characters';
+                    if (v == null || v.isEmpty) {
+                      return 'Password is required';
+                    }
+                    if (v.length < 6) {
+                      return 'Password must be at least 6 characters';
+                    }
                     return null;
                   },
                 ),
@@ -141,8 +201,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 8),
                 PrimaryButton(
                   label: 'Sign in',
-                  isLoading: _isLoading,
-                  onPressed: _isLoading ? null : _signIn,
+                  isLoading: isLoading,
+                  onPressed: isLoading ? null : _signIn,
                 ),
                 const SizedBox(height: 16),
                 _TertiaryRow(
