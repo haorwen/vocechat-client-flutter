@@ -1,8 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_client_sse/constants/sse_request_type_enum.dart';
-import 'package:flutter_client_sse/flutter_client_sse.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -17,6 +17,12 @@ part 'sse_client.g.dart';
 // ---------------------------------------------------------------------------
 // VoceSseClient
 // ---------------------------------------------------------------------------
+//
+// We talk to `/api/user/events_ws` — the server's WebSocket twin of the SSE
+// `/api/user/events` endpoint. Same JSON envelopes, but each message is its
+// own WebSocket text frame, so there's no chunked-transfer + gzip + line-
+// splitter dance. This avoids the Windows-desktop SSE buffering problem we
+// hit with the HTTP-based clients.
 
 class VoceSseClient {
   VoceSseClient({
@@ -34,15 +40,20 @@ class VoceSseClient {
   /// (re)connect so the server replays anything we missed during a gap.
   int? _highWaterMid;
 
+  WebSocket? _socket;
+  StreamSubscription<dynamic>? _sub;
+
   /// Returns a broadcast [Stream<ChatEvent>] with auto-reconnect.
   Stream<ChatEvent> events() {
-    final controller = StreamController<ChatEvent>.broadcast();
+    final controller = StreamController<ChatEvent>.broadcast(
+      onCancel: () => _cleanup(),
+    );
     _connect(controller, const Duration(seconds: 1));
     return controller.stream;
   }
 
-  void _connect(
-      StreamController<ChatEvent> controller, Duration currentDelay) {
+  Future<void> _connect(
+      StreamController<ChatEvent> controller, Duration currentDelay) async {
     if (controller.isClosed) return;
 
     final encodedKey = Uri.encodeComponent(apiKey);
@@ -50,43 +61,63 @@ class VoceSseClient {
     if (_highWaterMid != null) {
       query.write('&after_mid=${_highWaterMid!}');
     }
-    final url = '$baseUrl/api/user/events?$query';
 
-    final sseStream = SSEClient.subscribeToSSE(
-      method: SSERequestType.GET,
-      url: url,
-      header: {
-        'X-API-Key': apiKey,
-        'Accept': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-      },
-    );
+    // Convert https:// → wss:// (and http → ws). Server route is
+    // `/api/user/events_ws`.
+    final wsBase = baseUrl.replaceFirst(RegExp(r'^http'), 'ws');
+    final url = '$wsBase/api/user/events_ws?$query';
+    debugPrint(
+        '[SSE] ws connecting → $wsBase/api/user/events_ws  (highWaterMid=$_highWaterMid)');
 
-    bool firstEvent = true;
-    sseStream.listen(
-      (sseEvent) async {
+    WebSocket socket;
+    try {
+      socket = await WebSocket.connect(
+        url,
+        headers: {'X-API-Key': apiKey},
+      );
+    } catch (e) {
+      debugPrint('[SSE] ws connect failed: $e');
+      _scheduleReconnect(controller, currentDelay);
+      return;
+    }
+    _socket = socket;
+
+    bool firstFrame = true;
+    _sub = socket.listen(
+      (frame) async {
         if (controller.isClosed) return;
-        final eventType = (sseEvent.event ?? '').trim();
-        final rawData = (sseEvent.data ?? '').trim();
+        if (firstFrame) {
+          firstFrame = false;
+          currentDelay = const Duration(seconds: 1);
+        }
+        final raw = frame is String
+            ? frame
+            : (frame is List<int> ? utf8.decode(frame) : frame.toString());
+        final trimmed = raw.trim();
+        if (trimmed.isEmpty) return;
 
-        // Heartbeats / ready / kick are tiny — parse on-thread to avoid the
-        // isolate hop overhead. Everything else (notably chat / users_snapshot
-        // with potentially heavy JSON) goes to a background isolate so the UI
-        // thread stays free.
+        final eventType = _peekTypeField(trimmed) ?? '';
+        if (kDebugMode) {
+          final preview = trimmed.length > 240
+              ? '${trimmed.substring(0, 240)}…'
+              : trimmed;
+          debugPrint('[SSE] recv type=$eventType  data=$preview');
+        }
+
         ChatEvent chatEvent;
         if (eventType == 'ready' ||
             eventType == 'heartbeat' ||
             eventType == 'kick') {
-          chatEvent = parseSseEvent(eventType, rawData);
+          chatEvent = parseSseEvent(eventType, trimmed);
         } else {
           try {
             chatEvent = await compute(
               _parseSseEventInIsolate,
-              [eventType, rawData],
+              [eventType, trimmed],
               debugLabel: 'parseSseEvent',
             );
           } catch (_) {
-            chatEvent = ChatEvent.unknown(type: eventType, raw: rawData);
+            chatEvent = ChatEvent.unknown(type: eventType, raw: trimmed);
           }
           if (controller.isClosed) return;
         }
@@ -97,16 +128,14 @@ class VoceSseClient {
             _highWaterMid = mid;
           }
         }
-        if (firstEvent) {
-          firstEvent = false;
-          currentDelay = const Duration(seconds: 1);
-        }
         controller.add(chatEvent);
       },
-      onError: (_) {
+      onError: (err) {
+        debugPrint('[SSE] ws error: $err');
         _scheduleReconnect(controller, currentDelay);
       },
       onDone: () {
+        debugPrint('[SSE] ws done (close=${socket.closeCode})');
         _scheduleReconnect(controller, currentDelay);
       },
       cancelOnError: false,
@@ -116,12 +145,19 @@ class VoceSseClient {
   void _scheduleReconnect(
       StreamController<ChatEvent> controller, Duration delay) {
     if (controller.isClosed) return;
+    _cleanup();
     Future.delayed(delay, () {
       final nextDelay = delay * 2;
-      final capped =
-          nextDelay > _maxBackoff ? _maxBackoff : nextDelay;
+      final capped = nextDelay > _maxBackoff ? _maxBackoff : nextDelay;
       _connect(controller, capped);
     });
+  }
+
+  void _cleanup() {
+    _sub?.cancel();
+    _sub = null;
+    _socket?.close().catchError((_) {});
+    _socket = null;
   }
 }
 
@@ -132,8 +168,7 @@ class VoceSseClient {
 @riverpod
 Stream<ChatEvent> sseEvents(Ref ref) async* {
   // Only stream when authenticated
-  final authState =
-      await ref.watch(authControllerProvider.future);
+  final authState = await ref.watch(authControllerProvider.future);
 
   if (authState is! AuthStateAuthenticated) return;
 
@@ -167,4 +202,22 @@ Stream<ChatEvent> sseEvents(Ref ref) async* {
 /// background isolate so JSON decoding never blocks the UI thread.
 ChatEvent _parseSseEventInIsolate(List<String> args) {
   return parseSseEvent(args[0], args[1]);
+}
+
+/// Read the top-level `"type"` field from a raw SSE/WS JSON envelope.
+///
+/// Important: chat envelopes embed a `detail.type` ("normal", "reply",
+/// "edit", …) BEFORE the outer `"type":"chat"` in the wire order, so a
+/// naive "first match" regex picks the wrong one. We instead do a real
+/// JSON decode for the discriminator — small price for correctness, and
+/// the heavy decode still happens later inside the isolate.
+String? _peekTypeField(String raw) {
+  try {
+    final decoded = jsonDecode(raw);
+    if (decoded is Map<String, dynamic>) {
+      final t = decoded['type'];
+      if (t is String) return t;
+    }
+  } catch (_) {}
+  return null;
 }

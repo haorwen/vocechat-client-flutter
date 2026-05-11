@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/dio_client.dart';
+import '../../auth/application/auth_controller.dart';
 import '../../messages/data/message_api.dart';
 import '../../messages/data/message_cache.dart';
 import '../../messages/domain/message_models.dart';
@@ -393,8 +394,21 @@ class Conversations extends _$Conversations {
   /// can replay dozens of messages in one tick, and rebuilding the entire
   /// chat list per message visibly hitches the UI.
   void applyIncomingMessage(ChatMessage msg) {
+    // DM session id is always the OTHER user's uid:
+    //   - outgoing  → msg.target.uid is the peer
+    //   - incoming  → msg.target.uid is OURSELF; the peer is msg.fromUid
+    // Mirrors web `chat.handler.ts`: `id = self ? target.uid : from_uid`.
+    final authState = ref.read(authControllerProvider).valueOrNull;
+    final currentUid =
+        authState is AuthStateAuthenticated ? authState.user.uid : null;
+
     final targetKey = msg.target.map<ConversationKey>(
-      user: (t) => UserConversationKey(t.uid),
+      user: (t) {
+        final peerUid = currentUid != null && msg.fromUid != currentUid
+            ? msg.fromUid
+            : t.uid;
+        return UserConversationKey(peerUid);
+      },
       group: (t) => GroupConversationKey(t.gid),
     );
 

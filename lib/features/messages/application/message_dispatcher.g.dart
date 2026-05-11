@@ -6,13 +6,17 @@ part of 'message_dispatcher.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$messageDispatcherHash() => r'4e00ce7d4cc20e72f5823d5f9ed304927f41f06d';
+String _$messageDispatcherHash() => r'a4fc03a145a3d9686880003283bbcc084d0f0f4a';
 
 /// Long-lived listener that routes every incoming SSE chat event to:
-///   1. the conversations list (so previews update on the left), and
+///   1. the conversations list (so previews update on the left),
 ///   2. the per-target ChatController (so the chat screen has the message
 ///      ready the moment it's opened, even if it had never been opened
-///      before — and stays in sync while it's in the background).
+///      before — and stays in sync while it's in the background), and
+///   3. the presence / show-online-status providers (so DM avatars reflect
+///      the actual online state, mirroring the web client's `useStreaming`
+///      handler for `users_state` / `users_state_changed` /
+///      `server_config_changed`).
 ///
 /// Kept alive for the entire app lifetime so it does NOT depend on any
 /// screen being mounted.

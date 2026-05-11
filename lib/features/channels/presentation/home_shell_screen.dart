@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../contacts/application/presence_provider.dart';
 import '../../messages/application/message_dispatcher.dart';
 
 /// Width threshold above which the desktop left rail layout is used.
@@ -28,10 +27,6 @@ class HomeShellScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Activate the global SSE → ChatController/Conversations dispatcher.
     ref.watch(messageDispatcherProvider);
-    // Activate the presence map / online-status flag so they latch onto SSE
-    // before any UI consults them.
-    ref.watch(presenceProvider);
-    ref.watch(showOnlineStatusProvider);
 
     // Match web behavior: hide the bottom nav while inside a chat
     // conversation (matches `isChattingPage && "hidden"` in MobileNavs.tsx).

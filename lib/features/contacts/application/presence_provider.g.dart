@@ -6,16 +6,14 @@ part of 'presence_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$presenceHash() => r'2d250e9a14fa322a71deeb72c4f765265c96a5dd';
+String _$presenceHash() => r'3316b956915192f5f0a5f48d02a8b0404b81b800';
 
 /// Per-user online state.
 ///
 /// Mirrors the web client's `users_state` / `users_state_changed` SSE handling
 /// in `useStreaming`: we hold a `uid -> online` map that the avatar status dot
-/// consults. The server only mentions a uid in `users_state` when it has a
-/// non-default state — anyone absent is treated as offline (matches the web
-/// behavior in `slices/users.ts: updateUsersStatus` where missing uids retain
-/// their last value, which defaults to undefined/false).
+/// consults. Driven by `MessageDispatcher` (single SSE consumer) so we don't
+/// need a second `ref.listen` competing for the same stream.
 ///
 /// Copied from [Presence].
 @ProviderFor(Presence)
@@ -29,7 +27,7 @@ final presenceProvider = NotifierProvider<Presence, Map<int, bool>>.internal(
 );
 
 typedef _$Presence = Notifier<Map<int, bool>>;
-String _$showOnlineStatusHash() => r'a98a0d8b24375d1f560474a8f4d93873a6220853';
+String _$showOnlineStatusHash() => r'db62c94dc5274816d22c612f6bc4d37946f53060';
 
 /// Whether the server admin has enabled per-user online dots.
 ///

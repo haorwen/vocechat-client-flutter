@@ -49,15 +49,28 @@ class ChatController extends _$ChatController {
   /// Coalesces bursts: SSE replay on reconnect can deliver dozens of
   /// messages back-to-back, and emitting state per message hitches the UI.
   void applyIncomingMessage(ChatMessage msg) {
+    final currentUid = _currentUid();
+
+    // DM session id is always the OTHER user's uid:
+    //   - outgoing  → msg.target.uid is the peer
+    //   - incoming  → msg.target.uid is OURSELF; the peer is msg.fromUid
+    // Mirrors web `chat.handler.ts`: `id = self ? target.uid : from_uid`.
     final matches = msg.target.map(
-      user: (t) =>
-          target.map(user: (tt) => tt.uid == t.uid, group: (_) => false),
+      user: (t) => target.map(
+        user: (tt) {
+          final peerUid =
+              currentUid != null && msg.fromUid != currentUid
+                  ? msg.fromUid
+                  : t.uid;
+          return tt.uid == peerUid;
+        },
+        group: (_) => false,
+      ),
       group: (t) =>
           target.map(user: (_) => false, group: (tt) => tt.gid == t.gid),
     );
     if (!matches) return;
 
-    final currentUid = _currentUid();
     if (currentUid != null && msg.fromUid == currentUid) return;
 
     if (msg.mid > 0 && _seenMids.contains(msg.mid)) return;
