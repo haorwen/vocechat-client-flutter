@@ -236,12 +236,18 @@ class Conversations extends _$Conversations {
     // multi-second freeze into a sub-second paint.
     final base = await _fetchBaseRoster();
     if (base.isNotEmpty) {
-      // Persist the un-enriched roster right away so a kill-and-relaunch
+      // Persist the un-enriched roster synchronously so a kill-and-relaunch
       // before enrichment finishes still gets cached names on next start.
-      _persist(cache, base);
-      // Fire enrichment in the background; state updates flow through
-      // _applyEnrichedBatch as previews arrive.
-      Future.microtask(() => _enrichPreviews(cache, base));
+      // Bypass the 400ms debounce — on a cleared cache the user is more
+      // likely to bounce the app, and we must not lose this first write.
+      _persist(cache, base, immediate: true);
+      // Defer enrichment past first paint. `Future.microtask` runs before
+      // build() resolves to Riverpod, so a 50+ workspace would saturate the
+      // connection pool and starve the basic UI render. A short delay lets
+      // the chat list paint first, then enrichment streams in.
+      Future.delayed(const Duration(milliseconds: 50), () {
+        _enrichPreviews(cache, base);
+      });
     }
     return _sorted(base);
   }
@@ -419,13 +425,22 @@ class Conversations extends _$Conversations {
     }
   }
 
-  void _persist(MessageCache cache, List<ConversationItem> items) {
+  void _persist(MessageCache cache, List<ConversationItem> items,
+      {bool immediate = false}) {
     // Coalesce bursts of state updates (SSE replay, preview enrichment) into
     // a single DB write. Each write triggers a jsonEncode pass (isolated via
     // compute, but still allocates) so it pays to skip redundant ones.
+    //
+    // `immediate` bypasses the debounce — used by the cold-start no-cache
+    // path so the very first persist lands on disk even if the user kills
+    // the app within the debounce window.
     _pendingPersistItems = items;
     _pendingPersistCache = cache;
     _persistTimer?.cancel();
+    if (immediate) {
+      _flushPersist();
+      return;
+    }
     _persistTimer = Timer(_persistDebounce, _flushPersist);
   }
 
