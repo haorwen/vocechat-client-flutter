@@ -66,8 +66,6 @@ class VoceSseClient {
     // `/api/user/events_ws`.
     final wsBase = baseUrl.replaceFirst(RegExp(r'^http'), 'ws');
     final url = '$wsBase/api/user/events_ws?$query';
-    debugPrint(
-        '[SSE] ws connecting → $wsBase/api/user/events_ws  (highWaterMid=$_highWaterMid)');
 
     WebSocket socket;
     try {
@@ -75,8 +73,7 @@ class VoceSseClient {
         url,
         headers: {'X-API-Key': apiKey},
       );
-    } catch (e) {
-      debugPrint('[SSE] ws connect failed: $e');
+    } catch (_) {
       _scheduleReconnect(controller, currentDelay);
       return;
     }
@@ -97,12 +94,6 @@ class VoceSseClient {
         if (trimmed.isEmpty) return;
 
         final eventType = _peekTypeField(trimmed) ?? '';
-        if (kDebugMode) {
-          final preview = trimmed.length > 240
-              ? '${trimmed.substring(0, 240)}…'
-              : trimmed;
-          debugPrint('[SSE] recv type=$eventType  data=$preview');
-        }
 
         ChatEvent chatEvent;
         if (eventType == 'ready' ||
@@ -130,14 +121,8 @@ class VoceSseClient {
         }
         controller.add(chatEvent);
       },
-      onError: (err) {
-        debugPrint('[SSE] ws error: $err');
-        _scheduleReconnect(controller, currentDelay);
-      },
-      onDone: () {
-        debugPrint('[SSE] ws done (close=${socket.closeCode})');
-        _scheduleReconnect(controller, currentDelay);
-      },
+      onError: (_) => _scheduleReconnect(controller, currentDelay),
+      onDone: () => _scheduleReconnect(controller, currentDelay),
       cancelOnError: false,
     );
   }

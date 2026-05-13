@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -227,12 +229,21 @@ class Conversations extends _$Conversations {
       return _sorted(cached);
     }
 
-    // Step 2: no cache — must wait on network so the UI has something to show.
-    final fresh = await _fetchFromNetwork();
-    if (fresh.isNotEmpty) {
-      _persist(cache, fresh);
+    // Step 2: no cache — fetch the base roster (groups + users) and return
+    // immediately so the UI paints. Preview enrichment (per-conversation
+    // getHistory fan-out) continues in the background and pushes incremental
+    // state updates. On low-end devices over a slow network, this turns a
+    // multi-second freeze into a sub-second paint.
+    final base = await _fetchBaseRoster();
+    if (base.isNotEmpty) {
+      // Persist the un-enriched roster right away so a kill-and-relaunch
+      // before enrichment finishes still gets cached names on next start.
+      _persist(cache, base);
+      // Fire enrichment in the background; state updates flow through
+      // _applyEnrichedBatch as previews arrive.
+      Future.microtask(() => _enrichPreviews(cache, base));
     }
-    return _sorted(fresh);
+    return _sorted(base);
   }
 
   /// Public: ask the notifier to re-pull the list from the network without
@@ -247,29 +258,29 @@ class Conversations extends _$Conversations {
   Future<void> _refreshFromNetwork(MessageCache cache) async {
     ref.read(conversationsRefreshingProvider.notifier).set(true);
     try {
-      final fresh = await _fetchFromNetwork();
-      if (fresh.isEmpty) return;
-      // Merge: prefer network metadata, but keep last-message preview from
-      // the existing state when network omitted it (e.g. a getHistory call
-      // failed) so the UI doesn't lose data.
+      final base = await _fetchBaseRoster();
+      if (base.isEmpty) return;
+      // Merge roster with current state, preserving existing previews while
+      // network catches up. This gives the UI a fresh name/membership list
+      // in 1 RTT, before any history fan-out completes.
       final current = state.valueOrNull ?? const <ConversationItem>[];
       final byKey = {for (final c in current) c.key: c};
-      final merged = fresh
-          .map((item) {
-            final existing = byKey[item.key];
-            if (existing == null) return item;
-            // Network item wins for name + (when present) preview/timestamp.
-            return item.copyWith(
-              lastMid: item.lastMid ?? existing.lastMid,
-              lastAt: item.lastAt ?? existing.lastAt,
-              lastPreview: item.lastPreview ?? existing.lastPreview,
-              lastFromUid: item.lastFromUid ?? existing.lastFromUid,
-            );
-          })
-          .toList();
+      final merged = base.map((item) {
+        final existing = byKey[item.key];
+        if (existing == null) return item;
+        return item.copyWith(
+          lastMid: existing.lastMid,
+          lastAt: existing.lastAt,
+          lastPreview: existing.lastPreview,
+          lastFromUid: existing.lastFromUid,
+        );
+      }).toList();
       final sorted = _sorted(merged);
       state = AsyncData(sorted);
       _persist(cache, sorted);
+
+      // Background enrichment — preview updates flow incrementally.
+      await _enrichPreviews(cache, base);
     } catch (_) {
       // ignore — cached state stays valid
     } finally {
@@ -277,10 +288,10 @@ class Conversations extends _$Conversations {
     }
   }
 
-  Future<List<ConversationItem>> _fetchFromNetwork() async {
+  /// Single round-trip to fetch group + user roster. Cheap (2 requests, no
+  /// per-conversation fan-out) so cold-start can paint after this returns.
+  Future<List<ConversationItem>> _fetchBaseRoster() async {
     final dio = ref.read(dioProvider);
-    final api = ref.read(messageApiProvider);
-
     final List<ConversationItem> base = [];
 
     try {
@@ -317,37 +328,47 @@ class Conversations extends _$Conversations {
       // offline: fall through
     }
 
-    if (base.isEmpty) return base;
+    return base;
+  }
 
-    // Reconcile the in-memory state with the freshly fetched roster as
-    // early as possible — this gives the UI an updated name list the
-    // instant /api/group + /api/user complete, BEFORE we start chasing
-    // per-conversation history. Prevents a long history-fetch fan-out
-    // from delaying the visible refresh.
-    final cached = state.valueOrNull;
-    if (cached != null) {
-      final cachedByKey = {for (final c in cached) c.key: c};
-      final preview = base
-          .map((item) =>
-              cachedByKey[item.key]?.copyWith() != null
-                  ? item.copyWith(
-                      lastMid: cachedByKey[item.key]!.lastMid,
-                      lastAt: cachedByKey[item.key]!.lastAt,
-                      lastPreview: cachedByKey[item.key]!.lastPreview,
-                      lastFromUid: cachedByKey[item.key]!.lastFromUid,
-                    )
-                  : item)
-          .toList();
-      state = AsyncData(_sorted(preview));
+  /// Per-conversation preview enrichment — fans out getHistory(limit:1) with
+  /// a bounded concurrency window and batches state updates so the UI gets
+  /// "drip" updates instead of one big rebuild at the end. Runs in the
+  /// background; never blocks first paint.
+  Future<void> _enrichPreviews(
+      MessageCache cache, List<ConversationItem> base) async {
+    if (base.isEmpty) return;
+    final api = ref.read(messageApiProvider);
+
+    // Tunable: 3 keeps a phone's network + CPU comfortable. The previous
+    // code used 4; on low-end devices 3 is a better default because each
+    // response triggers a main-isolate JSON decode by dio.
+    const int kHistoryConcurrency = 3;
+
+    // Batched flushes: collect enrichments in a buffer and emit at most one
+    // state update per ~120ms so we don't rebuild the list per response.
+    final Map<ConversationKey, ConversationItem> pending = {};
+    Timer? flushTimer;
+
+    void schedule() {
+      if (flushTimer != null) return;
+      flushTimer = Timer(const Duration(milliseconds: 120), () {
+        flushTimer = null;
+        if (pending.isEmpty) return;
+        final current = state.valueOrNull;
+        if (current == null) return;
+        final byKey = {for (final c in current) c.key: c};
+        for (final entry in pending.entries) {
+          byKey[entry.key] = entry.value;
+        }
+        pending.clear();
+        final next = byKey.values.toList();
+        final sorted = _sorted(next);
+        state = AsyncData(sorted);
+        _persist(cache, sorted);
+      });
     }
 
-    // Fetch the latest message for each conversation with a small concurrency
-    // cap. Hitting all conversations at once on a big workspace (50+ chats)
-    // saturates the connection pool and forces the main isolate to decode N
-    // payloads in a single tick — visible UI hitch. A 4-wide window keeps the
-    // network busy without starving the UI thread.
-    const int kHistoryConcurrency = 4;
-    final enriched = List<ConversationItem>.from(base);
     int idx = 0;
     Future<void> worker() async {
       while (true) {
@@ -363,12 +384,13 @@ class Conversations extends _$Conversations {
           final msgs = await api.getHistory(target, limit: 1);
           if (msgs.isNotEmpty) {
             final last = msgs.first;
-            enriched[mine] = item.copyWith(
+            pending[item.key] = item.copyWith(
               lastMid: last.mid,
               lastAt: last.createdAt,
               lastPreview: _previewFor(last),
               lastFromUid: last.fromUid,
             );
+            schedule();
           }
         } on DioException {
           // keep the un-enriched entry
@@ -380,10 +402,45 @@ class Conversations extends _$Conversations {
       List.generate(kHistoryConcurrency, (_) => worker()),
     );
 
-    return enriched;
+    // Final flush: cancel any pending timer and apply the leftover batch
+    // synchronously so the persisted state matches what's on screen.
+    flushTimer?.cancel();
+    if (pending.isNotEmpty) {
+      final current = state.valueOrNull;
+      if (current != null) {
+        final byKey = {for (final c in current) c.key: c};
+        for (final entry in pending.entries) {
+          byKey[entry.key] = entry.value;
+        }
+        final sorted = _sorted(byKey.values.toList());
+        state = AsyncData(sorted);
+        _persist(cache, sorted);
+      }
+    }
   }
 
   void _persist(MessageCache cache, List<ConversationItem> items) {
+    // Coalesce bursts of state updates (SSE replay, preview enrichment) into
+    // a single DB write. Each write triggers a jsonEncode pass (isolated via
+    // compute, but still allocates) so it pays to skip redundant ones.
+    _pendingPersistItems = items;
+    _pendingPersistCache = cache;
+    _persistTimer?.cancel();
+    _persistTimer = Timer(_persistDebounce, _flushPersist);
+  }
+
+  static const Duration _persistDebounce = Duration(milliseconds: 400);
+  Timer? _persistTimer;
+  List<ConversationItem>? _pendingPersistItems;
+  MessageCache? _pendingPersistCache;
+
+  void _flushPersist() {
+    _persistTimer = null;
+    final items = _pendingPersistItems;
+    final cache = _pendingPersistCache;
+    _pendingPersistItems = null;
+    _pendingPersistCache = null;
+    if (items == null || cache == null) return;
     cache.writeConversations(items.map((e) => e.toJson()).toList());
   }
 

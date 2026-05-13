@@ -48,6 +48,20 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
       final asyncConvs = ref.watch(conversationsProvider);
       final refreshing = ref.watch(conversationsRefreshingProvider);
 
+      // Pre-compute the per-build context shared by every visible tile:
+      // baseUrl + avatar metadata maps + the global "show online dots" flag.
+      // Lifting this out of _ConversationTile.build means presence flicker
+      // on user X no longer forces user Y's tile to re-watch 5 providers.
+      final userDir = ref.watch(userDirectoryProvider).valueOrNull ?? const {};
+      final groupDir = ref.watch(groupDirectoryProvider).valueOrNull ?? const {};
+      final serverState = ref.watch(serverStoreProvider).valueOrNull;
+      final baseUrl = serverState?.servers
+              .where((s) => s.id == serverState.currentServerId)
+              .firstOrNull
+              ?.baseUrl ??
+          '';
+      final showStatus = ref.watch(showOnlineStatusProvider);
+
       Widget listPanel = Container(
         width: isWide ? 268 : double.infinity,
         decoration: BoxDecoration(
@@ -99,8 +113,14 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           itemCount: filtered.length,
-                          itemBuilder: (context, i) =>
-                              _buildTile(context, filtered[i]),
+                          itemBuilder: (context, i) => _buildTile(
+                            context,
+                            filtered[i],
+                            userDir: userDir,
+                            groupDir: groupDir,
+                            baseUrl: baseUrl,
+                            showStatus: showStatus,
+                          ),
                         ),
                       );
                     },
@@ -137,7 +157,14 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     });
   }
 
-  Widget _buildTile(BuildContext context, ConversationItem item) {
+  Widget _buildTile(
+    BuildContext context,
+    ConversationItem item, {
+    required Map<int, dynamic> userDir,
+    required Map<int, dynamic> groupDir,
+    required String baseUrl,
+    required bool showStatus,
+  }) {
     final unread = ref.watch(unreadCountProvider(item.key));
 
     String routeId;
@@ -151,18 +178,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     final isWide = MediaQuery.of(context).size.width >= 700;
     final isSelected = isWide && _selectedId == routeId;
 
-    // Look up the per-target avatar metadata (uid/gid → avatar_updated_at)
-    // and turn it into a real URL on the active server. The directory
-    // providers serve from cache first so this is synchronous on warm start.
-    final userDir = ref.watch(userDirectoryProvider).valueOrNull ?? const {};
-    final groupDir = ref.watch(groupDirectoryProvider).valueOrNull ?? const {};
-    final serverState = ref.watch(serverStoreProvider).valueOrNull;
-    final baseUrl = serverState?.servers
-            .where((s) => s.id == serverState.currentServerId)
-            .firstOrNull
-            ?.baseUrl ??
-        '';
-
+    // Resolve avatar URL up front using the pre-fetched directory maps so
+    // we don't re-read three providers per tile per rebuild.
     String? avatarUrl;
     switch (item.key) {
       case UserConversationKey(uid: final uid):
@@ -179,18 +196,23 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         }
     }
 
-    return _ConversationTile(
-      item: item,
-      unread: unread,
-      isSelected: isSelected,
-      avatarUrl: avatarUrl,
-      onTap: () {
-        if (isWide) {
-          setState(() => _selectedId = routeId);
-        } else {
-          context.go('/home/chat/$routeId');
-        }
-      },
+    // RepaintBoundary isolates each tile in its own layer so a hover state
+    // or unread-count update doesn't repaint the whole list.
+    return RepaintBoundary(
+      child: _ConversationTile(
+        item: item,
+        unread: unread,
+        isSelected: isSelected,
+        avatarUrl: avatarUrl,
+        showStatus: showStatus,
+        onTap: () {
+          if (isWide) {
+            setState(() => _selectedId = routeId);
+          } else {
+            context.go('/home/chat/$routeId');
+          }
+        },
+      ),
     );
   }
 }
@@ -275,6 +297,7 @@ class _ConversationTile extends ConsumerWidget {
     required this.unread,
     required this.isSelected,
     required this.onTap,
+    required this.showStatus,
     this.avatarUrl,
   });
 
@@ -283,19 +306,22 @@ class _ConversationTile extends ConsumerWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final String? avatarUrl;
+  final bool showStatus;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bg = isSelected ? AppTokens.selected : Colors.transparent;
 
-    final showStatus = ref.watch(showOnlineStatusProvider);
-    final presence = ref.watch(presenceProvider);
     int? dmUid;
     if (!item.isChannel) {
       final key = item.key;
       if (key is UserConversationKey) dmUid = key.uid;
     }
-    final isOnline = dmUid != null && (presence[dmUid] ?? false);
+    // Slice the presence map by THIS user's uid only — when someone else
+    // toggles online, this select returns the same bool and skips rebuild.
+    final isOnline = dmUid != null
+        ? ref.watch(presenceProvider.select((m) => m[dmUid!] ?? false))
+        : false;
 
     return Material(
       color: bg,

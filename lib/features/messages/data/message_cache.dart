@@ -120,20 +120,49 @@ class MessageCache {
     );
   }
 
-  Future<List<Map<String, dynamic>>?> readConversations() async {
-    final raw = await _readMeta(_kConversationsKey);
-    if (raw == null || raw.isEmpty) return null;
+  // JSON encode/decode helpers — dispatch to a background isolate via
+  // `compute` so a big conversation/directory blob never blocks the UI
+  // thread on cold start or on SSE-driven writes.
+  //
+  // The threshold (`_kIsolateThreshold`) skips the isolate for tiny inputs:
+  // spawning an isolate has a fixed cost (~1–2ms on a phone), so for very
+  // small blobs it's faster to just decode inline.
+  static const int _kIsolateThreshold = 2048;
+
+  static Future<List<Map<String, dynamic>>?> _decodeListInIsolate(
+      String raw) async {
     try {
-      final list = jsonDecode(raw) as List<dynamic>;
-      return list.cast<Map<String, dynamic>>();
+      final list = raw.length < _kIsolateThreshold
+          ? _decodeList(raw)
+          : await compute(_decodeList, raw);
+      return list;
     } catch (_) {
       return null;
     }
   }
 
+  static Future<String> _encodeInIsolate(
+      List<Map<String, dynamic>> items) async {
+    // Quick-path the empty/very-small case inline.
+    if (items.length < 8) {
+      return jsonEncode(items);
+    }
+    return compute(_encodeList, items);
+  }
+
+  Future<List<Map<String, dynamic>>?> readConversations() async {
+    final raw = await _readMeta(_kConversationsKey);
+    if (raw == null || raw.isEmpty) return null;
+    // Decode off the UI isolate — these blobs can be 100+KB on busy
+    // workspaces and parsing them at first-paint time used to block the
+    // chat list from rendering on low-end phones.
+    return _decodeListInIsolate(raw);
+  }
+
   Future<void> writeConversations(List<Map<String, dynamic>> items) async {
     try {
-      await _writeMeta(_kConversationsKey, jsonEncode(items));
+      final encoded = await _encodeInIsolate(items);
+      await _writeMeta(_kConversationsKey, encoded);
     } catch (_) {
       // ignore — cache is best-effort
     }
@@ -142,17 +171,13 @@ class MessageCache {
   Future<List<Map<String, dynamic>>?> readUserDirectory() async {
     final raw = await _readMeta(_kUserDirectoryKey);
     if (raw == null || raw.isEmpty) return null;
-    try {
-      final list = jsonDecode(raw) as List<dynamic>;
-      return list.cast<Map<String, dynamic>>();
-    } catch (_) {
-      return null;
-    }
+    return _decodeListInIsolate(raw);
   }
 
   Future<void> writeUserDirectory(List<Map<String, dynamic>> users) async {
     try {
-      await _writeMeta(_kUserDirectoryKey, jsonEncode(users));
+      final encoded = await _encodeInIsolate(users);
+      await _writeMeta(_kUserDirectoryKey, encoded);
     } catch (_) {
       // ignore
     }
@@ -161,17 +186,13 @@ class MessageCache {
   Future<List<Map<String, dynamic>>?> readGroupDirectory() async {
     final raw = await _readMeta(_kGroupDirectoryKey);
     if (raw == null || raw.isEmpty) return null;
-    try {
-      final list = jsonDecode(raw) as List<dynamic>;
-      return list.cast<Map<String, dynamic>>();
-    } catch (_) {
-      return null;
-    }
+    return _decodeListInIsolate(raw);
   }
 
   Future<void> writeGroupDirectory(List<Map<String, dynamic>> groups) async {
     try {
-      await _writeMeta(_kGroupDirectoryKey, jsonEncode(groups));
+      final encoded = await _encodeInIsolate(groups);
+      await _writeMeta(_kGroupDirectoryKey, encoded);
     } catch (_) {
       // ignore
     }
@@ -308,4 +329,17 @@ Future<Database> _openDb() async {
 Future<MessageCache> messageCache(Ref ref) async {
   final db = await _openDb();
   return MessageCache._(db);
+}
+
+// ---------------------------------------------------------------------------
+// Top-level isolate entry points (must be top-level for `compute`).
+// ---------------------------------------------------------------------------
+
+List<Map<String, dynamic>> _decodeList(String raw) {
+  final list = jsonDecode(raw) as List<dynamic>;
+  return list.cast<Map<String, dynamic>>();
+}
+
+String _encodeList(List<Map<String, dynamic>> items) {
+  return jsonEncode(items);
 }

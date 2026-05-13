@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/sse_client.dart';
@@ -29,17 +28,8 @@ class MessageDispatcher extends _$MessageDispatcher {
   void build() {
     ref.listen(sseEventsProvider, (_, next) {
       next.whenData((event) {
-        if (kDebugMode) {
-          // ignore: avoid_print
-          print('Dispatcher event: ${event.runtimeType}');
-        }
         if (event is ChatEventChat) {
           final msg = event.message;
-          if (kDebugMode) {
-            // ignore: avoid_print
-            print(
-                'Dispatcher chat mid=${msg.mid} from=${msg.fromUid} target=${msg.target}');
-          }
 
           // Update the conversation list preview/timestamp.
           ref
