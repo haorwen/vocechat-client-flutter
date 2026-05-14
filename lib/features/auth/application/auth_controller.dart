@@ -38,6 +38,7 @@ class AuthController extends _$AuthController {
 
   @override
   Future<AuthState> build() async {
+    bootLog('5 AuthController.build: enter');
     // Listen — instead of watch — so updates to serverStore (e.g. login
     // replacing the local id with the server-issued one, or the user
     // changing servers) trigger an explicit re-bootstrap rather than
@@ -56,8 +57,12 @@ class AuthController extends _$AuthController {
       },
     );
     // Wait for ServerStore to finish loading before bootstrapping.
+    bootLog('6 AuthController.build: await serverStoreProvider.future');
     await ref.read(serverStoreProvider.notifier).future;
-    return await _bootstrap();
+    bootLog('7 AuthController.build: serverStore ready, calling _bootstrap');
+    final result = await _bootstrap();
+    bootLog('8 AuthController.build: _bootstrap returned ${result.runtimeType}');
+    return result;
   }
 
   /// Called at startup: reads stored tokens, refreshes if expired,

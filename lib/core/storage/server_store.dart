@@ -4,6 +4,8 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../utils/app_log.dart';
+
 part 'server_store.freezed.dart';
 part 'server_store.g.dart';
 
@@ -47,13 +49,17 @@ const _kCurrentServerKey = 'voce_current_server';
 class ServerStore extends _$ServerStore {
   @override
   Future<ServerState> build() async {
+    bootLog('2 ServerStore.build: SharedPreferences.getInstance');
     final prefs = await SharedPreferences.getInstance();
+    bootLog('3 ServerStore.build: prefs ready');
     final raw = prefs.getStringList(_kServersKey) ?? [];
     final servers = raw.map((e) {
       final map = jsonDecode(e) as Map<String, dynamic>;
       return ServerConfig.fromJson(map);
     }).toList();
     final currentId = prefs.getString(_kCurrentServerKey);
+    bootLog(
+        '4 ServerStore.build: done servers=${servers.length} currentId=$currentId');
     return ServerState(servers: servers, currentServerId: currentId);
   }
 

@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import '../../../core/utils/app_log.dart';
 import '../domain/message_models.dart';
 
 part 'message_cache.g.dart';
@@ -287,20 +288,25 @@ class MessageCache {
 // ---------------------------------------------------------------------------
 
 Future<Database> _openDb() async {
+  bootLog('10 _openDb: enter');
   // sqflite uses platform-native sqlite on Android/iOS/macOS, but Linux/
   // Windows need the FFI implementation explicitly.
   if (!kIsWeb &&
       (Platform.isLinux || Platform.isWindows)) {
+    bootLog('11 _openDb: sqfliteFfiInit');
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
 
+  bootLog('12 _openDb: getApplicationDocumentsDirectory');
   final dir = await getApplicationDocumentsDirectory();
   final dbPath = '${dir.path}${Platform.pathSeparator}voce_messages.db';
-  return openDatabase(
+  bootLog('13 _openDb: openDatabase path=$dbPath');
+  final db = await openDatabase(
     dbPath,
     version: 1,
     onCreate: (db, version) async {
+      bootLog('14 _openDb.onCreate: creating tables');
       await db.execute('''
         CREATE TABLE messages (
           target_key TEXT NOT NULL,
@@ -321,13 +327,18 @@ Future<Database> _openDb() async {
           value TEXT NOT NULL
         )
       ''');
+      bootLog('15 _openDb.onCreate: tables created');
     },
   );
+  bootLog('16 _openDb: openDatabase done');
+  return db;
 }
 
 @Riverpod(keepAlive: true)
 Future<MessageCache> messageCache(Ref ref) async {
+  bootLog('9 messageCacheProvider.build: enter');
   final db = await _openDb();
+  bootLog('17 messageCacheProvider.build: db ready');
   return MessageCache._(db);
 }
 

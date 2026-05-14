@@ -1,6 +1,22 @@
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
+/// Master switch for cold-start `[BOOT n]` diagnostic prints.
+///
+/// Flip to `false` to silence every `bootLog(...)` call in one go.
+/// Used to hunt down "loading freezes" — leave on until the offending
+/// step is identified, then turn off.
+const bool kBootDiagnostics = false;
+
+/// Print a `[BOOT n]` line gated by [kBootDiagnostics]. The compiler
+/// tree-shakes the body when the constant is `false`, so disabling it
+/// has zero runtime cost.
+void bootLog(String msg) {
+  if (!kBootDiagnostics) return;
+  // ignore: avoid_print
+  print('[BOOT] $msg');
+}
+
 /// Centralized logging.
 ///
 /// Defaults to silent for routine traffic so `flutter run` isn't drowned by
