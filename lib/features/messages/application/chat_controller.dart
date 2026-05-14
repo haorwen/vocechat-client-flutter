@@ -93,9 +93,11 @@ class ChatController extends _$ChatController {
 
     final current = state.valueOrNull;
     if (current == null) {
-      // Still loading — re-queue to wait until build() finishes.
-      _applyScheduled = true;
-      Future.microtask(_flushPendingApply);
+      // Still bootstrapping (build() hasn't resolved yet). DO NOT
+      // self-reschedule — microtasks have priority over normal events, and a
+      // self-reschedule loop while build() awaits the network/disk will
+      // starve the event loop indefinitely. Leave items in _pendingApply;
+      // build()'s own `_drainPending` call will absorb them once state lands.
       return;
     }
 

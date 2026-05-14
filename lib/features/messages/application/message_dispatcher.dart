@@ -6,7 +6,6 @@ import '../../../core/network/sse_client.dart';
 import '../../channels/application/conversation_providers.dart';
 import '../../contacts/application/presence_provider.dart';
 import '../domain/message_models.dart';
-import 'chat_controller.dart';
 
 part 'message_dispatcher.g.dart';
 
@@ -36,12 +35,18 @@ class MessageDispatcher extends _$MessageDispatcher {
               .read(conversationsProvider.notifier)
               .applyIncomingMessage(msg);
 
-          // Hand the message to the per-target chat controller. This both
-          // builds the controller if needed (so subsequent navigation finds
-          // it ready) and appends the message to its in-memory list.
-          ref
-              .read(chatControllerProvider(msg.target).notifier)
-              .applyIncomingMessage(msg);
+          // NOTE: We intentionally do NOT touch chatControllerProvider here.
+          // Each ChatController.build() already does `ref.listen(
+          // sseEventsProvider, ...)` for its target, so any mounted chat
+          // screen receives the message directly from SSE. Forcing
+          // `ref.read(chatControllerProvider(msg.target).notifier)` for
+          // every incoming message would spawn a fresh controller for every
+          // target that ever appeared in an SSE replay — on a cold start
+          // with `after_mid` catch-up that replays hundreds of messages
+          // across dozens of targets, this snowballs into hundreds of
+          // concurrent provider builds, each awaiting messageCache + disk
+          // reads, and saturates the microtask queue until the UI hangs.
+          // A fresh controller will catch up via getHistory on first open.
           return;
         }
         if (event is ChatEventServerConfigChanged) {

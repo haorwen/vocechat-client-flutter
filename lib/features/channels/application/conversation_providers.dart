@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/dio_client.dart';
+import '../../../core/utils/app_log.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../messages/data/message_api.dart';
 import '../../messages/data/message_cache.dart';
@@ -210,10 +211,12 @@ class Conversations extends _$Conversations {
 
   @override
   Future<List<ConversationItem>> build() async {
+    bootLog('20 Conversations.build: await messageCacheProvider');
     final cache = await ref.watch(messageCacheProvider.future);
     _cache = cache;
 
     // Step 1: paint from disk.
+    bootLog('21 Conversations.build: readConversations from disk');
     final cachedRaw = await cache.readConversations();
     List<ConversationItem>? cached;
     if (cachedRaw != null && cachedRaw.isNotEmpty) {
@@ -224,8 +227,11 @@ class Conversations extends _$Conversations {
     }
 
     if (cached != null && cached.isNotEmpty) {
+      bootLog('22 Conversations.build: returning ${cached.length} cached items');
       // Schedule refresh, return cached state.
       Future.microtask(() => _refreshFromNetwork(cache));
+      // Apply any SSE patches that arrived while we were reading from disk.
+      Future.microtask(_drainPendingPatches);
       return _sorted(cached);
     }
 
@@ -234,7 +240,9 @@ class Conversations extends _$Conversations {
     // getHistory fan-out) continues in the background and pushes incremental
     // state updates. On low-end devices over a slow network, this turns a
     // multi-second freeze into a sub-second paint.
+    bootLog('23 Conversations.build: no cache, awaiting _fetchBaseRoster');
     final base = await _fetchBaseRoster();
+    bootLog('24 Conversations.build: _fetchBaseRoster returned ${base.length} items');
     if (base.isNotEmpty) {
       // Persist the un-enriched roster synchronously so a kill-and-relaunch
       // before enrichment finishes still gets cached names on next start.
@@ -249,6 +257,8 @@ class Conversations extends _$Conversations {
         _enrichPreviews(cache, base);
       });
     }
+    // Drain SSE patches that piled up during _fetchBaseRoster.
+    Future.microtask(_drainPendingPatches);
     return _sorted(base);
   }
 
@@ -500,9 +510,13 @@ class Conversations extends _$Conversations {
 
     final current = state.valueOrNull;
     if (current == null) {
-      // Still bootstrapping — leave the patches queued.
-      _patchScheduled = true;
-      Future.microtask(_flushPendingPatches);
+      // Still bootstrapping (build() hasn't resolved yet). DO NOT re-schedule
+      // a microtask here — microtasks have priority over normal events, and
+      // a self-rescheduling loop while the network roster is being awaited
+      // will starve the event loop indefinitely (UI freezes, the awaited
+      // dio response never gets delivered, build() never resolves → infinite
+      // microtask spin). Leave the patches queued; the bootstrap path calls
+      // `_drainPendingPatches()` once `state` is populated.
       return;
     }
 
@@ -544,6 +558,15 @@ class Conversations extends _$Conversations {
         Future.microtask(() => _refreshFromNetwork(c));
       }
     }
+  }
+
+  /// Called by `build()` once `state` is populated, to apply any patches
+  /// that arrived during bootstrap. Idempotent.
+  void _drainPendingPatches() {
+    if (_pendingPatches.isEmpty) return;
+    if (_patchScheduled) return;
+    _patchScheduled = true;
+    Future.microtask(_flushPendingPatches);
   }
 
   static List<ConversationItem> _sorted(List<ConversationItem> items) {

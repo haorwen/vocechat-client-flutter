@@ -111,10 +111,14 @@ class VoceDioClient {
                 error.response!.statusCode! >= 500),
       ),
     );
-    // The full request/response body dump is the single biggest source of
-    // log spam during message sync. Only attach it when the user explicitly
-    // turns the network tag on (AppLog.enable(LogTag.network)).
-    if (AppLog.isEnabled(LogTag.network)) {
+    // Body dumps are intentionally OFF. A single /api/group or /api/user
+    // response can be tens of KB, and synchronously print()-ing that on the
+    // Windows desktop main isolate visibly freezes the UI (rotating cursor,
+    // "Not Responding"). The request line + status code interceptor above
+    // gives enough signal for routine debugging; flip the literal below to
+    // `true` only while actively investigating a specific request.
+    // ignore: dead_code
+    if (false) {
       _dio.interceptors.add(
         LogInterceptor(
           requestBody: true,
