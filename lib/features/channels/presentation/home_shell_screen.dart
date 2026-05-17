@@ -33,67 +33,71 @@ class HomeShellScreen extends ConsumerWidget {
     final location = GoRouterState.of(context).matchedLocation;
     final isChatting = RegExp(r'^/home/chat/').hasMatch(location);
 
-    return LayoutBuilder(builder: (context, constraints) {
-      final isWide = constraints.maxWidth >= _kWideBreakpoint;
-      if (isWide) {
-        return Scaffold(
-          backgroundColor: AppTokens.canvas,
-          body: Row(
-            children: [
-              _DesktopLeftRail(
-                currentIndex: navigationShell.currentIndex,
-                onDestinationSelected: _onDestinationSelected,
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      color: AppTokens.surface,
-                      child: navigationShell,
-                    ),
+    // Use MediaQuery instead of LayoutBuilder for the breakpoint: on desktop
+    // (Windows/macOS/Linux) resizing the window must flip the layout reliably,
+    // and a LayoutBuilder placed inside a Scaffold body can lag behind window
+    // metrics during a drag. MediaQuery.sizeOf rebuilds on every metric change.
+    final width = MediaQuery.sizeOf(context).width;
+    final isWide = width >= _kWideBreakpoint;
+
+    if (isWide) {
+      return Scaffold(
+        backgroundColor: AppTokens.canvas,
+        body: Row(
+          children: [
+            _DesktopLeftRail(
+              currentIndex: navigationShell.currentIndex,
+              onDestinationSelected: _onDestinationSelected,
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    color: AppTokens.surface,
+                    child: navigationShell,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-            ],
-          ),
-        );
-      }
-
-      return Scaffold(
-        body: SafeArea(
-          bottom: false,
-          child: navigationShell,
+            ),
+            const SizedBox(width: 12),
+          ],
         ),
-        bottomNavigationBar: isChatting
-            ? null
-            : NavigationBar(
-                selectedIndex: navigationShell.currentIndex,
-                onDestinationSelected: _onDestinationSelected,
-                indicatorColor:
-                    Theme.of(context).colorScheme.primaryContainer,
-                destinations: const [
-                  NavigationDestination(
-                    icon: Icon(Icons.chat_bubble_outline),
-                    selectedIcon: Icon(Icons.chat_bubble),
-                    label: 'Chats',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.people_outline),
-                    selectedIcon: Icon(Icons.people),
-                    label: 'Contacts',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.settings_outlined),
-                    selectedIcon: Icon(Icons.settings),
-                    label: 'Settings',
-                  ),
-                ],
-              ),
       );
-    });
+    }
+
+    return Scaffold(
+      body: SafeArea(
+        bottom: false,
+        child: navigationShell,
+      ),
+      bottomNavigationBar: isChatting
+          ? null
+          : NavigationBar(
+              selectedIndex: navigationShell.currentIndex,
+              onDestinationSelected: _onDestinationSelected,
+              indicatorColor:
+                  Theme.of(context).colorScheme.primaryContainer,
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.chat_bubble_outline),
+                  selectedIcon: Icon(Icons.chat_bubble),
+                  label: 'Chats',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.people_outline),
+                  selectedIcon: Icon(Icons.people),
+                  label: 'Contacts',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.settings_outlined),
+                  selectedIcon: Icon(Icons.settings),
+                  label: 'Settings',
+                ),
+              ],
+            ),
+    );
   }
 }
 

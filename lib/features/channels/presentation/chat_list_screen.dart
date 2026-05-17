@@ -43,123 +43,127 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      final isWide = constraints.maxWidth >= 700;
-      final asyncConvs = ref.watch(conversationsProvider);
-      final refreshing = ref.watch(conversationsRefreshingProvider);
+    // Drive the breakpoint off MediaQuery so desktop window resizes flip the
+    // single-pane / two-pane layout reliably (LayoutBuilder inside a Scaffold
+    // body can lag behind window metrics during a drag on Windows/Linux).
+    final width = MediaQuery.sizeOf(context).width;
+    final isWide = width >= 700;
+    final asyncConvs = ref.watch(conversationsProvider);
+    final refreshing = ref.watch(conversationsRefreshingProvider);
 
-      // Pre-compute the per-build context shared by every visible tile:
-      // baseUrl + avatar metadata maps + the global "show online dots" flag.
-      // Lifting this out of _ConversationTile.build means presence flicker
-      // on user X no longer forces user Y's tile to re-watch 5 providers.
-      final userDir = ref.watch(userDirectoryProvider).valueOrNull ?? const {};
-      final groupDir = ref.watch(groupDirectoryProvider).valueOrNull ?? const {};
-      final serverState = ref.watch(serverStoreProvider).valueOrNull;
-      final baseUrl = serverState?.servers
-              .where((s) => s.id == serverState.currentServerId)
-              .firstOrNull
-              ?.baseUrl ??
-          '';
-      final showStatus = ref.watch(showOnlineStatusProvider);
+    // Pre-compute the per-build context shared by every visible tile:
+    // baseUrl + avatar metadata maps + the global "show online dots" flag.
+    // Lifting this out of _ConversationTile.build means presence flicker
+    // on user X no longer forces user Y's tile to re-watch 5 providers.
+    final userDir = ref.watch(userDirectoryProvider).valueOrNull ?? const {};
+    final groupDir = ref.watch(groupDirectoryProvider).valueOrNull ?? const {};
+    final serverState = ref.watch(serverStoreProvider).valueOrNull;
+    final baseUrl = serverState?.servers
+            .where((s) => s.id == serverState.currentServerId)
+            .firstOrNull
+            ?.baseUrl ??
+        '';
+    final showStatus = ref.watch(showOnlineStatusProvider);
 
-      Widget listPanel = Container(
-        width: isWide ? 268 : double.infinity,
-        decoration: BoxDecoration(
-          color: AppTokens.surface,
-          border: isWide
-              ? const Border(
-                  right: BorderSide(color: AppTokens.gray200, width: 1),
-                )
-              : null,
-        ),
-        child: Column(
-          children: [
-            _ChatListHeader(
-              controller: _searchCtrl,
-              onChanged: (v) => setState(() => _query = v),
-            ),
-            Expanded(
-              child: Stack(
-                children: [
-                  asyncConvs.when(
-                    // Cold-start (no cached snapshot yet) — show capsule
-                    // centered while we await the first network paint.
-                    loading: () => const Center(
-                      child: LoadingCapsule(label: 'Loading chats…'),
-                    ),
-                    error: (e, _) =>
-                        Center(child: Text(safeText('Error: $e'))),
-                    data: (conversations) {
-                      final lowerQuery = _query.toLowerCase();
-                      final filtered = lowerQuery.isEmpty
-                          ? conversations
-                          : conversations
-                              .where((c) =>
-                                  c.name.toLowerCase().contains(lowerQuery))
-                              .toList();
-                      if (conversations.isEmpty) {
-                        return const _EmptyState(
-                            message: 'No conversations yet');
-                      }
-                      if (filtered.isEmpty) {
-                        return _EmptyState(
-                            message: 'No results for "$_query"');
-                      }
-                      return RefreshIndicator(
-                        onRefresh: () async => ref
-                            .read(conversationsProvider.notifier)
-                            .refresh(),
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, i) => _buildTile(
-                            context,
-                            filtered[i],
-                            userDir: userDir,
-                            groupDir: groupDir,
-                            baseUrl: baseUrl,
-                            showStatus: showStatus,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  // Background-refresh capsule: visible only when we already
-                  // have cached data on screen and a network refresh is in
-                  // flight. Hidden during the initial cold-start spinner.
-                  if (asyncConvs.hasValue)
-                    LoadingCapsuleOverlay(
-                      visible: refreshing,
-                      label: 'Updating…',
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-
-      if (!isWide) {
-        return listPanel;
-      }
-
-      return Row(
+    Widget listPanel = Container(
+      width: isWide ? 268 : double.infinity,
+      decoration: BoxDecoration(
+        color: AppTokens.surface,
+        border: isWide
+            ? const Border(
+                right: BorderSide(color: AppTokens.gray200, width: 1),
+              )
+            : null,
+      ),
+      child: Column(
         children: [
-          listPanel,
+          _ChatListHeader(
+            controller: _searchCtrl,
+            onChanged: (v) => setState(() => _query = v),
+          ),
           Expanded(
-            child: _selectedId != null
-                ? ChatScreen(id: _selectedId!)
-                : const _EmptyChatPlaceholder(),
+            child: Stack(
+              children: [
+                asyncConvs.when(
+                  // Cold-start (no cached snapshot yet) — show capsule
+                  // centered while we await the first network paint.
+                  loading: () => const Center(
+                    child: LoadingCapsule(label: 'Loading chats…'),
+                  ),
+                  error: (e, _) =>
+                      Center(child: Text(safeText('Error: $e'))),
+                  data: (conversations) {
+                    final lowerQuery = _query.toLowerCase();
+                    final filtered = lowerQuery.isEmpty
+                        ? conversations
+                        : conversations
+                            .where((c) =>
+                                c.name.toLowerCase().contains(lowerQuery))
+                            .toList();
+                    if (conversations.isEmpty) {
+                      return const _EmptyState(
+                          message: 'No conversations yet');
+                    }
+                    if (filtered.isEmpty) {
+                      return _EmptyState(
+                          message: 'No results for "$_query"');
+                    }
+                    return RefreshIndicator(
+                      onRefresh: () async => ref
+                          .read(conversationsProvider.notifier)
+                          .refresh(),
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, i) => _buildTile(
+                          context,
+                          filtered[i],
+                          isWide: isWide,
+                          userDir: userDir,
+                          groupDir: groupDir,
+                          baseUrl: baseUrl,
+                          showStatus: showStatus,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                // Background-refresh capsule: visible only when we already
+                // have cached data on screen and a network refresh is in
+                // flight. Hidden during the initial cold-start spinner.
+                if (asyncConvs.hasValue)
+                  LoadingCapsuleOverlay(
+                    visible: refreshing,
+                    label: 'Updating…',
+                  ),
+              ],
+            ),
           ),
         ],
-      );
-    });
+      ),
+    );
+
+    if (!isWide) {
+      return listPanel;
+    }
+
+    return Row(
+      children: [
+        listPanel,
+        Expanded(
+          child: _selectedId != null
+              ? ChatScreen(id: _selectedId!)
+              : const _EmptyChatPlaceholder(),
+        ),
+      ],
+    );
   }
 
   Widget _buildTile(
     BuildContext context,
     ConversationItem item, {
+    required bool isWide,
     required Map<int, dynamic> userDir,
     required Map<int, dynamic> groupDir,
     required String baseUrl,
@@ -175,7 +179,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         routeId = 'g-$gid';
     }
 
-    final isWide = MediaQuery.of(context).size.width >= 700;
     final isSelected = isWide && _selectedId == routeId;
 
     // Resolve avatar URL up front using the pre-fetched directory maps so
