@@ -46,6 +46,12 @@ class AppL10nEn extends AppL10n {
   String get chatToolMembers => 'Members';
 
   @override
+  String get chatToolEmpty => 'No content yet.';
+
+  @override
+  String get chatSearchHint => 'Search messages';
+
+  @override
   String get settingsTitle => 'Settings';
 
   @override

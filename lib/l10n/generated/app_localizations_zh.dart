@@ -46,6 +46,12 @@ class AppL10nZh extends AppL10n {
   String get chatToolMembers => '成员';
 
   @override
+  String get chatToolEmpty => '暂无内容';
+
+  @override
+  String get chatSearchHint => '搜索消息';
+
+  @override
   String get settingsTitle => '设置';
 
   @override

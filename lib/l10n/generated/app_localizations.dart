@@ -173,6 +173,18 @@ abstract class AppL10n {
   /// **'Members'**
   String get chatToolMembers;
 
+  /// No description provided for @chatToolEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No content yet.'**
+  String get chatToolEmpty;
+
+  /// No description provided for @chatSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search messages'**
+  String get chatSearchHint;
+
   /// No description provided for @settingsTitle.
   ///
   /// In en, this message translates to:

@@ -16,6 +16,8 @@
   "chatToolPin": "置顶",
   "chatToolSaved": "收藏",
   "chatToolMembers": "成员",
+  "chatToolEmpty": "暂无内容",
+  "chatSearchHint": "搜索消息",
 
 
   "settingsTitle": "设置",

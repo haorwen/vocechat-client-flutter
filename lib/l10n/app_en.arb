@@ -17,6 +17,8 @@
   "chatToolPin": "Pinned",
   "chatToolSaved": "Saved",
   "chatToolMembers": "Members",
+  "chatToolEmpty": "No content yet.",
+  "chatSearchHint": "Search messages",
 
 
   "settingsTitle": "Settings",
