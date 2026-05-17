@@ -8,6 +8,7 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../../contacts/application/user_directory_provider.dart';
 import '../application/chat_tools_provider.dart';
+import '../domain/message_models.dart';
 
 // ---------------------------------------------------------------------------
 // Chat tool overlays — Pinned / Saved / Members
@@ -503,4 +504,308 @@ String? _userAvatarUrl(WidgetRef ref, int uid, int? avatarUpdatedAt) {
   final base = server?.baseUrl ?? '';
   if (base.isEmpty) return null;
   return '$base/api/resource/avatar?uid=$uid';
+}
+
+// ---------------------------------------------------------------------------
+// Search overlay — web-style 320px dropdown anchored to the search icon.
+// Narrow screens: anchored to top of screen, full-width minus 16px gutter.
+// ---------------------------------------------------------------------------
+
+Future<void> showSearchOverlay(
+  BuildContext context, {
+  required GlobalKey anchorKey,
+  required List<ChatMessage> messages,
+  required Map<int, UserSummary> userDir,
+  required String? Function(int uid, int? avatarUpdatedAt) avatarUrlBuilder,
+  required Future<void> Function(int mid) onLocate,
+}) {
+  final renderBox = anchorKey.currentContext?.findRenderObject() as RenderBox?;
+  final screen = MediaQuery.sizeOf(context);
+  final isWide = screen.width >= 700;
+
+  // Compute anchor position so the dropdown opens right-aligned under the
+  // search icon (web behaviour: `top-full right-0`).
+  Offset anchorOffset = Offset.zero;
+  Size anchorSize = const Size(32, 32);
+  if (renderBox != null && renderBox.attached) {
+    anchorOffset = renderBox.localToGlobal(Offset.zero);
+    anchorSize = renderBox.size;
+  }
+
+  return showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'dismiss',
+    barrierColor: Colors.transparent,
+    pageBuilder: (ctx, _, __) {
+      final width = isWide ? 320.0 : screen.width - 16.0;
+      final left = isWide
+          ? (anchorOffset.dx + anchorSize.width - width)
+              .clamp(8.0, screen.width - width - 8.0)
+          : 8.0;
+      final top = isWide
+          ? (anchorOffset.dy + anchorSize.height + 6)
+          : MediaQuery.viewPaddingOf(ctx).top + 8.0;
+      return Stack(
+        children: [
+          Positioned(
+            left: left,
+            top: top,
+            width: width,
+            child: Material(
+              color: Colors.transparent,
+              child: _SearchPopover(
+                messages: messages,
+                userDir: userDir,
+                avatarUrlBuilder: avatarUrlBuilder,
+                onLocate: (mid) async {
+                  Navigator.of(ctx).pop();
+                  await onLocate(mid);
+                },
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+    transitionBuilder: (ctx, anim, _, child) {
+      return FadeTransition(
+        opacity: anim,
+        child: SlideTransition(
+          position: Tween(
+            begin: const Offset(0, -0.05),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+          child: child,
+        ),
+      );
+    },
+    transitionDuration: const Duration(milliseconds: 140),
+  );
+}
+
+class _SearchPopover extends StatefulWidget {
+  const _SearchPopover({
+    required this.messages,
+    required this.userDir,
+    required this.avatarUrlBuilder,
+    required this.onLocate,
+  });
+
+  final List<ChatMessage> messages;
+  final Map<int, UserSummary> userDir;
+  final String? Function(int uid, int? avatarUpdatedAt) avatarUrlBuilder;
+  final ValueChanged<int> onLocate;
+
+  @override
+  State<_SearchPopover> createState() => _SearchPopoverState();
+}
+
+class _SearchPopoverState extends State<_SearchPopover> {
+  final _ctrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  List<ChatMessage> _results() {
+    if (_query.trim().isEmpty) return const [];
+    final q = _query.toLowerCase();
+    final matches = widget.messages.where((m) {
+      final d = m.detail;
+      final text = switch (d) {
+        NormalMessageDetail() => d.content,
+        ReplyMessageDetail() => d.content,
+        _ => '',
+      };
+      // Plain text / markdown only — mirrors web's MessageSearch.
+      final ct = switch (d) {
+        NormalMessageDetail() => d.contentType,
+        ReplyMessageDetail() => d.contentType,
+        _ => '',
+      };
+      if (ct != 'text/plain' && ct != 'text/markdown') return false;
+      return text.toLowerCase().contains(q);
+    }).toList();
+    matches.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return matches.length > 50 ? matches.sublist(0, 50) : matches;
+  }
+
+  String _formatTime(int createdAt) {
+    if (createdAt == 0) return '';
+    final dt = DateTime.fromMillisecondsSinceEpoch(createdAt, isUtc: true)
+        .toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final messageDay = DateTime(dt.year, dt.month, dt.day);
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final mm = dt.minute.toString().padLeft(2, '0');
+    if (messageDay == today) return '$hh:$mm';
+    final mo = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    return '$mo-$d $hh:$mm';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    final results = _results();
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTokens.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTokens.gray200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: AppTokens.gray100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: TextField(
+                      controller: _ctrl,
+                      autofocus: true,
+                      onChanged: (v) => setState(() => _query = v),
+                      style: const TextStyle(
+                          fontSize: 14, color: Color(0xFF1C1C1E)),
+                      decoration: InputDecoration(
+                        isCollapsed: true,
+                        border: InputBorder.none,
+                        hintText: l.chatSearchHint,
+                        hintStyle: const TextStyle(
+                            fontSize: 14, color: AppTokens.gray400),
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close,
+                      size: 18, color: AppTokens.gray500),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: AppTokens.gray200),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 384),
+            child: _query.trim().isEmpty
+                ? const SizedBox.shrink()
+                : results.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          l.chatSearchEmpty,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 13, color: AppTokens.gray500),
+                        ),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        padding: EdgeInsets.zero,
+                        itemCount: results.length,
+                        separatorBuilder: (_, __) => const Divider(
+                            height: 1, color: AppTokens.gray100, indent: 60),
+                        itemBuilder: (ctx, i) {
+                          final msg = results[i];
+                          final user = widget.userDir[msg.fromUid];
+                          final name =
+                              user?.name ?? 'uid:${msg.fromUid}';
+                          final content = switch (msg.detail) {
+                            NormalMessageDetail() =>
+                              (msg.detail as NormalMessageDetail).content,
+                            ReplyMessageDetail() =>
+                              (msg.detail as ReplyMessageDetail).content,
+                            _ => '',
+                          };
+                          return InkWell(
+                            onTap: () => widget.onLocate(msg.mid),
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                  12, 10, 12, 10),
+                              child: Row(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  VoceAvatar(
+                                    name: name,
+                                    imageUrl: widget.avatarUrlBuilder(
+                                        msg.fromUid, user?.avatarUpdatedAt),
+                                    size: 32,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                safeText(name),
+                                                maxLines: 1,
+                                                overflow:
+                                                    TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight:
+                                                      FontWeight.w600,
+                                                  color: Color(0xFF1C1C1E),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              _formatTime(msg.createdAt),
+                                              style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppTokens.gray400),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          safeText(content),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Color(0xFF4B5563),
+                                              height: 1.4),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
 }

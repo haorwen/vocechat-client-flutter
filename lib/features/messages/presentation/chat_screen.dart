@@ -28,10 +28,9 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _textCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
-  final _searchCtrl = TextEditingController();
+  final _searchAnchorKey = GlobalKey();
+  final Map<int, GlobalKey> _messageKeys = {};
   bool _canSend = false;
-  bool _searching = false;
-  String _query = '';
 
   late MessageTarget _target;
 
@@ -61,7 +60,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void dispose() {
     _textCtrl.dispose();
-    _searchCtrl.dispose();
     _scrollCtrl.removeListener(_onScroll);
     _scrollCtrl.dispose();
     super.dispose();
@@ -137,24 +135,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return '$base/api/resource/group_avatar?gid=$gid';
   }
 
-  void _toggleSearch() {
-    setState(() {
-      _searching = !_searching;
-      if (!_searching) {
-        _searchCtrl.clear();
-        _query = '';
-      }
-    });
+  Future<void> _openSearchOverlay() async {
+    final messages =
+        ref.read(chatControllerProvider(_target)).valueOrNull ?? const [];
+    await showSearchOverlay(
+      context,
+      anchorKey: _searchAnchorKey,
+      messages: messages,
+      userDir: ref.read(userDirectoryProvider).valueOrNull ?? const {},
+      avatarUrlBuilder: _avatarUrl,
+      onLocate: _scrollToMid,
+    );
   }
 
-  bool _messageMatches(ChatMessage m, String q) {
-    final detail = m.detail;
-    final text = switch (detail) {
-      NormalMessageDetail() => detail.content,
-      ReplyMessageDetail() => detail.content,
-      _ => '',
-    };
-    return text.toLowerCase().contains(q.toLowerCase());
+  Future<void> _scrollToMid(int mid) async {
+    final key = _messageKeys[mid];
+    if (key == null) return;
+    final ctx = key.currentContext;
+    if (ctx == null) return;
+    await Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 280),
+      alignment: 0.3,
+      curve: Curves.easeOut,
+    );
   }
 
   void _showToolPanel(ChatTool tool) {
@@ -245,11 +249,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       isOnline: dmOnline,
                       showStatus: showStatus,
                       showMoreMenu: !isWide,
-                      searching: _searching,
-                      searchController: _searchCtrl,
-                      onSearch: _toggleSearch,
-                      onSearchChanged: (v) => setState(() => _query = v),
-                      onSearchClose: _toggleSearch,
+                      searchAnchorKey: _searchAnchorKey,
+                      onSearch: _openSearchOverlay,
                       onPin: isChannel
                           ? () => _showToolPanel(ChatTool.pin)
                           : null,
@@ -267,12 +268,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             child:
                                 Text(safeText(l.errorPrefix(e.toString())))),
                         data: (messages) {
-                          final filtered = _query.isEmpty
-                              ? messages
-                              : messages
-                                  .where((m) => _messageMatches(m, _query))
-                                  .toList();
-                          if (filtered.isEmpty) {
+                          if (messages.isEmpty) {
                             return const _EmptyConversation();
                           }
                           return ListView.builder(
@@ -280,41 +276,46 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             reverse: true,
                             padding:
                                 const EdgeInsets.fromLTRB(8, 16, 8, 16),
-                            itemCount: filtered.length,
+                            itemCount: messages.length,
                             findChildIndexCallback: (key) {
                               if (key is ValueKey<int>) {
-                                final idx = filtered
+                                final idx = messages
                                     .indexWhere((m) => m.mid == key.value);
                                 return idx >= 0 ? idx : null;
                               }
                               return null;
                             },
                             itemBuilder: (context, index) {
-                              final msg = filtered[index];
+                              final msg = messages[index];
                               final showSep =
-                                  _showDateSeparator(filtered, index);
+                                  _showDateSeparator(messages, index);
+                              final rowKey = _messageKeys.putIfAbsent(
+                                  msg.mid, GlobalKey.new);
                               return KeyedSubtree(
                                 key: ValueKey<int>(msg.mid),
                                 child: Column(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
-                                    _MessageRow(
-                                      message: msg,
-                                      currentUid: currentUid,
-                                      status: statuses[msg.mid],
-                                      userDir: userDir,
-                                      avatarUrlBuilder: _avatarUrl,
-                                      target: _target,
-                                      onRetry: msg.mid < 0 &&
-                                              statuses[msg.mid] ==
-                                                  MessageSendStatus.failed
-                                          ? () => ref
-                                              .read(chatControllerProvider(
-                                                      _target)
-                                                  .notifier)
-                                              .retrySend(msg.mid)
-                                          : null,
+                                    KeyedSubtree(
+                                      key: rowKey,
+                                      child: _MessageRow(
+                                        message: msg,
+                                        currentUid: currentUid,
+                                        status: statuses[msg.mid],
+                                        userDir: userDir,
+                                        avatarUrlBuilder: _avatarUrl,
+                                        target: _target,
+                                        onRetry: msg.mid < 0 &&
+                                                statuses[msg.mid] ==
+                                                    MessageSendStatus.failed
+                                            ? () => ref
+                                                .read(chatControllerProvider(
+                                                        _target)
+                                                    .notifier)
+                                                .retrySend(msg.mid)
+                                            : null,
+                                      ),
                                     ),
                                     if (showSep)
                                       _DateSeparator(
@@ -372,11 +373,8 @@ class _ChatHeader extends StatelessWidget {
     this.isOnline = false,
     this.showStatus = true,
     this.showMoreMenu = false,
-    this.searching = false,
-    this.searchController,
+    this.searchAnchorKey,
     this.onSearch,
-    this.onSearchChanged,
-    this.onSearchClose,
     this.onPin,
     this.onSaved,
     this.onMembers,
@@ -390,11 +388,8 @@ class _ChatHeader extends StatelessWidget {
   final bool isOnline;
   final bool showStatus;
   final bool showMoreMenu;
-  final bool searching;
-  final TextEditingController? searchController;
+  final Key? searchAnchorKey;
   final VoidCallback? onSearch;
-  final ValueChanged<String>? onSearchChanged;
-  final VoidCallback? onSearchClose;
   final VoidCallback? onPin;
   final VoidCallback? onSaved;
   final VoidCallback? onMembers;
@@ -411,164 +406,131 @@ class _ChatHeader extends StatelessWidget {
         ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: searching
-          ? Row(
-              children: [
-                const Icon(Icons.search,
-                    size: 20, color: AppTokens.gray500),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: searchController,
-                    autofocus: true,
-                    onChanged: onSearchChanged,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF1C1C1E),
-                    ),
-                    decoration: InputDecoration(
-                      hintText: l.chatSearchHint,
-                      hintStyle: const TextStyle(
-                        fontSize: 14,
-                        color: AppTokens.gray400,
-                      ),
-                      isCollapsed: true,
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close,
-                      size: 20, color: AppTokens.gray500),
-                  onPressed: onSearchClose,
-                  tooltip: l.actionCancel,
-                ),
-              ],
+      child: Row(
+        children: [
+          if (canPop)
+            IconButton(
+              icon: const Icon(Icons.arrow_back,
+                  size: 20, color: AppTokens.gray700),
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
+          if (isChannel)
+            const Padding(
+              padding: EdgeInsets.only(right: 4),
+              child: Icon(Icons.tag,
+                  size: 20, color: Color(0xFF1C1C1E)),
             )
-          : Row(
+          else
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Stack(
+                children: [
+                  VoceAvatar(
+                      name: title, imageUrl: avatarUrl, size: 28),
+                  if (showStatus)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: isOnline
+                              ? AppTokens.successDot
+                              : AppTokens.gray400,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: AppTokens.surface, width: 1.5),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: Row(
               children: [
-                if (canPop)
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back,
-                        size: 20, color: AppTokens.gray700),
-                    onPressed: () => Navigator.of(context).maybePop(),
-                  ),
-                if (isChannel)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 4),
-                    child: Icon(Icons.tag,
-                        size: 20, color: Color(0xFF1C1C1E)),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Stack(
-                      children: [
-                        VoceAvatar(
-                            name: title, imageUrl: avatarUrl, size: 28),
-                        if (showStatus)
-                          Positioned(
-                            right: 0,
-                            bottom: 0,
-                            child: Container(
-                              width: 9,
-                              height: 9,
-                              decoration: BoxDecoration(
-                                color: isOnline
-                                    ? AppTokens.successDot
-                                    : AppTokens.gray400,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                    color: AppTokens.surface, width: 1.5),
-                              ),
-                            ),
-                          ),
-                      ],
+                Flexible(
+                  child: Text(
+                    safeText(title),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1C1C1E),
+                      height: 24 / 16,
                     ),
                   ),
-                Expanded(
-                  child: Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          safeText(title),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1C1C1E),
-                            height: 24 / 16,
-                          ),
-                        ),
+                ),
+                if (subtitle != null && subtitle!.isNotEmpty) ...[
+                  const SizedBox(width: 16),
+                  Flexible(
+                    child: Text(
+                      safeText(subtitle!),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFF616161),
+                        height: 24 / 16,
                       ),
-                      if (subtitle != null && subtitle!.isNotEmpty) ...[
-                        const SizedBox(width: 16),
-                        Flexible(
-                          child: Text(
-                            safeText(subtitle!),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Color(0xFF616161),
-                              height: 24 / 16,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          IconButton(
+            key: searchAnchorKey,
+            icon: const Icon(Icons.search,
+                size: 20, color: AppTokens.gray500),
+            onPressed: onSearch,
+            tooltip: l.actionSearch,
+          ),
+          if (showMoreMenu)
+            PopupMenuButton<ChatTool>(
+              icon: const Icon(Icons.more_horiz,
+                  size: 20, color: AppTokens.gray500),
+              tooltip: l.actionMore,
+              onSelected: (tool) {
+                switch (tool) {
+                  case ChatTool.pin:
+                    onPin?.call();
+                  case ChatTool.saved:
+                    onSaved?.call();
+                  case ChatTool.members:
+                    onMembers?.call();
+                }
+              },
+              itemBuilder: (context) => [
+                if (isChannel)
+                  PopupMenuItem(
+                    value: ChatTool.pin,
+                    child: _ChatToolMenuRow(
+                      icon: Icons.push_pin_outlined,
+                      label: l.chatToolPin,
+                    ),
+                  ),
+                PopupMenuItem(
+                  value: ChatTool.saved,
+                  child: _ChatToolMenuRow(
+                    icon: Icons.bookmark_outline,
+                    label: l.chatToolSaved,
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.search,
-                      size: 20, color: AppTokens.gray500),
-                  onPressed: onSearch,
-                  tooltip: l.actionSearch,
-                ),
-                if (showMoreMenu)
-                  PopupMenuButton<ChatTool>(
-                    icon: const Icon(Icons.more_horiz,
-                        size: 20, color: AppTokens.gray500),
-                    tooltip: l.actionMore,
-                    onSelected: (tool) {
-                      switch (tool) {
-                        case ChatTool.pin:
-                          onPin?.call();
-                        case ChatTool.saved:
-                          onSaved?.call();
-                        case ChatTool.members:
-                          onMembers?.call();
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      if (isChannel)
-                        PopupMenuItem(
-                          value: ChatTool.pin,
-                          child: _ChatToolMenuRow(
-                            icon: Icons.push_pin_outlined,
-                            label: l.chatToolPin,
-                          ),
-                        ),
-                      PopupMenuItem(
-                        value: ChatTool.saved,
-                        child: _ChatToolMenuRow(
-                          icon: Icons.bookmark_outline,
-                          label: l.chatToolSaved,
-                        ),
-                      ),
-                      if (isChannel)
-                        PopupMenuItem(
-                          value: ChatTool.members,
-                          child: _ChatToolMenuRow(
-                            icon: Icons.people_outline,
-                            label: l.chatToolMembers,
-                          ),
-                        ),
-                    ],
+                if (isChannel)
+                  PopupMenuItem(
+                    value: ChatTool.members,
+                    child: _ChatToolMenuRow(
+                      icon: Icons.people_outline,
+                      label: l.chatToolMembers,
+                    ),
                   ),
               ],
             ),
+        ],
+      ),
     );
   }
 }
