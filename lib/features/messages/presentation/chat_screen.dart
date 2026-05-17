@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -31,6 +33,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _searchAnchorKey = GlobalKey();
   final Map<int, GlobalKey> _messageKeys = {};
   bool _canSend = false;
+  int? _highlightMid;
+  Timer? _highlightTimer;
 
   late MessageTarget _target;
 
@@ -60,6 +64,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void dispose() {
     _textCtrl.dispose();
+    _highlightTimer?.cancel();
     _scrollCtrl.removeListener(_onScroll);
     _scrollCtrl.dispose();
     super.dispose();
@@ -159,6 +164,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       alignment: 0.3,
       curve: Curves.easeOut,
     );
+    if (!mounted) return;
+    setState(() => _highlightMid = mid);
+    _highlightTimer?.cancel();
+    _highlightTimer = Timer(const Duration(milliseconds: 1600), () {
+      if (!mounted) return;
+      setState(() => _highlightMid = null);
+    });
   }
 
   void _showToolPanel(ChatTool tool) {
@@ -306,6 +318,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                         userDir: userDir,
                                         avatarUrlBuilder: _avatarUrl,
                                         target: _target,
+                                        highlighted: msg.mid == _highlightMid,
                                         onRetry: msg.mid < 0 &&
                                                 statuses[msg.mid] ==
                                                     MessageSendStatus.failed
@@ -707,6 +720,7 @@ class _MessageRow extends ConsumerStatefulWidget {
     required this.target,
     this.status,
     this.onRetry,
+    this.highlighted = false,
   });
 
   final ChatMessage message;
@@ -716,6 +730,7 @@ class _MessageRow extends ConsumerStatefulWidget {
   final String? Function(int uid, int? avatarUpdatedAt) avatarUrlBuilder;
   final MessageTarget target;
   final VoidCallback? onRetry;
+  final bool highlighted;
 
   @override
   ConsumerState<_MessageRow> createState() => _MessageRowState();
@@ -798,9 +813,14 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
     }
 
     final pinned = _isPinned;
-    final rowBg = pinned ? AppTokens.primary50 : Colors.transparent;
+    final highlighted = widget.highlighted;
+    final rowBg = highlighted
+        ? AppTokens.gray200
+        : (pinned ? AppTokens.primary50 : Colors.transparent);
 
-    final mainRow = Container(
+    final mainRow = AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
       decoration: BoxDecoration(
         color: rowBg,
         borderRadius: BorderRadius.circular(8),
