@@ -97,11 +97,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       const authScreens = ['/login', '/register', '/splash'];
       if (authScreens.contains(location)) return '/home';
 
-      // Validate nested chat route IDs — redirect invalid ones to /home
+      // Validate nested chat route IDs — redirect invalid ones to /home.
+      // Tile IDs are emitted as `u-<uid>` / `g-<gid>`, so the hyphen is part
+      // of the canonical shape and the regex must include it.
       final chatMatch = RegExp(r'^/home/chat/(.+)$').firstMatch(location);
       if (chatMatch != null) {
         final id = chatMatch.group(1)!;
-        if (!RegExp(r'^[ug]\d+$').hasMatch(id)) return '/home';
+        if (!RegExp(r'^[ug]-\d+$').hasMatch(id)) return '/home';
       }
 
       return null;

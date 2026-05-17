@@ -63,7 +63,10 @@ class HomeShellScreen extends ConsumerWidget {
       }
 
       return Scaffold(
-        body: navigationShell,
+        body: SafeArea(
+          bottom: false,
+          child: navigationShell,
+        ),
         bottomNavigationBar: isChatting
             ? null
             : NavigationBar(
