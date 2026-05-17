@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/i18n/locale_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/safe_text.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 
@@ -16,16 +18,29 @@ import '../../auth/application/auth_controller.dart';
 // ---------------------------------------------------------------------------
 
 enum _SettingsNav {
-  myAccount('My Account', 'general'),
-  notifications('Notifications', 'general'),
-  appearance('Appearance', 'general'),
-  storage('Storage & Data', 'general'),
-  about('About', 'about');
+  myAccount('general'),
+  notifications('general'),
+  appearance('general'),
+  storage('general'),
+  about('about');
 
-  const _SettingsNav(this.title, this.group);
-  final String title;
+  const _SettingsNav(this.group);
   final String group;
+
+  String title(AppL10n l) => switch (this) {
+        _SettingsNav.myAccount => l.settingsMyAccount,
+        _SettingsNav.notifications => l.settingsNotifications,
+        _SettingsNav.appearance => l.settingsAppearance,
+        _SettingsNav.storage => l.settingsStorage,
+        _SettingsNav.about => l.settingsAbout,
+      };
 }
+
+String _groupLabel(AppL10n l, String key) => switch (key) {
+      'general' => l.settingsGroupGeneral,
+      'about' => l.settingsGroupAbout,
+      _ => key,
+    };
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -46,16 +61,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _confirmLogout() {
+    final l = AppL10n.of(context);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Log out?'),
-        content: const Text(
-            'You will need to sign in again to access this server.'),
+        title: Text(l.settingsLogoutConfirmTitle),
+        content: Text(l.settingsLogoutConfirmContent),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: Text(l.actionCancel),
           ),
           TextButton(
             onPressed: () {
@@ -63,7 +78,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _logout();
             },
             style: TextButton.styleFrom(foregroundColor: AppTokens.error),
-            child: const Text('Log out'),
+            child: Text(l.settingsLogout),
           ),
         ],
       ),
@@ -97,6 +112,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildNarrow(BuildContext context) {
+    final l = AppL10n.of(context);
     return Container(
       color: AppTokens.surface,
       child: ListView(
@@ -106,7 +122,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
               child: Text(
-                group.toUpperCase(),
+                _groupLabel(l, group).toUpperCase(),
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -117,7 +133,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             for (final n in _SettingsNav.values.where((x) => x.group == group))
               ListTile(
-                title: Text(n.title),
+                title: Text(n.title(l)),
                 trailing: const Icon(Icons.chevron_right, size: 18),
                 onTap: () {
                   setState(() => _nav = n);
@@ -128,7 +144,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       child: Scaffold(
                         backgroundColor: AppTokens.surface,
                         appBar: AppBar(
-                          title: Text(n.title),
+                          title: Text(n.title(l)),
                           leading: IconButton(
                             icon: const Icon(Icons.arrow_back),
                             onPressed: () => Navigator.of(ctx).pop(),
@@ -146,9 +162,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
           const Divider(height: 32),
           ListTile(
-            title: const Text(
-              'Log out',
-              style: TextStyle(
+            title: Text(
+              l.settingsLogout,
+              style: const TextStyle(
                 color: AppTokens.error,
                 fontWeight: FontWeight.w600,
               ),
@@ -170,6 +186,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildBody({bool showHeader = true}) {
+    final l = AppL10n.of(context);
     final authState = ref.watch(authControllerProvider);
     final user = authState.valueOrNull;
     final String userName =
@@ -201,11 +218,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         );
       case _SettingsNav.appearance:
         final mode = ref.watch(themeModeNotifierProvider);
+        final localeSel =
+            ref.watch(localeNotifierProvider.notifier).selection;
+        // Also watch the underlying Locale? state so the radio updates when
+        // the persisted preference loads asynchronously on first launch.
+        ref.watch(localeNotifierProvider);
         content = _AppearancePane(
           themeMode: mode,
-          onChanged: (m) => ref
+          onThemeChanged: (m) => ref
               .read(themeModeNotifierProvider.notifier)
               .setMode(m),
+          locale: localeSel,
+          onLocaleChanged: (loc) => ref
+              .read(localeNotifierProvider.notifier)
+              .setLocale(loc),
         );
       case _SettingsNav.storage:
         content = const _StoragePane();
@@ -220,7 +246,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           if (showHeader) ...[
             Text(
-              _nav.title,
+              _nav.title(l),
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
@@ -255,6 +281,7 @@ class _SettingsRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     final groups = <String, List<_SettingsNav>>{};
     for (final n in _SettingsNav.values) {
       (groups[n.group] ??= []).add(n);
@@ -268,11 +295,11 @@ class _SettingsRail extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(0, 0, 0, 32),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 0, 0, 32),
               child: Text(
-                'Settings',
-                style: TextStyle(
+                l.settingsTitle,
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: AppTokens.gray800,
@@ -283,7 +310,7 @@ class _SettingsRail extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
                 child: Text(
-                  entry.key,
+                  _groupLabel(l, entry.key),
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -293,7 +320,7 @@ class _SettingsRail extends StatelessWidget {
               ),
               for (final n in entry.value)
                 _RailItem(
-                  title: n.title,
+                  title: n.title(l),
                   isSelected: n == current,
                   onTap: () => onSelect(n),
                 ),
@@ -306,9 +333,9 @@ class _SettingsRail extends StatelessWidget {
               child: Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: const Text(
-                  'Log out',
-                  style: TextStyle(
+                child: Text(
+                  l.settingsLogout,
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppTokens.error,
@@ -511,6 +538,7 @@ class _MyAccountPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -544,18 +572,18 @@ class _MyAccountPane extends StatelessWidget {
             ),
           ),
           _LabeledRow(
-            label: 'Email',
+            label: l.accountEmail,
             value: safeText(email).isEmpty ? '—' : safeText(email),
           ),
           _LabeledRow(
-            label: 'Username',
+            label: l.accountUsername,
             value: '${safeText(name)}  #$uid',
-            trailing: _SecondaryButton(label: 'Edit', onTap: () {}),
+            trailing: _SecondaryButton(label: l.actionEdit, onTap: () {}),
           ),
           _LabeledRow(
-            label: 'Password',
-            value: '*********',
-            trailing: _SecondaryButton(label: 'Edit', onTap: () {}),
+            label: l.accountPassword,
+            value: l.accountPasswordMasked,
+            trailing: _SecondaryButton(label: l.actionEdit, onTap: () {}),
           ),
         ],
       ),
@@ -586,27 +614,28 @@ class _NotificationsPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SwitchTile(
-            title: 'Push notifications',
-            subtitle: 'Get notified about new messages and mentions.',
+            title: l.notificationsPush,
+            subtitle: l.notificationsPushSubtitle,
             value: notificationsEnabled,
             onChanged: onNotificationsChanged,
           ),
           const _CardDivider(),
           _SwitchTile(
-            title: 'Notification sounds',
-            subtitle: 'Play a chime on incoming messages.',
+            title: l.notificationsSound,
+            subtitle: l.notificationsSoundSubtitle,
             value: soundEnabled,
             onChanged: notificationsEnabled ? onSoundChanged : null,
           ),
           const _CardDivider(),
           _SwitchTile(
-            title: 'Mentions only',
-            subtitle: 'Only notify for @mentions.',
+            title: l.notificationsMentionsOnly,
+            subtitle: l.notificationsMentionsOnlySubtitle,
             value: mentionOnlyMode,
             onChanged:
                 notificationsEnabled ? onMentionOnlyChanged : null,
@@ -684,62 +713,110 @@ class _CardDivider extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// _AppearancePane — theme selector (light/system/dark) as radio rows.
+// _AppearancePane — theme selector + language selector.
 // ---------------------------------------------------------------------------
 
 class _AppearancePane extends StatelessWidget {
   const _AppearancePane({
     required this.themeMode,
-    required this.onChanged,
+    required this.onThemeChanged,
+    required this.locale,
+    required this.onLocaleChanged,
   });
 
   final ThemeMode themeMode;
-  final ValueChanged<ThemeMode> onChanged;
+  final ValueChanged<ThemeMode> onThemeChanged;
+  final AppLocale locale;
+  final ValueChanged<AppLocale> onLocaleChanged;
 
   @override
   Widget build(BuildContext context) {
-    return _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(bottom: 8),
-            child: Text(
-              'THEME',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppTokens.gray500,
-                letterSpacing: 0.6,
+    final l = AppL10n.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  l.appearanceTheme,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTokens.gray500,
+                    letterSpacing: 0.6,
+                  ),
+                ),
               ),
-            ),
+              _OptionTile(
+                icon: Icons.light_mode_outlined,
+                label: l.appearanceLight,
+                isSelected: themeMode == ThemeMode.light,
+                onTap: () => onThemeChanged(ThemeMode.light),
+              ),
+              _OptionTile(
+                icon: Icons.brightness_auto_outlined,
+                label: l.appearanceSystem,
+                isSelected: themeMode == ThemeMode.system,
+                onTap: () => onThemeChanged(ThemeMode.system),
+              ),
+              _OptionTile(
+                icon: Icons.dark_mode_outlined,
+                label: l.appearanceDark,
+                isSelected: themeMode == ThemeMode.dark,
+                onTap: () => onThemeChanged(ThemeMode.dark),
+              ),
+            ],
           ),
-          _ThemeOption(
-            icon: Icons.light_mode_outlined,
-            label: 'Light',
-            isSelected: themeMode == ThemeMode.light,
-            onTap: () => onChanged(ThemeMode.light),
+        ),
+        const SizedBox(height: 16),
+        _Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  l.appearanceLanguage,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTokens.gray500,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ),
+              _OptionTile(
+                icon: Icons.language_outlined,
+                label: l.languageSystem,
+                isSelected: locale == AppLocale.system,
+                onTap: () => onLocaleChanged(AppLocale.system),
+              ),
+              _OptionTile(
+                icon: Icons.translate_outlined,
+                label: l.languageEnglish,
+                isSelected: locale == AppLocale.english,
+                onTap: () => onLocaleChanged(AppLocale.english),
+              ),
+              _OptionTile(
+                icon: Icons.translate_outlined,
+                label: l.languageChinese,
+                isSelected: locale == AppLocale.chinese,
+                onTap: () => onLocaleChanged(AppLocale.chinese),
+              ),
+            ],
           ),
-          _ThemeOption(
-            icon: Icons.brightness_auto_outlined,
-            label: 'System default',
-            isSelected: themeMode == ThemeMode.system,
-            onTap: () => onChanged(ThemeMode.system),
-          ),
-          _ThemeOption(
-            icon: Icons.dark_mode_outlined,
-            label: 'Dark',
-            isSelected: themeMode == ThemeMode.dark,
-            onTap: () => onChanged(ThemeMode.dark),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-class _ThemeOption extends StatelessWidget {
-  const _ThemeOption({
+class _OptionTile extends StatelessWidget {
+  const _OptionTile({
     required this.icon,
     required this.label,
     required this.isSelected,
@@ -816,23 +893,24 @@ class _StoragePane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _LabeledRow(
-            label: 'Storage usage',
+            label: l.storageUsage,
             value: '42 MB',
           ),
           _LabeledRow(
-            label: 'Auto-download media',
-            value: 'Wi-Fi only',
-            trailing: _SecondaryButton(label: 'Change', onTap: () {}),
+            label: l.storageAutoDownload,
+            value: l.storageWifiOnly,
+            trailing: _SecondaryButton(label: l.actionChange, onTap: () {}),
           ),
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: _SecondaryButton(
-              label: 'Clear cache',
+              label: l.storageClearCache,
               icon: Icons.delete_sweep_outlined,
               onTap: () {},
             ),
@@ -852,25 +930,26 @@ class _AboutPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _LabeledRow(label: 'App version', value: '1.0.0'),
+          _LabeledRow(label: l.aboutAppVersion, value: '1.0.0'),
           _LabeledRow(
-            label: 'Website',
+            label: l.aboutWebsite,
             value: 'voce.chat',
             trailing: _SecondaryButton(
-              label: 'Open',
+              label: l.actionOpen,
               icon: Icons.open_in_new_outlined,
               onTap: () {},
             ),
           ),
           _LabeledRow(
-            label: 'Report a bug',
-            value: 'Help us improve VoceChat.',
+            label: l.aboutReportBug,
+            value: l.aboutReportBugSubtitle,
             trailing: _SecondaryButton(
-              label: 'Contact',
+              label: l.actionContact,
               onTap: () {},
             ),
           ),

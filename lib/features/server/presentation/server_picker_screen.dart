@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/utils/safe_text.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/empty_state_view.dart';
 import '../../../shared/widgets/primary_button.dart';
 
@@ -43,13 +44,14 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppL10n.of(context);
     final serverState = ref.watch(serverStoreProvider);
 
     return serverState.when(
       loading: () => const Scaffold(
           body: Center(child: CircularProgressIndicator())),
       error: (e, _) =>
-          Scaffold(body: Center(child: Text(safeText('Error: $e')))),
+          Scaffold(body: Center(child: Text(safeText(l.errorPrefix(e.toString()))))),
       data: (state) {
         final servers = state.servers;
         final selectedIndex = _selectedId != null
@@ -59,16 +61,15 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Select Server'),
+            title: Text(l.serverPickerTitle),
             centerTitle: false,
           ),
           body: servers.isEmpty
               ? EmptyStateView(
                   icon: Icons.dns_outlined,
-                  title: 'Connect to a VoceChat server',
-                  subtitle:
-                      'Add a server to get started chatting with your team.',
-                  actionLabel: 'Add your first server',
+                  title: l.serverPickerEmptyTitle,
+                  subtitle: l.serverPickerEmptySubtitle,
+                  actionLabel: l.serverPickerAddFirst,
                   onAction: _showAddSheet,
                 )
               : ListView.separated(
@@ -160,7 +161,7 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
           floatingActionButton: FloatingActionButton.extended(
             onPressed: _showAddSheet,
             icon: const Icon(Icons.add),
-            label: const Text('Add server'),
+            label: Text(l.serverPickerAdd),
           ),
         );
       },
@@ -202,6 +203,7 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
   }
 
   Future<void> _testConnection() async {
+    final l = AppL10n.of(context);
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _testing = true);
     final url = _urlCtrl.text.trim().replaceAll(RegExp(r'/+$'), '');
@@ -217,7 +219,7 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Connection successful')),
+          SnackBar(content: Text(l.serverTestSuccess)),
         );
       }
     } catch (_) {
@@ -227,13 +229,14 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not connect to server')),
+          SnackBar(content: Text(l.serverTestFailed)),
         );
       }
     }
   }
 
   Future<void> _save() async {
+    final l = AppL10n.of(context);
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final url = _urlCtrl.text.trim().replaceAll(RegExp(r'/+$'), '');
     final alias = _aliasCtrl.text.trim();
@@ -252,7 +255,7 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
       if (mounted) {
         setState(() => _saving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(safeText('Error: $e'))),
+          SnackBar(content: Text(safeText(l.errorPrefix(e.toString())))),
         );
       }
     }
@@ -261,6 +264,7 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppL10n.of(context);
     return Padding(
       padding: EdgeInsets.only(
         left: 24,
@@ -285,36 +289,36 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
               ),
             ),
             const SizedBox(height: 20),
-            Text('Add Server',
+            Text(l.serverAddTitle,
                 style: theme.textTheme.titleLarge
                     ?.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: 20),
             TextFormField(
               controller: _urlCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Server URL',
-                hintText: 'https://chat.example.com',
-                prefixIcon: Icon(Icons.link),
-                border: OutlineInputBorder(
+              decoration: InputDecoration(
+                labelText: l.serverUrl,
+                hintText: l.serverUrlHint,
+                prefixIcon: const Icon(Icons.link),
+                border: const OutlineInputBorder(
                   borderRadius: BorderRadius.all(Radius.circular(12)),
                 ),
               ),
               keyboardType: TextInputType.url,
               autofocus: true,
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'URL is required';
+                if (v == null || v.trim().isEmpty) return l.serverUrlRequired;
                 final uri = Uri.tryParse(v.trim());
                 if (uri == null || !uri.hasScheme) {
-                  return 'Must start with https://';
+                  return l.serverUrlMustHttps;
                 }
                 final host = uri.host.toLowerCase();
                 final isLocalhost =
                     host == 'localhost' || host == '127.0.0.1';
                 if (uri.scheme == 'http' && !isLocalhost) {
-                  return 'Only https:// is allowed (http not permitted for remote servers)';
+                  return l.serverUrlHttpNotAllowed;
                 }
                 if (uri.scheme != 'https' && uri.scheme != 'http') {
-                  return 'Must start with https://';
+                  return l.serverUrlMustHttps;
                 }
                 return null;
               },
@@ -322,11 +326,11 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
             const SizedBox(height: 14),
             TextFormField(
               controller: _aliasCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Alias (optional)',
-                hintText: 'My Work Server',
-                prefixIcon: Icon(Icons.label_outline),
-                border: OutlineInputBorder(
+              decoration: InputDecoration(
+                labelText: l.serverAlias,
+                hintText: l.serverAliasHint,
+                prefixIcon: const Icon(Icons.label_outline),
+                border: const OutlineInputBorder(
                   borderRadius: BorderRadius.all(Radius.circular(12)),
                 ),
               ),
@@ -343,7 +347,7 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
                   : Icon(_tested
                       ? Icons.check_circle_outline
                       : Icons.wifi),
-              label: Text(safeText(_testing ? 'Testing…' : 'Test connection')),
+              label: Text(safeText(_testing ? l.serverTesting : l.serverTestConnection)),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 48),
                 shape: RoundedRectangleBorder(
@@ -352,7 +356,7 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
             ),
             const SizedBox(height: 12),
             PrimaryButton(
-              label: 'Save & Continue',
+              label: l.serverSave,
               isLoading: _saving,
               onPressed: _saving ? null : _save,
             ),

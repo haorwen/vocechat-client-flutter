@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/safe_text.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/loading_capsule.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../../../features/contacts/application/presence_provider.dart';
@@ -48,6 +49,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     // body can lag behind window metrics during a drag on Windows/Linux).
     final width = MediaQuery.sizeOf(context).width;
     final isWide = width >= 700;
+    final l = AppL10n.of(context);
     final asyncConvs = ref.watch(conversationsProvider);
     final refreshing = ref.watch(conversationsRefreshingProvider);
 
@@ -87,11 +89,11 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                 asyncConvs.when(
                   // Cold-start (no cached snapshot yet) — show capsule
                   // centered while we await the first network paint.
-                  loading: () => const Center(
-                    child: LoadingCapsule(label: 'Loading chats…'),
+                  loading: () => Center(
+                    child: LoadingCapsule(label: l.chatListLoading),
                   ),
                   error: (e, _) =>
-                      Center(child: Text(safeText('Error: $e'))),
+                      Center(child: Text(safeText(l.errorPrefix(e.toString())))),
                   data: (conversations) {
                     final lowerQuery = _query.toLowerCase();
                     final filtered = lowerQuery.isEmpty
@@ -101,12 +103,12 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                                 c.name.toLowerCase().contains(lowerQuery))
                             .toList();
                     if (conversations.isEmpty) {
-                      return const _EmptyState(
-                          message: 'No conversations yet');
+                      return _EmptyState(
+                          message: l.chatListEmpty);
                     }
                     if (filtered.isEmpty) {
                       return _EmptyState(
-                          message: 'No results for "$_query"');
+                          message: l.chatListNoResults(_query));
                     }
                     return RefreshIndicator(
                       onRefresh: () async => ref
@@ -135,7 +137,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                 if (asyncConvs.hasValue)
                   LoadingCapsuleOverlay(
                     visible: refreshing,
-                    label: 'Updating…',
+                    label: l.chatListUpdating,
                   ),
               ],
             ),
@@ -235,6 +237,7 @@ class _ChatListHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
       decoration: const BoxDecoration(
@@ -259,20 +262,20 @@ class _ChatListHeader extends StatelessWidget {
                   fontSize: 14,
                   color: AppTokens.gray700,
                 ),
-                decoration: const InputDecoration(
-                  hintText: 'Search...',
-                  hintStyle: TextStyle(
+                decoration: InputDecoration(
+                  hintText: l.chatListSearch,
+                  hintStyle: const TextStyle(
                     color: AppTokens.gray400,
                     fontSize: 14,
                   ),
-                  prefixIcon: Icon(Icons.search,
+                  prefixIcon: const Icon(Icons.search,
                       size: 18, color: AppTokens.gray400),
                   prefixIconConstraints:
-                      BoxConstraints(minWidth: 36, minHeight: 36),
+                      const BoxConstraints(minWidth: 36, minHeight: 36),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding:
-                      EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                      const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                 ),
               ),
             ),
@@ -281,7 +284,7 @@ class _ChatListHeader extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.add, size: 22, color: AppTokens.gray500),
             onPressed: () {},
-            tooltip: 'New chat',
+            tooltip: l.chatListNewChat,
           ),
         ],
       ),
@@ -406,7 +409,7 @@ class _ConversationTile extends ConsumerWidget {
                           Padding(
                             padding: const EdgeInsets.only(left: 4),
                             child: Text(
-                              _formatRelativeTime(item.lastAt!),
+                              _formatRelativeTime(context, item.lastAt!),
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: AppTokens.zinc500,
@@ -496,6 +499,7 @@ class _EmptyChatPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     return Container(
       color: AppTokens.surface,
       alignment: Alignment.center,
@@ -513,18 +517,18 @@ class _EmptyChatPlaceholder extends StatelessWidget {
                 size: 30, color: AppTokens.primary500),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Select a conversation',
-            style: TextStyle(
+          Text(
+            l.chatListSelectTitle,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: AppTokens.gray700,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Pick a chat from the left panel to start messaging',
-            style: TextStyle(
+          Text(
+            l.chatListSelectSubtitle,
+            style: const TextStyle(
               fontSize: 13,
               color: AppTokens.gray500,
             ),
@@ -535,15 +539,16 @@ class _EmptyChatPlaceholder extends StatelessWidget {
   }
 }
 
-String _formatRelativeTime(int unixMs) {
+String _formatRelativeTime(BuildContext context, int unixMs) {
+  final l = AppL10n.of(context);
   final ts = DateTime.fromMillisecondsSinceEpoch(unixMs);
   final now = DateTime.now();
   final diff = now.difference(ts);
 
-  if (diff.inSeconds < 60) return 'just now';
-  if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
-  if (diff.inHours < 24) return '${diff.inHours} hours ago';
-  if (diff.inDays < 7) return '${diff.inDays} days ago';
+  if (diff.inSeconds < 60) return l.timeJustNow;
+  if (diff.inMinutes < 60) return l.timeMinutesAgo(diff.inMinutes);
+  if (diff.inHours < 24) return l.timeHoursAgo(diff.inHours);
+  if (diff.inDays < 7) return l.timeDaysAgo(diff.inDays);
 
   final mo = ts.month.toString().padLeft(2, '0');
   final d = ts.day.toString().padLeft(2, '0');

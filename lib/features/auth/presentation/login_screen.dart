@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/utils/safe_text.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../application/auth_controller.dart';
 
@@ -68,6 +69,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final l = AppL10n.of(context);
 
     // Listen for auth state changes to navigate
     ref.listen(authControllerProvider, (_, next) {
@@ -120,7 +122,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 28),
                 Text(
-                  'Welcome back',
+                  l.loginWelcomeBack,
                   style: theme.textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
@@ -137,10 +139,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 40),
                 TextFormField(
                   controller: _emailCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(
+                  decoration: InputDecoration(
+                    labelText: l.loginEmail,
+                    prefixIcon: const Icon(Icons.email_outlined),
+                    border: const OutlineInputBorder(
                       borderRadius:
                           BorderRadius.all(Radius.circular(12)),
                     ),
@@ -149,12 +151,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   textInputAction: TextInputAction.next,
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
-                      return 'Email is required';
+                      return l.loginEmailRequired;
                     }
                     final emailRegex =
                         RegExp(r'^[\w\.\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
                     if (!emailRegex.hasMatch(v.trim())) {
-                      return 'Enter a valid email address';
+                      return l.loginEmailInvalid;
                     }
                     return null;
                   },
@@ -163,7 +165,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 TextFormField(
                   controller: _passwordCtrl,
                   decoration: InputDecoration(
-                    labelText: 'Password',
+                    labelText: l.loginPassword,
                     prefixIcon: const Icon(Icons.lock_outline),
                     border: const OutlineInputBorder(
                       borderRadius:
@@ -182,10 +184,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   onFieldSubmitted: (_) => _signIn(),
                   validator: (v) {
                     if (v == null || v.isEmpty) {
-                      return 'Password is required';
+                      return l.loginPasswordRequired;
                     }
                     if (v.length < 6) {
-                      return 'Password must be at least 6 characters';
+                      return l.loginPasswordTooShort;
                     }
                     return null;
                   },
@@ -195,12 +197,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () {},
-                    child: const Text('Forgot password?'),
+                    child: Text(l.loginForgotPassword),
                   ),
                 ),
                 const SizedBox(height: 8),
                 PrimaryButton(
-                  label: 'Sign in',
+                  label: l.loginSignIn,
                   isLoading: isLoading,
                   onPressed: isLoading ? null : _signIn,
                 ),
@@ -209,17 +211,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   actions: [
                     _TertiaryAction(
                       icon: Icons.auto_awesome_outlined,
-                      label: 'Use magic link',
+                      label: l.loginMagicLink,
                       onTap: () {},
                     ),
                     _TertiaryAction(
                       icon: Icons.fingerprint,
-                      label: 'Sign in with passkey',
+                      label: l.loginPasskey,
                       onTap: () {},
                     ),
                     _TertiaryAction(
                       icon: Icons.dns_outlined,
-                      label: 'Switch server',
+                      label: l.loginSwitchServer,
                       onTap: () => context.go('/server-picker'),
                     ),
                   ],
@@ -229,12 +231,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      "Don't have an account? ",
+                      l.loginNoAccount,
                       style: theme.textTheme.bodyMedium,
                     ),
                     TextButton(
                       onPressed: () => context.go('/register'),
-                      child: const Text('Sign up'),
+                      child: Text(l.loginSignUp),
                     ),
                   ],
                 ),

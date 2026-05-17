@@ -1,0 +1,196 @@
+{
+  "@@locale": "en",
+
+  "appTitle": "VoceChat",
+  "@appTitle": {"description": "Application title"},
+
+  "actionCancel": "Cancel",
+  "actionOpen": "Open",
+  "actionChange": "Change",
+  "actionContact": "Contact",
+  "actionEdit": "Edit",
+  "actionSend": "Send",
+  "actionSearch": "Search",
+  "actionMore": "More",
+  "actionRetry": "Retry",
+
+  "settingsTitle": "Settings",
+  "settingsGroupGeneral": "general",
+  "settingsGroupAbout": "about",
+  "settingsMyAccount": "My Account",
+  "settingsNotifications": "Notifications",
+  "settingsAppearance": "Appearance",
+  "settingsStorage": "Storage & Data",
+  "settingsAbout": "About",
+  "settingsLogout": "Log out",
+  "settingsLogoutConfirmTitle": "Log out?",
+  "settingsLogoutConfirmContent": "You will need to sign in again to access this server.",
+
+  "accountEmail": "Email",
+  "accountUsername": "Username",
+  "accountPassword": "Password",
+  "accountPasswordMasked": "*********",
+
+  "notificationsPush": "Push notifications",
+  "notificationsPushSubtitle": "Get notified about new messages and mentions.",
+  "notificationsSound": "Notification sounds",
+  "notificationsSoundSubtitle": "Play a chime on incoming messages.",
+  "notificationsMentionsOnly": "Mentions only",
+  "notificationsMentionsOnlySubtitle": "Only notify for @mentions.",
+
+  "appearanceTheme": "THEME",
+  "appearanceLight": "Light",
+  "appearanceSystem": "System default",
+  "appearanceDark": "Dark",
+  "appearanceLanguage": "LANGUAGE",
+  "languageSystem": "System default",
+  "languageEnglish": "English",
+  "languageChinese": "简体中文",
+
+  "storageUsage": "Storage usage",
+  "storageAutoDownload": "Auto-download media",
+  "storageWifiOnly": "Wi-Fi only",
+  "storageClearCache": "Clear cache",
+
+  "aboutAppVersion": "App version",
+  "aboutWebsite": "Website",
+  "aboutReportBug": "Report a bug",
+  "aboutReportBugSubtitle": "Help us improve VoceChat.",
+
+  "loginWelcomeBack": "Welcome back",
+  "loginEmail": "Email",
+  "loginEmailRequired": "Email is required",
+  "loginEmailInvalid": "Enter a valid email address",
+  "loginPassword": "Password",
+  "loginPasswordRequired": "Password is required",
+  "loginPasswordTooShort": "Password must be at least 6 characters",
+  "loginForgotPassword": "Forgot password?",
+  "loginSignIn": "Sign in",
+  "loginMagicLink": "Use magic link",
+  "loginPasskey": "Sign in with passkey",
+  "loginSwitchServer": "Switch server",
+  "loginNoAccount": "Don't have an account? ",
+  "loginSignUp": "Sign up",
+
+  "registerTitle": "Create account",
+  "registerHeader": "Join the conversation",
+  "registerSubtitle": "Fill in your details to get started.",
+  "registerName": "Full name",
+  "registerNameRequired": "Name is required",
+  "registerNameTooShort": "Name must be at least 2 characters",
+  "registerEmailRequired": "Email is required",
+  "registerEmailInvalid": "Enter a valid email",
+  "registerPasswordRequired": "Password is required",
+  "registerPasswordTooShort": "At least 6 characters required",
+  "registerConfirmPassword": "Confirm password",
+  "registerConfirmRequired": "Please confirm your password",
+  "registerConfirmMismatch": "Passwords do not match",
+  "registerCreate": "Create account",
+  "registerMagicLink": "Send invitation link instead",
+  "registerEmailFirst": "Please enter your email first",
+  "registerInvitationSent": "Invitation link sent",
+  "registerHaveAccount": "Already have an account? ",
+
+  "serverPickerTitle": "Select Server",
+  "serverPickerEmptyTitle": "Connect to a VoceChat server",
+  "serverPickerEmptySubtitle": "Add a server to get started chatting with your team.",
+  "serverPickerAddFirst": "Add your first server",
+  "serverPickerAdd": "Add server",
+  "serverAddTitle": "Add Server",
+  "serverUrl": "Server URL",
+  "serverUrlHint": "https://chat.example.com",
+  "serverUrlRequired": "URL is required",
+  "serverUrlMustHttps": "Must start with https://",
+  "serverUrlHttpNotAllowed": "Only https:// is allowed (http not permitted for remote servers)",
+  "serverAlias": "Alias (optional)",
+  "serverAliasHint": "My Work Server",
+  "serverTesting": "Testing…",
+  "serverTestConnection": "Test connection",
+  "serverTestSuccess": "Connection successful",
+  "serverTestFailed": "Could not connect to server",
+  "serverSave": "Save & Continue",
+
+  "chatListSearch": "Search...",
+  "chatListNewChat": "New chat",
+  "chatListLoading": "Loading chats…",
+  "chatListUpdating": "Updating…",
+  "chatListEmpty": "No conversations yet",
+  "chatListNoResults": "No results for \"{query}\"",
+  "@chatListNoResults": {
+    "placeholders": {"query": {"type": "String"}}
+  },
+  "chatListSelectTitle": "Select a conversation",
+  "chatListSelectSubtitle": "Pick a chat from the left panel to start messaging",
+
+  "timeJustNow": "just now",
+  "timeMinutesAgo": "{count} mins ago",
+  "@timeMinutesAgo": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "timeHoursAgo": "{count} hours ago",
+  "@timeHoursAgo": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "timeDaysAgo": "{count} days ago",
+  "@timeDaysAgo": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+
+  "contactsSearch": "Search...",
+  "contactsAdd": "Add contact",
+  "contactsLoading": "Loading contacts…",
+  "contactsEmpty": "No contacts found",
+  "contactsSectionBot": "BOT - {count}",
+  "@contactsSectionBot": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "contactsSectionContact": "CONTACT - {count}",
+  "@contactsSectionContact": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "contactsSelectTitle": "Select a contact",
+  "contactsSelectSubtitle": "Pick someone from the list to see their profile",
+  "contactsMessage": "Message",
+  "contactsCall": "Call",
+
+  "chatLoadingMessages": "Loading messages…",
+  "chatStatusOnline": "Online",
+  "chatStatusOffline": "Offline",
+  "chatGroupIntro": "Introduce yourself to the community!",
+  "chatEmpty": "No messages yet",
+  "chatSendFailed": "Send failed: {error}",
+  "@chatSendFailed": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "chatMessagePlaceholderChannel": "Message #{name}",
+  "@chatMessagePlaceholderChannel": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "chatMessagePlaceholderUser": "Message {name}",
+  "@chatMessagePlaceholderUser": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "chatPinned": "pinned",
+  "chatUnsupported": "[unsupported message]",
+  "chatMarkdown": "Markdown",
+  "chatAttach": "Attach",
+  "chatUserFallback": "User {uid}",
+  "@chatUserFallback": {
+    "placeholders": {"uid": {"type": "int"}}
+  },
+  "chatGroupFallback": "Group {gid}",
+  "@chatGroupFallback": {
+    "placeholders": {"gid": {"type": "int"}}
+  },
+
+  "previewFile": "[File]",
+  "previewVoice": "[Voice]",
+  "previewArchive": "[Archive]",
+  "previewImage": "[Image]",
+  "previewReaction": "[Reaction]",
+
+  "errorPrefix": "Error: {message}",
+  "@errorPrefix": {
+    "placeholders": {"message": {"type": "String"}}
+  }
+}

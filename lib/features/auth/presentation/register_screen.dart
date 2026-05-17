@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/utils/safe_text.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../application/auth_controller.dart';
 
@@ -63,10 +64,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _sendMagicLink() async {
+    final l = AppL10n.of(context);
     final email = _emailCtrl.text.trim();
     if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your email first')),
+        SnackBar(content: Text(l.registerEmailFirst)),
       );
       return;
     }
@@ -76,8 +78,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (mounted) {
       setState(() => _isMagicLinkLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Invitation link sent')),
+        SnackBar(
+            content: Text(l.registerInvitationSent)),
       );
     }
   }
@@ -86,6 +88,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final l = AppL10n.of(context);
 
     // Listen for auth state changes
     ref.listen(authControllerProvider, (_, next) {
@@ -111,7 +114,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: BackButton(onPressed: () => context.go('/login')),
-        title: const Text('Create account'),
+        title: Text(l.registerTitle),
         centerTitle: false,
       ),
       body: SafeArea(
@@ -124,14 +127,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Join the conversation',
+                  l.registerHeader,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Fill in your details to get started.',
+                  l.registerSubtitle,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),
@@ -139,10 +142,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 const SizedBox(height: 32),
                 TextFormField(
                   controller: _nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Full name',
-                    prefixIcon: Icon(Icons.person_outline),
-                    border: OutlineInputBorder(
+                  decoration: InputDecoration(
+                    labelText: l.registerName,
+                    prefixIcon: const Icon(Icons.person_outline),
+                    border: const OutlineInputBorder(
                       borderRadius:
                           BorderRadius.all(Radius.circular(12)),
                     ),
@@ -151,10 +154,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   textInputAction: TextInputAction.next,
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
-                      return 'Name is required';
+                      return l.registerNameRequired;
                     }
                     if (v.trim().length < 2) {
-                      return 'Name must be at least 2 characters';
+                      return l.registerNameTooShort;
                     }
                     return null;
                   },
@@ -162,10 +165,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 const SizedBox(height: 14),
                 TextFormField(
                   controller: _emailCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(
+                  decoration: InputDecoration(
+                    labelText: l.loginEmail,
+                    prefixIcon: const Icon(Icons.email_outlined),
+                    border: const OutlineInputBorder(
                       borderRadius:
                           BorderRadius.all(Radius.circular(12)),
                     ),
@@ -174,12 +177,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   textInputAction: TextInputAction.next,
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
-                      return 'Email is required';
+                      return l.registerEmailRequired;
                     }
                     final regex =
                         RegExp(r'^[\w\.\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
                     if (!regex.hasMatch(v.trim())) {
-                      return 'Enter a valid email';
+                      return l.registerEmailInvalid;
                     }
                     return null;
                   },
@@ -188,7 +191,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 TextFormField(
                   controller: _passwordCtrl,
                   decoration: InputDecoration(
-                    labelText: 'Password',
+                    labelText: l.loginPassword,
                     prefixIcon: const Icon(Icons.lock_outline),
                     border: const OutlineInputBorder(
                       borderRadius:
@@ -206,10 +209,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   textInputAction: TextInputAction.next,
                   validator: (v) {
                     if (v == null || v.isEmpty) {
-                      return 'Password is required';
+                      return l.registerPasswordRequired;
                     }
                     if (v.length < 6) {
-                      return 'At least 6 characters required';
+                      return l.registerPasswordTooShort;
                     }
                     return null;
                   },
@@ -218,7 +221,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 TextFormField(
                   controller: _confirmCtrl,
                   decoration: InputDecoration(
-                    labelText: 'Confirm password',
+                    labelText: l.registerConfirmPassword,
                     prefixIcon: const Icon(Icons.lock_outline),
                     border: const OutlineInputBorder(
                       borderRadius:
@@ -237,17 +240,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   onFieldSubmitted: (_) => _createAccount(),
                   validator: (v) {
                     if (v == null || v.isEmpty) {
-                      return 'Please confirm your password';
+                      return l.registerConfirmRequired;
                     }
                     if (v != _passwordCtrl.text) {
-                      return 'Passwords do not match';
+                      return l.registerConfirmMismatch;
                     }
                     return null;
                   },
                 ),
                 const SizedBox(height: 28),
                 PrimaryButton(
-                  label: 'Create account',
+                  label: l.registerCreate,
                   isLoading: isLoading,
                   onPressed: isLoading ? null : _createAccount,
                 ),
@@ -265,7 +268,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       : const Icon(Icons.auto_awesome_outlined,
                           size: 18),
                   label:
-                      const Text('Send invitation link instead'),
+                      Text(l.registerMagicLink),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 52),
                     shape: RoundedRectangleBorder(
@@ -277,12 +280,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      'Already have an account? ',
+                      l.registerHaveAccount,
                       style: theme.textTheme.bodyMedium,
                     ),
                     TextButton(
                       onPressed: () => context.go('/login'),
-                      child: const Text('Sign in'),
+                      child: Text(l.loginSignIn),
                     ),
                   ],
                 ),

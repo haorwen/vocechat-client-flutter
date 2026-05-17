@@ -8,6 +8,7 @@ import '../../../core/utils/safe_text.dart';
 import '../../../features/auth/application/auth_controller.dart';
 import '../../../features/contacts/application/presence_provider.dart';
 import '../../../features/contacts/application/user_directory_provider.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/loading_capsule.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../application/chat_controller.dart';
@@ -82,6 +83,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _sendMessage() async {
     if (!_canSend) return;
     final text = _textCtrl.text.trim();
+    final l = AppL10n.of(context);
     _textCtrl.clear();
     setState(() => _canSend = false);
     try {
@@ -91,7 +93,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(safeText('Send failed: $e'))));
+            SnackBar(content: Text(safeText(l.chatSendFailed(e.toString())))));
       }
     }
   }
@@ -131,6 +133,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     final messagesAsync = ref.watch(chatControllerProvider(_target));
 
     final authState = ref.watch(authControllerProvider).valueOrNull;
@@ -156,20 +159,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ) = _target.map(
       user: (t) {
         final u = userDir[t.uid];
-        final name = u?.name ?? 'User ${t.uid}';
+        final name = u?.name ?? l.chatUserFallback(t.uid);
         return (
           name,
-          showStatus ? (dmOnline ? 'Online' : 'Offline') : null,
+          showStatus ? (dmOnline ? l.chatStatusOnline : l.chatStatusOffline) : null,
           u != null ? _avatarUrl(t.uid, u.avatarUpdatedAt) : null,
           false,
         );
       },
       group: (t) {
         final g = groupDir[t.gid];
-        final name = g?.name ?? 'Group ${t.gid}';
+        final name = g?.name ?? l.chatGroupFallback(t.gid);
         return (
           name,
-          'Introduce yourself to the community!',
+          l.chatGroupIntro,
           g != null ? _groupAvatarUrl(t.gid, g.avatarUpdatedAt) : null,
           true,
         );
@@ -194,11 +197,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
           Expanded(
             child: messagesAsync.when(
-              loading: () => const Center(
-                child: LoadingCapsule(label: 'Loading messages…'),
+              loading: () => Center(
+                child: LoadingCapsule(label: l.chatLoadingMessages),
               ),
               error: (e, _) =>
-                  Center(child: Text(safeText('Error: $e'))),
+                  Center(child: Text(safeText(l.errorPrefix(e.toString())))),
               data: (messages) => messages.isEmpty
                   ? const _EmptyConversation()
                   : ListView.builder(
@@ -258,7 +261,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             controller: _textCtrl,
             canSend: _canSend,
             onSend: _sendMessage,
-            placeholder: isChannel ? 'Message #$title' : 'Message $title',
+            placeholder: isChannel
+                ? l.chatMessagePlaceholderChannel(title)
+                : l.chatMessagePlaceholderUser(title),
           ),
         ],
       ),
@@ -292,6 +297,7 @@ class _ChatHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     return Container(
       height: 52,
       decoration: const BoxDecoration(
@@ -375,13 +381,13 @@ class _ChatHeader extends StatelessWidget {
             icon: const Icon(Icons.search,
                 size: 20, color: AppTokens.gray500),
             onPressed: () {},
-            tooltip: 'Search',
+            tooltip: l.actionSearch,
           ),
           IconButton(
             icon: const Icon(Icons.more_horiz,
                 size: 20, color: AppTokens.gray500),
             onPressed: () {},
-            tooltip: 'More',
+            tooltip: l.actionMore,
           ),
         ],
       ),
@@ -477,6 +483,7 @@ class _MessageRowState extends State<_MessageRow> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     final msg = widget.message;
     final sender = widget.userDir[msg.fromUid];
     final senderName = sender?.name ?? 'uid:${msg.fromUid}';
@@ -534,9 +541,9 @@ class _MessageRowState extends State<_MessageRow> {
         ),
       );
     } else {
-      content = const Text(
-        '[unsupported message]',
-        style: TextStyle(fontSize: 13, color: AppTokens.gray500),
+      content = Text(
+        l.chatUnsupported,
+        style: const TextStyle(fontSize: 13, color: AppTokens.gray500),
       );
     }
 
@@ -558,13 +565,13 @@ class _MessageRowState extends State<_MessageRow> {
             Padding(
               padding: const EdgeInsets.only(left: 56, bottom: 4),
               child: Row(
-                children: const [
-                  Icon(Icons.push_pin,
+                children: [
+                  const Icon(Icons.push_pin,
                       size: 12, color: AppTokens.gray400),
-                  SizedBox(width: 4),
+                  const SizedBox(width: 4),
                   Text(
-                    'pinned',
-                    style: TextStyle(
+                    l.chatPinned,
+                    style: const TextStyle(
                       fontSize: 12,
                       color: AppTokens.gray400,
                       height: 18 / 12,
@@ -719,6 +726,7 @@ class _SendBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     return Container(
       color: AppTokens.surface,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -765,14 +773,14 @@ class _SendBox extends StatelessWidget {
               icon: const Icon(Icons.code,
                   size: 22, color: AppTokens.gray500),
               onPressed: () {},
-              tooltip: 'Markdown',
+              tooltip: l.chatMarkdown,
               visualDensity: VisualDensity.compact,
             ),
             IconButton(
               icon: const Icon(Icons.attach_file_outlined,
                   size: 22, color: AppTokens.gray500),
               onPressed: () {},
-              tooltip: 'Attach',
+              tooltip: l.chatAttach,
               visualDensity: VisualDensity.compact,
             ),
             AnimatedSwitcher(
@@ -783,7 +791,7 @@ class _SendBox extends StatelessWidget {
                       icon: const Icon(Icons.send_rounded,
                           size: 20, color: AppTokens.primary500),
                       onPressed: onSend,
-                      tooltip: 'Send',
+                      tooltip: l.actionSend,
                       visualDensity: VisualDensity.compact,
                     )
                   : const SizedBox(width: 0),
@@ -804,6 +812,7 @@ class _EmptyConversation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -819,9 +828,9 @@ class _EmptyConversation extends StatelessWidget {
                 size: 24, color: AppTokens.primary500),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'No messages yet',
-            style: TextStyle(
+          Text(
+            l.chatEmpty,
+            style: const TextStyle(
               fontSize: 14,
               color: AppTokens.gray500,
             ),

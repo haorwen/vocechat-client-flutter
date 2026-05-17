@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/safe_text.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/loading_capsule.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../application/contacts_provider.dart';
@@ -33,6 +34,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
       final isWide = constraints.maxWidth >= 700;
+      final l = AppL10n.of(context);
       final asyncContacts = ref.watch(contactsProvider);
 
       Widget listPanel = Container(
@@ -53,11 +55,11 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
             ),
             Expanded(
               child: asyncContacts.when(
-                loading: () => const Center(
-                  child: LoadingCapsule(label: 'Loading contacts…'),
+                loading: () => Center(
+                  child: LoadingCapsule(label: l.contactsLoading),
                 ),
                 error: (e, _) =>
-                    Center(child: Text(safeText('Error: $e'))),
+                    Center(child: Text(safeText(l.errorPrefix(e.toString())))),
                 data: (allContacts) {
                   final q = _query.toLowerCase();
                   final filtered = q.isEmpty
@@ -80,10 +82,10 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                       .toList();
 
                   if (filtered.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Text(
-                        'No contacts found',
-                        style: TextStyle(
+                        l.contactsEmpty,
+                        style: const TextStyle(
                             color: AppTokens.gray500, fontSize: 13),
                       ),
                     );
@@ -94,7 +96,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                         horizontal: 8, vertical: 4),
                     children: [
                       if (bots.isNotEmpty) ...[
-                        _SectionLabel('BOT - ${bots.length}'),
+                        _SectionLabel(l.contactsSectionBot(bots.length)),
                         ...bots.map((c) => _ContactTile(
                               contact: c,
                               isBot: true,
@@ -106,7 +108,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                         const SizedBox(height: 4),
                       ],
                       if (contacts.isNotEmpty) ...[
-                        _SectionLabel('CONTACT - ${contacts.length}'),
+                        _SectionLabel(l.contactsSectionContact(contacts.length)),
                         ...contacts.map((c) => _ContactTile(
                               contact: c,
                               isBot: false,
@@ -170,6 +172,7 @@ class _ContactsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
       decoration: const BoxDecoration(
@@ -194,20 +197,20 @@ class _ContactsHeader extends StatelessWidget {
                   fontSize: 14,
                   color: AppTokens.gray700,
                 ),
-                decoration: const InputDecoration(
-                  hintText: 'Search...',
-                  hintStyle: TextStyle(
+                decoration: InputDecoration(
+                  hintText: l.contactsSearch,
+                  hintStyle: const TextStyle(
                     color: AppTokens.gray400,
                     fontSize: 14,
                   ),
-                  prefixIcon: Icon(Icons.search,
+                  prefixIcon: const Icon(Icons.search,
                       size: 18, color: AppTokens.gray400),
                   prefixIconConstraints:
-                      BoxConstraints(minWidth: 36, minHeight: 36),
+                      const BoxConstraints(minWidth: 36, minHeight: 36),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding:
-                      EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                      const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                 ),
               ),
             ),
@@ -217,7 +220,7 @@ class _ContactsHeader extends StatelessWidget {
             icon: const Icon(Icons.person_add_alt_1,
                 size: 22, color: AppTokens.gray500),
             onPressed: () {},
-            tooltip: 'Add contact',
+            tooltip: l.contactsAdd,
           ),
         ],
       ),
@@ -386,6 +389,7 @@ class _ContactProfile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppL10n.of(context);
     final userDir = ref.watch(userDirectoryProvider).valueOrNull ?? const {};
     final serverState = ref.watch(serverStoreProvider).valueOrNull;
     final baseUrl = serverState?.servers
@@ -437,20 +441,20 @@ class _ContactProfile extends ConsumerWidget {
               children: [
                 _ProfileAction(
                   icon: Icons.chat_bubble_outline,
-                  label: 'Message',
+                  label: l.contactsMessage,
                   isPrimary: true,
                   onTap: () => context.push('/chat/u-${contact.uid}'),
                 ),
                 const SizedBox(width: 8),
                 _ProfileAction(
                   icon: Icons.call_outlined,
-                  label: 'Call',
+                  label: l.contactsCall,
                   onTap: () {},
                 ),
                 const SizedBox(width: 8),
                 _ProfileAction(
                   icon: Icons.more_horiz,
-                  label: 'More',
+                  label: l.actionMore,
                   onTap: () {},
                 ),
               ],
@@ -513,6 +517,7 @@ class _ContactsEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     return Container(
       color: AppTokens.surface,
       alignment: Alignment.center,
@@ -530,18 +535,18 @@ class _ContactsEmptyState extends StatelessWidget {
                 size: 30, color: AppTokens.primary500),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Select a contact',
-            style: TextStyle(
+          Text(
+            l.contactsSelectTitle,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: AppTokens.gray700,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'Pick someone from the list to see their profile',
-            style: TextStyle(
+          Text(
+            l.contactsSelectSubtitle,
+            style: const TextStyle(
               fontSize: 13,
               color: AppTokens.gray500,
             ),
