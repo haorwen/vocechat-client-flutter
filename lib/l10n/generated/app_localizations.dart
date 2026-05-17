@@ -179,11 +179,89 @@ abstract class AppL10n {
   /// **'No content yet.'**
   String get chatToolEmpty;
 
+  /// No description provided for @chatToolPinEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No pinned messages.'**
+  String get chatToolPinEmpty;
+
+  /// No description provided for @chatToolSavedEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved messages.'**
+  String get chatToolSavedEmpty;
+
+  /// No description provided for @chatToolMembersEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No members.'**
+  String get chatToolMembersEmpty;
+
+  /// No description provided for @chatToolUnpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get chatToolUnpin;
+
+  /// No description provided for @chatToolRemoveFav.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get chatToolRemoveFav;
+
+  /// No description provided for @chatToolPinFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin failed'**
+  String get chatToolPinFail;
+
+  /// No description provided for @chatToolUnpinFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin failed'**
+  String get chatToolUnpinFail;
+
+  /// No description provided for @chatToolSaveFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Save failed'**
+  String get chatToolSaveFail;
+
+  /// No description provided for @chatToolRemoveFavFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove failed'**
+  String get chatToolRemoveFavFail;
+
+  /// No description provided for @chatToolSavedAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get chatToolSavedAdded;
+
+  /// No description provided for @chatToolPinAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned'**
+  String get chatToolPinAdded;
+
+  /// No description provided for @chatToolUnpinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpinned'**
+  String get chatToolUnpinned;
+
   /// No description provided for @chatSearchHint.
   ///
   /// In en, this message translates to:
   /// **'Search messages'**
   String get chatSearchHint;
+
+  /// No description provided for @chatSearchEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching messages.'**
+  String get chatSearchEmpty;
 
   /// No description provided for @settingsTitle.
   ///

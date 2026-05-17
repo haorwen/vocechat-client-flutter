@@ -12,8 +12,10 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/loading_capsule.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../application/chat_controller.dart';
+import '../application/chat_tools_provider.dart';
 import '../domain/message_models.dart';
 import '../domain/message_status.dart';
+import 'chat_tool_panels.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String id;
@@ -155,62 +157,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return text.toLowerCase().contains(q.toLowerCase());
   }
 
-  void _showToolPanel(_ChatTool tool) {
-    final l = AppL10n.of(context);
-    final (String title, IconData icon) = switch (tool) {
-      _ChatTool.pin => (l.chatToolPin, Icons.push_pin_outlined),
-      _ChatTool.saved => (l.chatToolSaved, Icons.bookmark_outline),
-      _ChatTool.members => (l.chatToolMembers, Icons.people_outline),
-    };
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppTokens.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Icon(icon, size: 20, color: AppTokens.gray700),
-                    const SizedBox(width: 8),
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1C1C1E),
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close,
-                          size: 18, color: AppTokens.gray500),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Center(
-                  child: Text(
-                    AppL10n.of(context).chatToolEmpty,
-                    style: const TextStyle(
-                        fontSize: 13, color: AppTokens.gray500),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-        );
-      },
+  void _showToolPanel(ChatTool tool) {
+    final id = _target.map<int>(
+      user: (t) => t.uid,
+      group: (t) => t.gid,
+    );
+    final isChannel = _target.map<bool>(
+      user: (_) => false,
+      group: (_) => true,
+    );
+    showChatToolOverlay(
+      context,
+      tool: tool,
+      targetId: id,
+      isChannel: isChannel,
     );
   }
 
@@ -291,11 +251,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       onSearchChanged: (v) => setState(() => _query = v),
                       onSearchClose: _toggleSearch,
                       onPin: isChannel
-                          ? () => _showToolPanel(_ChatTool.pin)
+                          ? () => _showToolPanel(ChatTool.pin)
                           : null,
-                      onSaved: () => _showToolPanel(_ChatTool.saved),
+                      onSaved: () => _showToolPanel(ChatTool.saved),
                       onMembers: isChannel
-                          ? () => _showToolPanel(_ChatTool.members)
+                          ? () => _showToolPanel(ChatTool.members)
                           : null,
                     ),
                     Expanded(
@@ -345,6 +305,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                       status: statuses[msg.mid],
                                       userDir: userDir,
                                       avatarUrlBuilder: _avatarUrl,
+                                      target: _target,
                                       onRetry: msg.mid < 0 &&
                                               statuses[msg.mid] ==
                                                   MessageSendStatus.failed
@@ -381,11 +342,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 _ChatSideRail(
                   isChannel: isChannel,
                   onPin: isChannel
-                      ? () => _showToolPanel(_ChatTool.pin)
+                      ? () => _showToolPanel(ChatTool.pin)
                       : null,
-                  onSaved: () => _showToolPanel(_ChatTool.saved),
+                  onSaved: () => _showToolPanel(ChatTool.saved),
                   onMembers: isChannel
-                      ? () => _showToolPanel(_ChatTool.members)
+                      ? () => _showToolPanel(ChatTool.members)
                       : null,
                 ),
             ],
@@ -566,31 +527,31 @@ class _ChatHeader extends StatelessWidget {
                   tooltip: l.actionSearch,
                 ),
                 if (showMoreMenu)
-                  PopupMenuButton<_ChatTool>(
+                  PopupMenuButton<ChatTool>(
                     icon: const Icon(Icons.more_horiz,
                         size: 20, color: AppTokens.gray500),
                     tooltip: l.actionMore,
                     onSelected: (tool) {
                       switch (tool) {
-                        case _ChatTool.pin:
+                        case ChatTool.pin:
                           onPin?.call();
-                        case _ChatTool.saved:
+                        case ChatTool.saved:
                           onSaved?.call();
-                        case _ChatTool.members:
+                        case ChatTool.members:
                           onMembers?.call();
                       }
                     },
                     itemBuilder: (context) => [
                       if (isChannel)
                         PopupMenuItem(
-                          value: _ChatTool.pin,
+                          value: ChatTool.pin,
                           child: _ChatToolMenuRow(
                             icon: Icons.push_pin_outlined,
                             label: l.chatToolPin,
                           ),
                         ),
                       PopupMenuItem(
-                        value: _ChatTool.saved,
+                        value: ChatTool.saved,
                         child: _ChatToolMenuRow(
                           icon: Icons.bookmark_outline,
                           label: l.chatToolSaved,
@@ -598,7 +559,7 @@ class _ChatHeader extends StatelessWidget {
                       ),
                       if (isChannel)
                         PopupMenuItem(
-                          value: _ChatTool.members,
+                          value: ChatTool.members,
                           child: _ChatToolMenuRow(
                             icon: Icons.people_outline,
                             label: l.chatToolMembers,
@@ -611,8 +572,6 @@ class _ChatHeader extends StatelessWidget {
     );
   }
 }
-
-enum _ChatTool { pin, saved, members }
 
 class _ChatToolMenuRow extends StatelessWidget {
   const _ChatToolMenuRow({required this.icon, required this.label});
@@ -777,12 +736,13 @@ class _DateSeparator extends StatelessWidget {
 // the right of the row (Emoji / Reply / Bookmark / More).
 // ---------------------------------------------------------------------------
 
-class _MessageRow extends StatefulWidget {
+class _MessageRow extends ConsumerStatefulWidget {
   const _MessageRow({
     required this.message,
     required this.currentUid,
     required this.userDir,
     required this.avatarUrlBuilder,
+    required this.target,
     this.status,
     this.onRetry,
   });
@@ -792,13 +752,14 @@ class _MessageRow extends StatefulWidget {
   final MessageSendStatus? status;
   final Map<int, UserSummary> userDir;
   final String? Function(int uid, int? avatarUpdatedAt) avatarUrlBuilder;
+  final MessageTarget target;
   final VoidCallback? onRetry;
 
   @override
-  State<_MessageRow> createState() => _MessageRowState();
+  ConsumerState<_MessageRow> createState() => _MessageRowState();
 }
 
-class _MessageRowState extends State<_MessageRow> {
+class _MessageRowState extends ConsumerState<_MessageRow> {
   bool _hovered = false;
 
   bool get _isPinned {
@@ -982,10 +943,81 @@ class _MessageRowState extends State<_MessageRow> {
       ),
     );
 
+    // Optimistic / failed rows can't be acted on yet.
+    if (widget.message.mid > 0) {
+      row = GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onLongPressStart: (details) => _openContextMenu(details.globalPosition),
+        onSecondaryTapDown: (details) =>
+            _openContextMenu(details.globalPosition),
+        child: row,
+      );
+    }
+
     if (widget.onRetry != null) {
       row = GestureDetector(onTap: widget.onRetry, child: row);
     }
     return row;
+  }
+
+  Future<void> _openContextMenu(Offset globalPos) async {
+    final l = AppL10n.of(context);
+    final isChannel = widget.target.map<bool>(
+      user: (_) => false,
+      group: (_) => true,
+    );
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox;
+    final selection = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromPoints(globalPos, globalPos),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        if (isChannel)
+          PopupMenuItem(
+            value: 'pin',
+            child: Row(children: [
+              const Icon(Icons.push_pin_outlined,
+                  size: 18, color: AppTokens.gray500),
+              const SizedBox(width: 12),
+              Text(l.chatToolPin),
+            ]),
+          ),
+        PopupMenuItem(
+          value: 'fav',
+          child: Row(children: [
+            const Icon(Icons.bookmark_outline,
+                size: 18, color: AppTokens.gray500),
+            const SizedBox(width: 12),
+            Text(l.chatToolSaved),
+          ]),
+        ),
+      ],
+    );
+    if (!mounted || selection == null) return;
+    if (selection == 'pin') {
+      final gid = widget.target.map<int>(
+        user: (_) => 0,
+        group: (t) => t.gid,
+      );
+      final ok = await ref
+          .read(chatToolsProvider)
+          .pin(gid: gid, mid: widget.message.mid);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ok ? l.chatToolPinAdded : l.chatToolPinFail),
+      ));
+    } else if (selection == 'fav') {
+      final ok = await ref
+          .read(favoritesProvider.notifier)
+          .add([widget.message.mid]);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ok ? l.chatToolSavedAdded : l.chatToolSaveFail),
+      ));
+    }
   }
 }
 

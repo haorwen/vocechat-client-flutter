@@ -22,7 +22,7 @@ final userDirectoryProvider =
 );
 
 typedef _$UserDirectory = AsyncNotifier<Map<int, UserSummary>>;
-String _$groupDirectoryHash() => r'6a80f04a333f1f10c7d66d9903d10ccd3f3da9de';
+String _$groupDirectoryHash() => r'41b158280e747f1ce14b10e7c522740a00d05be2';
 
 /// See also [GroupDirectory].
 @ProviderFor(GroupDirectory)

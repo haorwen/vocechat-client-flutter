@@ -38,27 +38,98 @@ class UserSummary {
 // GroupSummary — minimal group info for display in AppBar
 // ---------------------------------------------------------------------------
 
+class PinnedMessageSummary {
+  const PinnedMessageSummary({
+    required this.mid,
+    required this.content,
+    required this.contentType,
+    required this.createdBy,
+    required this.createdAt,
+  });
+
+  final int mid;
+  final String content;
+  final String contentType;
+  final int createdBy;
+  final int createdAt;
+
+  factory PinnedMessageSummary.fromJson(Map<String, dynamic> j) =>
+      PinnedMessageSummary(
+        mid: (j['mid'] as num).toInt(),
+        content: j['content'] as String? ?? '',
+        contentType: j['content_type'] as String? ?? 'text/plain',
+        createdBy: (j['created_by'] as num?)?.toInt() ?? 0,
+        createdAt: (j['created_at'] as num?)?.toInt() ?? 0,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'mid': mid,
+        'content': content,
+        'content_type': contentType,
+        'created_by': createdBy,
+        'created_at': createdAt,
+      };
+}
+
 class GroupSummary {
   const GroupSummary({
     required this.gid,
     required this.name,
     this.avatarUpdatedAt,
+    this.owner = 0,
+    this.isPublic = false,
+    this.members = const [],
+    this.pinnedMessages = const [],
   });
 
   final int gid;
   final String name;
   final int? avatarUpdatedAt;
+  final int owner;
+  final bool isPublic;
+  final List<int> members;
+  final List<PinnedMessageSummary> pinnedMessages;
+
+  GroupSummary copyWith({
+    List<PinnedMessageSummary>? pinnedMessages,
+    List<int>? members,
+  }) =>
+      GroupSummary(
+        gid: gid,
+        name: name,
+        avatarUpdatedAt: avatarUpdatedAt,
+        owner: owner,
+        isPublic: isPublic,
+        members: members ?? this.members,
+        pinnedMessages: pinnedMessages ?? this.pinnedMessages,
+      );
 
   factory GroupSummary.fromJson(Map<String, dynamic> j) => GroupSummary(
         gid: (j['gid'] as num).toInt(),
         name: j['name'] as String? ?? 'Group',
         avatarUpdatedAt: (j['avatar_updated_at'] as num?)?.toInt(),
+        owner: (j['owner'] as num?)?.toInt() ?? 0,
+        isPublic: j['is_public'] as bool? ?? false,
+        members: (j['members'] as List<dynamic>?)
+                ?.map((e) => (e as num).toInt())
+                .toList() ??
+            const [],
+        pinnedMessages: (j['pinned_messages'] as List<dynamic>?)
+                ?.cast<Map<String, dynamic>>()
+                .map(PinnedMessageSummary.fromJson)
+                .toList() ??
+            const [],
       );
 
   Map<String, dynamic> toJson() => {
         'gid': gid,
         'name': name,
         if (avatarUpdatedAt != null) 'avatar_updated_at': avatarUpdatedAt,
+        'owner': owner,
+        'is_public': isPublic,
+        'members': members,
+        'pinned_messages':
+            pinnedMessages.map((p) => p.toJson()).toList(growable: false),
       };
 }
 
@@ -152,5 +223,21 @@ class GroupDirectory extends _$GroupDirectory {
     final fresh = await _fetch(cache);
     if (fresh.isEmpty) return;
     state = AsyncData(fresh);
+  }
+
+  Future<void> refresh() async {
+    final cache = await ref.read(messageCacheProvider.future);
+    await _refresh(cache);
+  }
+
+  void applyPinned(int gid, List<PinnedMessageSummary> pinned) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final group = current[gid];
+    if (group == null) return;
+    state = AsyncData({
+      ...current,
+      gid: group.copyWith(pinnedMessages: pinned),
+    });
   }
 }

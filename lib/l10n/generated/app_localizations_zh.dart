@@ -49,7 +49,46 @@ class AppL10nZh extends AppL10n {
   String get chatToolEmpty => '暂无内容';
 
   @override
+  String get chatToolPinEmpty => '暂无置顶消息';
+
+  @override
+  String get chatToolSavedEmpty => '暂无收藏';
+
+  @override
+  String get chatToolMembersEmpty => '暂无成员';
+
+  @override
+  String get chatToolUnpin => '取消置顶';
+
+  @override
+  String get chatToolRemoveFav => '移除';
+
+  @override
+  String get chatToolPinFail => '置顶失败';
+
+  @override
+  String get chatToolUnpinFail => '取消置顶失败';
+
+  @override
+  String get chatToolSaveFail => '收藏失败';
+
+  @override
+  String get chatToolRemoveFavFail => '移除失败';
+
+  @override
+  String get chatToolSavedAdded => '已收藏';
+
+  @override
+  String get chatToolPinAdded => '已置顶';
+
+  @override
+  String get chatToolUnpinned => '已取消置顶';
+
+  @override
   String get chatSearchHint => '搜索消息';
+
+  @override
+  String get chatSearchEmpty => '未找到匹配消息';
 
   @override
   String get settingsTitle => '设置';

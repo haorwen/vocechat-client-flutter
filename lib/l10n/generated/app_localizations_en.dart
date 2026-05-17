@@ -49,7 +49,46 @@ class AppL10nEn extends AppL10n {
   String get chatToolEmpty => 'No content yet.';
 
   @override
+  String get chatToolPinEmpty => 'No pinned messages.';
+
+  @override
+  String get chatToolSavedEmpty => 'No saved messages.';
+
+  @override
+  String get chatToolMembersEmpty => 'No members.';
+
+  @override
+  String get chatToolUnpin => 'Unpin';
+
+  @override
+  String get chatToolRemoveFav => 'Remove';
+
+  @override
+  String get chatToolPinFail => 'Pin failed';
+
+  @override
+  String get chatToolUnpinFail => 'Unpin failed';
+
+  @override
+  String get chatToolSaveFail => 'Save failed';
+
+  @override
+  String get chatToolRemoveFavFail => 'Remove failed';
+
+  @override
+  String get chatToolSavedAdded => 'Saved';
+
+  @override
+  String get chatToolPinAdded => 'Pinned';
+
+  @override
+  String get chatToolUnpinned => 'Unpinned';
+
+  @override
   String get chatSearchHint => 'Search messages';
+
+  @override
+  String get chatSearchEmpty => 'No matching messages.';
 
   @override
   String get settingsTitle => 'Settings';
