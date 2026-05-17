@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../../../core/storage/server_store.dart';
 import '../../../core/theme/app_theme.dart';
@@ -29,9 +30,10 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _textCtrl = TextEditingController();
-  final _scrollCtrl = ScrollController();
   final _searchAnchorKey = GlobalKey();
-  final Map<int, GlobalKey> _messageKeys = {};
+  final ItemScrollController _itemScrollController = ItemScrollController();
+  final ItemPositionsListener _itemPositionsListener =
+      ItemPositionsListener.create();
   bool _canSend = false;
   int? _highlightMid;
   Timer? _highlightTimer;
@@ -48,7 +50,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (hasText != _canSend) setState(() => _canSend = hasText);
     });
 
-    _scrollCtrl.addListener(_onScroll);
+    _itemPositionsListener.itemPositions.addListener(_onPositionsChanged);
   }
 
   @override
@@ -65,14 +67,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void dispose() {
     _textCtrl.dispose();
     _highlightTimer?.cancel();
-    _scrollCtrl.removeListener(_onScroll);
-    _scrollCtrl.dispose();
+    _itemPositionsListener.itemPositions.removeListener(_onPositionsChanged);
     super.dispose();
   }
 
-  void _onScroll() {
-    if (_scrollCtrl.position.pixels >=
-        _scrollCtrl.position.maxScrollExtent - 200) {
+  void _onPositionsChanged() {
+    final positions = _itemPositionsListener.itemPositions.value;
+    if (positions.isEmpty) return;
+    // List is reverse: index 0 is the newest. The "older" end of the visible
+    // window is the max trailing edge — when it's within 5 items of the
+    // bottom of the dataset, fetch older history.
+    final messages =
+        ref.read(chatControllerProvider(_target)).valueOrNull ?? const [];
+    if (messages.isEmpty) return;
+    final maxIndex = positions
+        .map((p) => p.index)
+        .reduce((a, b) => a > b ? a : b);
+    if (maxIndex >= messages.length - 5) {
       ref.read(chatControllerProvider(_target).notifier).loadMore();
     }
   }
@@ -154,16 +165,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _scrollToMid(int mid) async {
-    final key = _messageKeys[mid];
-    if (key == null) return;
-    final ctx = key.currentContext;
-    if (ctx == null) return;
-    await Scrollable.ensureVisible(
-      ctx,
-      duration: const Duration(milliseconds: 280),
-      alignment: 0.3,
-      curve: Curves.easeOut,
-    );
+    final messages =
+        ref.read(chatControllerProvider(_target)).valueOrNull ?? const [];
+    final index = messages.indexWhere((m) => m.mid == mid);
+    if (index < 0) return;
+    if (_itemScrollController.isAttached) {
+      await _itemScrollController.scrollTo(
+        index: index,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOut,
+        // 0.0 puts the item flush with the leading edge — for a reverse list
+        // that's the bottom; 0.3 nudges it a third of the way up.
+        alignment: 0.3,
+      );
+    }
     if (!mounted) return;
     setState(() => _highlightMid = mid);
     _highlightTimer?.cancel();
@@ -283,58 +298,45 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           if (messages.isEmpty) {
                             return const _EmptyConversation();
                           }
-                          return ListView.builder(
-                            controller: _scrollCtrl,
+                          return ScrollablePositionedList.builder(
+                            itemScrollController: _itemScrollController,
+                            itemPositionsListener: _itemPositionsListener,
                             reverse: true,
                             padding:
                                 const EdgeInsets.fromLTRB(8, 16, 8, 16),
                             itemCount: messages.length,
-                            findChildIndexCallback: (key) {
-                              if (key is ValueKey<int>) {
-                                final idx = messages
-                                    .indexWhere((m) => m.mid == key.value);
-                                return idx >= 0 ? idx : null;
-                              }
-                              return null;
-                            },
                             itemBuilder: (context, index) {
                               final msg = messages[index];
                               final showSep =
                                   _showDateSeparator(messages, index);
-                              final rowKey = _messageKeys.putIfAbsent(
-                                  msg.mid, GlobalKey.new);
-                              return KeyedSubtree(
+                              return Column(
                                 key: ValueKey<int>(msg.mid),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    KeyedSubtree(
-                                      key: rowKey,
-                                      child: _MessageRow(
-                                        message: msg,
-                                        currentUid: currentUid,
-                                        status: statuses[msg.mid],
-                                        userDir: userDir,
-                                        avatarUrlBuilder: _avatarUrl,
-                                        target: _target,
-                                        highlighted: msg.mid == _highlightMid,
-                                        onRetry: msg.mid < 0 &&
-                                                statuses[msg.mid] ==
-                                                    MessageSendStatus.failed
-                                            ? () => ref
-                                                .read(chatControllerProvider(
-                                                        _target)
-                                                    .notifier)
-                                                .retrySend(msg.mid)
-                                            : null,
-                                      ),
-                                    ),
-                                    if (showSep)
-                                      _DateSeparator(
-                                          createdAt: msg.createdAt),
-                                  ],
-                                ),
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.stretch,
+                                children: [
+                                  _MessageRow(
+                                    message: msg,
+                                    currentUid: currentUid,
+                                    status: statuses[msg.mid],
+                                    userDir: userDir,
+                                    avatarUrlBuilder: _avatarUrl,
+                                    target: _target,
+                                    highlighted:
+                                        msg.mid == _highlightMid,
+                                    onRetry: msg.mid < 0 &&
+                                            statuses[msg.mid] ==
+                                                MessageSendStatus.failed
+                                        ? () => ref
+                                            .read(chatControllerProvider(
+                                                    _target)
+                                                .notifier)
+                                            .retrySend(msg.mid)
+                                        : null,
+                                  ),
+                                  if (showSep)
+                                    _DateSeparator(
+                                        createdAt: msg.createdAt),
+                                ],
                               );
                             },
                           );
