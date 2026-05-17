@@ -37,6 +37,15 @@ class AppL10nZh extends AppL10n {
   String get actionRetry => '重试';
 
   @override
+  String get chatToolPin => '置顶';
+
+  @override
+  String get chatToolSaved => '收藏';
+
+  @override
+  String get chatToolMembers => '成员';
+
+  @override
   String get settingsTitle => '设置';
 
   @override

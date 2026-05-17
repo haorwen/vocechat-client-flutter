@@ -14,6 +14,11 @@
   "actionMore": "More",
   "actionRetry": "Retry",
 
+  "chatToolPin": "Pinned",
+  "chatToolSaved": "Saved",
+  "chatToolMembers": "Members",
+
+
   "settingsTitle": "Settings",
   "settingsGroupGeneral": "general",
   "settingsGroupAbout": "about",

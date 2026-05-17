@@ -155,6 +155,24 @@ abstract class AppL10n {
   /// **'Retry'**
   String get actionRetry;
 
+  /// No description provided for @chatToolPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned'**
+  String get chatToolPin;
+
+  /// No description provided for @chatToolSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get chatToolSaved;
+
+  /// No description provided for @chatToolMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'Members'**
+  String get chatToolMembers;
+
   /// No description provided for @settingsTitle.
   ///
   /// In en, this message translates to:

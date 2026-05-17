@@ -13,6 +13,11 @@
   "actionMore": "更多",
   "actionRetry": "重试",
 
+  "chatToolPin": "置顶",
+  "chatToolSaved": "收藏",
+  "chatToolMembers": "成员",
+
+
   "settingsTitle": "设置",
   "settingsGroupGeneral": "通用",
   "settingsGroupAbout": "关于",

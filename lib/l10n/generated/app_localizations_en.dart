@@ -37,6 +37,15 @@ class AppL10nEn extends AppL10n {
   String get actionRetry => 'Retry';
 
   @override
+  String get chatToolPin => 'Pinned';
+
+  @override
+  String get chatToolSaved => 'Saved';
+
+  @override
+  String get chatToolMembers => 'Members';
+
+  @override
   String get settingsTitle => 'Settings';
 
   @override

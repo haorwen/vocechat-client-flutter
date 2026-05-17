@@ -184,88 +184,100 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Container(
       color: AppTokens.surface,
-      child: Column(
-        children: [
-          _ChatHeader(
-            title: title,
-            subtitle: subtitle,
-            avatarUrl: avatarUrl,
-            isChannel: isChannel,
-            canPop: Navigator.of(context).canPop(),
-            isOnline: dmOnline,
-            showStatus: showStatus,
-          ),
-          Expanded(
-            child: messagesAsync.when(
-              loading: () => Center(
-                child: LoadingCapsule(label: l.chatLoadingMessages),
-              ),
-              error: (e, _) =>
-                  Center(child: Text(safeText(l.errorPrefix(e.toString())))),
-              data: (messages) => messages.isEmpty
-                  ? const _EmptyConversation()
-                  : ListView.builder(
-                      controller: _scrollCtrl,
-                      reverse: true,
-                      padding:
-                          const EdgeInsets.fromLTRB(8, 16, 8, 16),
-                      itemCount: messages.length,
-                      findChildIndexCallback: (key) {
-                        if (key is ValueKey<int>) {
-                          final idx = messages
-                              .indexWhere((m) => m.mid == key.value);
-                          return idx >= 0 ? idx : null;
-                        }
-                        return null;
-                      },
-                      itemBuilder: (context, index) {
-                        final msg = messages[index];
-                        final showSep =
-                            _showDateSeparator(messages, index);
-                        // Stack newest message at bottom; the older
-                        // separator must appear above it visually,
-                        // which in reverse:true means below in the list.
-                        return KeyedSubtree(
-                          key: ValueKey<int>(msg.mid),
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.stretch,
-                            children: [
-                              _MessageRow(
-                                message: msg,
-                                currentUid: currentUid,
-                                status: statuses[msg.mid],
-                                userDir: userDir,
-                                avatarUrlBuilder: _avatarUrl,
-                                onRetry: msg.mid < 0 &&
-                                        statuses[msg.mid] ==
-                                            MessageSendStatus.failed
-                                    ? () => ref
-                                        .read(chatControllerProvider(
-                                                _target)
-                                            .notifier)
-                                        .retrySend(msg.mid)
-                                    : null,
-                              ),
-                              if (showSep)
-                                _DateSeparator(
-                                    createdAt: msg.createdAt),
-                            ],
-                          ),
-                        );
-                      },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 700;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Column(
+                  children: [
+                    _ChatHeader(
+                      title: title,
+                      subtitle: subtitle,
+                      avatarUrl: avatarUrl,
+                      isChannel: isChannel,
+                      canPop: Navigator.of(context).canPop(),
+                      isOnline: dmOnline,
+                      showStatus: showStatus,
+                      showMoreMenu: !isWide,
                     ),
-            ),
-          ),
-          _SendBox(
-            controller: _textCtrl,
-            canSend: _canSend,
-            onSend: _sendMessage,
-            placeholder: isChannel
-                ? l.chatMessagePlaceholderChannel(title)
-                : l.chatMessagePlaceholderUser(title),
-          ),
-        ],
+                    Expanded(
+                      child: messagesAsync.when(
+                        loading: () => Center(
+                          child: LoadingCapsule(label: l.chatLoadingMessages),
+                        ),
+                        error: (e, _) => Center(
+                            child:
+                                Text(safeText(l.errorPrefix(e.toString())))),
+                        data: (messages) => messages.isEmpty
+                            ? const _EmptyConversation()
+                            : ListView.builder(
+                                controller: _scrollCtrl,
+                                reverse: true,
+                                padding:
+                                    const EdgeInsets.fromLTRB(8, 16, 8, 16),
+                                itemCount: messages.length,
+                                findChildIndexCallback: (key) {
+                                  if (key is ValueKey<int>) {
+                                    final idx = messages
+                                        .indexWhere((m) => m.mid == key.value);
+                                    return idx >= 0 ? idx : null;
+                                  }
+                                  return null;
+                                },
+                                itemBuilder: (context, index) {
+                                  final msg = messages[index];
+                                  final showSep =
+                                      _showDateSeparator(messages, index);
+                                  return KeyedSubtree(
+                                    key: ValueKey<int>(msg.mid),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        _MessageRow(
+                                          message: msg,
+                                          currentUid: currentUid,
+                                          status: statuses[msg.mid],
+                                          userDir: userDir,
+                                          avatarUrlBuilder: _avatarUrl,
+                                          onRetry: msg.mid < 0 &&
+                                                  statuses[msg.mid] ==
+                                                      MessageSendStatus.failed
+                                              ? () => ref
+                                                  .read(chatControllerProvider(
+                                                          _target)
+                                                      .notifier)
+                                                  .retrySend(msg.mid)
+                                              : null,
+                                        ),
+                                        if (showSep)
+                                          _DateSeparator(
+                                              createdAt: msg.createdAt),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ),
+                    _SendBox(
+                      controller: _textCtrl,
+                      canSend: _canSend,
+                      onSend: _sendMessage,
+                      placeholder: isChannel
+                          ? l.chatMessagePlaceholderChannel(title)
+                          : l.chatMessagePlaceholderUser(title),
+                    ),
+                  ],
+                ),
+              ),
+              if (isWide) _ChatSideRail(isChannel: isChannel),
+            ],
+          );
+        },
       ),
     );
   }
@@ -285,6 +297,7 @@ class _ChatHeader extends StatelessWidget {
     required this.canPop,
     this.isOnline = false,
     this.showStatus = true,
+    this.showMoreMenu = false,
   });
 
   final String title;
@@ -294,6 +307,7 @@ class _ChatHeader extends StatelessWidget {
   final bool canPop;
   final bool isOnline;
   final bool showStatus;
+  final bool showMoreMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -383,13 +397,141 @@ class _ChatHeader extends StatelessWidget {
             onPressed: () {},
             tooltip: l.actionSearch,
           ),
-          IconButton(
-            icon: const Icon(Icons.more_horiz,
-                size: 20, color: AppTokens.gray500),
-            onPressed: () {},
-            tooltip: l.actionMore,
-          ),
+          if (showMoreMenu)
+            PopupMenuButton<_ChatTool>(
+              icon: const Icon(Icons.more_horiz,
+                  size: 20, color: AppTokens.gray500),
+              tooltip: l.actionMore,
+              onSelected: (_) {},
+              itemBuilder: (context) => [
+                if (isChannel)
+                  PopupMenuItem(
+                    value: _ChatTool.pin,
+                    child: _ChatToolMenuRow(
+                      icon: Icons.push_pin_outlined,
+                      label: l.chatToolPin,
+                    ),
+                  ),
+                PopupMenuItem(
+                  value: _ChatTool.saved,
+                  child: _ChatToolMenuRow(
+                    icon: Icons.bookmark_outline,
+                    label: l.chatToolSaved,
+                  ),
+                ),
+                if (isChannel)
+                  PopupMenuItem(
+                    value: _ChatTool.members,
+                    child: _ChatToolMenuRow(
+                      icon: Icons.people_outline,
+                      label: l.chatToolMembers,
+                    ),
+                  ),
+              ],
+            ),
         ],
+      ),
+    );
+  }
+}
+
+enum _ChatTool { pin, saved, members }
+
+class _ChatToolMenuRow extends StatelessWidget {
+  const _ChatToolMenuRow({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppTokens.gray500),
+        const SizedBox(width: 12),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 14, color: AppTokens.gray700)),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _ChatSideRail — Figma/Web "aside" column. A 56px-wide vertical rail to the
+// right of the chat surface, surfacing Pin (channels only), Saved, and
+// Members (channels only). On narrow screens these collapse into the header's
+// "more" overflow menu.
+// ---------------------------------------------------------------------------
+
+class _ChatSideRail extends StatelessWidget {
+  const _ChatSideRail({required this.isChannel});
+
+  final bool isChannel;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    return Container(
+      width: 56,
+      decoration: const BoxDecoration(
+        color: AppTokens.surface,
+        border: Border(
+          left: BorderSide(color: AppTokens.gray200, width: 1),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        children: [
+          if (isChannel) ...[
+            _RailButton(
+              icon: Icons.push_pin_outlined,
+              tooltip: l.chatToolPin,
+              onPressed: () {},
+            ),
+            const SizedBox(height: 12),
+          ],
+          _RailButton(
+            icon: Icons.bookmark_outline,
+            tooltip: l.chatToolSaved,
+            onPressed: () {},
+          ),
+          if (isChannel) ...[
+            const SizedBox(height: 12),
+            _RailButton(
+              icon: Icons.people_outline,
+              tooltip: l.chatToolMembers,
+              onPressed: () {},
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RailButton extends StatelessWidget {
+  const _RailButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, size: 20, color: AppTokens.gray500),
+        ),
       ),
     );
   }
