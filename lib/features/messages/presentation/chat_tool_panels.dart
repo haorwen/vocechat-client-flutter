@@ -137,7 +137,7 @@ class _ToolCard extends StatelessWidget {
         child: Column(
           children: [
             _ToolHeader(title: title),
-            const Divider(height: 1, color: AppTokens.gray200),
+            Divider(height: 1, color: AppTokens.gray200),
             Expanded(child: child),
           ],
         ),
@@ -168,7 +168,7 @@ class _ToolHeader extends StatelessWidget {
             ),
             const Spacer(),
             IconButton(
-              icon: const Icon(Icons.close,
+              icon: Icon(Icons.close,
                   size: 18, color: AppTokens.gray500),
               onPressed: () => Navigator.of(context).pop(),
             ),
@@ -201,7 +201,7 @@ class _PinListPanel extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: pins.length,
       separatorBuilder: (_, __) =>
-          const Divider(height: 1, color: AppTokens.gray200),
+          Divider(height: 1, color: AppTokens.gray200),
       itemBuilder: (ctx, i) {
         final p = pins[i];
         final user = userDir[p.createdBy];
@@ -213,7 +213,7 @@ class _PinListPanel extends ConsumerWidget {
           contentType: p.contentType,
           trailing: IconButton(
             tooltip: l.chatToolUnpin,
-            icon: const Icon(Icons.close,
+            icon: Icon(Icons.close,
                 size: 16, color: AppTokens.gray500),
             onPressed: () async {
               final ok = await ref
@@ -263,7 +263,7 @@ class _FavListPanel extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(vertical: 8),
           itemCount: favs.length,
           separatorBuilder: (_, __) =>
-              const Divider(height: 1, color: AppTokens.gray200),
+              Divider(height: 1, color: AppTokens.gray200),
           itemBuilder: (ctx, i) {
             final fav = favs[i];
             final first =
@@ -281,7 +281,7 @@ class _FavListPanel extends ConsumerWidget {
               contentType: first?.contentType ?? 'text/plain',
               trailing: IconButton(
                 tooltip: l.chatToolRemoveFav,
-                icon: const Icon(Icons.close,
+                icon: Icon(Icons.close,
                     size: 16, color: AppTokens.gray500),
                 onPressed: () async {
                   final ok = await ref
@@ -342,7 +342,7 @@ class _MembersListPanel extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: sorted.length,
       separatorBuilder: (_, __) =>
-          const Divider(height: 1, color: AppTokens.gray200, indent: 64),
+          Divider(height: 1, color: AppTokens.gray200, indent: 64),
       itemBuilder: (ctx, i) {
         final uid = sorted[i];
         final user = userDir[uid];
@@ -364,7 +364,7 @@ class _MembersListPanel extends ConsumerWidget {
             ),
           ),
           subtitle: isOwner
-              ? const Text('Owner',
+              ? Text('Owner',
                   style: TextStyle(
                       fontSize: 12, color: AppTokens.gray500))
               : null,
@@ -447,7 +447,7 @@ class _MessageListTile extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       _formatTime(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         color: AppTokens.gray400,
                       ),
@@ -487,7 +487,7 @@ class _EmptyState extends StatelessWidget {
         child: Text(
           label,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 13, color: AppTokens.gray500),
+          style: TextStyle(fontSize: 13, color: AppTokens.gray500),
         ),
       ),
     );
@@ -674,9 +674,7 @@ class _SearchPopoverState extends State<_SearchPopover> {
             child: Row(
               children: [
                 Expanded(
-                  child: Container(
-                    height: 36,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: AppTokens.gray100,
                       borderRadius: BorderRadius.circular(8),
@@ -685,27 +683,30 @@ class _SearchPopoverState extends State<_SearchPopover> {
                       controller: _ctrl,
                       autofocus: true,
                       onChanged: (v) => setState(() => _query = v),
+                      textAlignVertical: TextAlignVertical.center,
                       style: const TextStyle(
                           fontSize: 14, color: Color(0xFF1C1C1E)),
                       decoration: InputDecoration(
                         isCollapsed: true,
                         border: InputBorder.none,
                         hintText: l.chatSearchHint,
-                        hintStyle: const TextStyle(
+                        hintStyle: TextStyle(
                             fontSize: 14, color: AppTokens.gray400),
+                        contentPadding: const EdgeInsets.symmetric(
+                            vertical: 8, horizontal: 12),
                       ),
                     ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close,
+                  icon: Icon(Icons.close,
                       size: 18, color: AppTokens.gray500),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: AppTokens.gray200),
+          Divider(height: 1, color: AppTokens.gray200),
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 384),
             child: _query.trim().isEmpty
@@ -716,7 +717,7 @@ class _SearchPopoverState extends State<_SearchPopover> {
                         child: Text(
                           l.chatSearchEmpty,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 13, color: AppTokens.gray500),
                         ),
                       )
@@ -724,7 +725,7 @@ class _SearchPopoverState extends State<_SearchPopover> {
                         shrinkWrap: true,
                         padding: EdgeInsets.zero,
                         itemCount: results.length,
-                        separatorBuilder: (_, __) => const Divider(
+                        separatorBuilder: (_, __) => Divider(
                             height: 1, color: AppTokens.gray100, indent: 60),
                         itemBuilder: (ctx, i) {
                           final msg = results[i];
@@ -778,7 +779,7 @@ class _SearchPopoverState extends State<_SearchPopover> {
                                             const SizedBox(width: 6),
                                             Text(
                                               _formatTime(msg.createdAt),
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                   fontSize: 11,
                                                   color: AppTokens.gray400),
                                             ),

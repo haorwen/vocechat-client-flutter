@@ -42,7 +42,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
         decoration: BoxDecoration(
           color: AppTokens.surface,
           border: isWide
-              ? const Border(
+              ? Border(
                   right: BorderSide(color: AppTokens.gray200, width: 1),
                 )
               : null,
@@ -85,7 +85,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                     return Center(
                       child: Text(
                         l.contactsEmpty,
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: AppTokens.gray500, fontSize: 13),
                       ),
                     );
@@ -175,7 +175,7 @@ class _ContactsHeader extends StatelessWidget {
     final l = AppL10n.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppTokens.surface,
         border: Border(
           bottom: BorderSide(color: AppTokens.gray200, width: 1),
@@ -184,8 +184,7 @@ class _ContactsHeader extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Container(
-              height: 40,
+            child: DecoratedBox(
               decoration: BoxDecoration(
                 color: const Color(0x14000000),
                 borderRadius: BorderRadius.circular(25),
@@ -193,22 +192,23 @@ class _ContactsHeader extends StatelessWidget {
               child: TextField(
                 controller: controller,
                 onChanged: onChanged,
-                style: const TextStyle(
+                textAlignVertical: TextAlignVertical.center,
+                style: TextStyle(
                   fontSize: 14,
                   color: AppTokens.gray700,
                 ),
                 decoration: InputDecoration(
                   hintText: l.contactsSearch,
-                  hintStyle: const TextStyle(
+                  hintStyle: TextStyle(
                     color: AppTokens.gray400,
                     fontSize: 14,
                   ),
-                  prefixIcon: const Icon(Icons.search,
+                  prefixIcon: Icon(Icons.search,
                       size: 18, color: AppTokens.gray400),
                   prefixIconConstraints:
-                      const BoxConstraints(minWidth: 36, minHeight: 36),
+                      const BoxConstraints(minWidth: 36, minHeight: 0),
                   border: InputBorder.none,
-                  isDense: true,
+                  isCollapsed: true,
                   contentPadding:
                       const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                 ),
@@ -217,7 +217,7 @@ class _ContactsHeader extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           IconButton(
-            icon: const Icon(Icons.person_add_alt_1,
+            icon: Icon(Icons.person_add_alt_1,
                 size: 22, color: AppTokens.gray500),
             onPressed: () {},
             tooltip: l.contactsAdd,
@@ -242,7 +242,7 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(8, 12, 8, 4),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: AppTokens.gray500,
@@ -330,7 +330,7 @@ class _ContactTile extends ConsumerWidget {
                                     color: AppTokens.surface, width: 1.5),
                               ),
                               alignment: Alignment.center,
-                              child: const Icon(
+                              child: Icon(
                                 Icons.smart_toy_outlined,
                                 size: 8,
                                 color: AppTokens.gray600,
@@ -420,7 +420,7 @@ class _ContactProfile extends ConsumerWidget {
             const SizedBox(height: 12),
             Text(
               safeText(contact.name),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
                 color: AppTokens.gray800,
@@ -429,7 +429,7 @@ class _ContactProfile extends ConsumerWidget {
             const SizedBox(height: 4),
             Text(
               '@${safeText(contact.email).split('@').first}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 color: AppTokens.gray400,
                 height: 20 / 14,
@@ -498,7 +498,7 @@ class _ProfileAction extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
                 color: AppTokens.gray500,
@@ -527,17 +527,17 @@ class _ContactsEmptyState extends StatelessWidget {
           Container(
             width: 64,
             height: 64,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppTokens.primary50,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.person_outline,
+            child: Icon(Icons.person_outline,
                 size: 30, color: AppTokens.primary500),
           ),
           const SizedBox(height: 16),
           Text(
             l.contactsSelectTitle,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: AppTokens.gray700,
@@ -546,7 +546,7 @@ class _ContactsEmptyState extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             l.contactsSelectSubtitle,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               color: AppTokens.gray500,
             ),

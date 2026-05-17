@@ -414,7 +414,7 @@ class _ChatHeader extends StatelessWidget {
     final l = AppL10n.of(context);
     return Container(
       height: 52,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppTokens.surface,
         border: Border(
           bottom: BorderSide(color: AppTokens.gray200, width: 1),
@@ -425,7 +425,7 @@ class _ChatHeader extends StatelessWidget {
         children: [
           if (canPop)
             IconButton(
-              icon: const Icon(Icons.arrow_back,
+              icon: Icon(Icons.arrow_back,
                   size: 20, color: AppTokens.gray700),
               onPressed: () => Navigator.of(context).maybePop(),
             ),
@@ -498,14 +498,14 @@ class _ChatHeader extends StatelessWidget {
           ),
           IconButton(
             key: searchAnchorKey,
-            icon: const Icon(Icons.search,
+            icon: Icon(Icons.search,
                 size: 20, color: AppTokens.gray500),
             onPressed: onSearch,
             tooltip: l.actionSearch,
           ),
           if (showMoreMenu)
             PopupMenuButton<ChatTool>(
-              icon: const Icon(Icons.more_horiz,
+              icon: Icon(Icons.more_horiz,
                   size: 20, color: AppTokens.gray500),
               tooltip: l.actionMore,
               onSelected: (tool) {
@@ -563,7 +563,7 @@ class _ChatToolMenuRow extends StatelessWidget {
         Icon(icon, size: 18, color: AppTokens.gray500),
         const SizedBox(width: 12),
         Text(label,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 14, color: AppTokens.gray700)),
       ],
     );
@@ -595,7 +595,7 @@ class _ChatSideRail extends StatelessWidget {
     final l = AppL10n.of(context);
     return Container(
       width: 56,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppTokens.surface,
         border: Border(
           left: BorderSide(color: AppTokens.gray200, width: 1),
@@ -794,7 +794,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         decoration: BoxDecoration(
           color: AppTokens.gray50,
           borderRadius: BorderRadius.circular(6),
-          border: const Border(
+          border: Border(
             left: BorderSide(color: AppTokens.primary500, width: 3),
           ),
         ),
@@ -810,7 +810,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
     } else {
       content = Text(
         l.chatUnsupported,
-        style: const TextStyle(fontSize: 13, color: AppTokens.gray500),
+        style: TextStyle(fontSize: 13, color: AppTokens.gray500),
       );
     }
 
@@ -838,12 +838,12 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
               padding: const EdgeInsets.only(left: 56, bottom: 4),
               child: Row(
                 children: [
-                  const Icon(Icons.push_pin,
+                  Icon(Icons.push_pin,
                       size: 12, color: AppTokens.gray400),
                   const SizedBox(width: 4),
                   Text(
                     l.chatPinned,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       color: AppTokens.gray400,
                       height: 18 / 12,
@@ -889,12 +889,12 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                         if (widget.status ==
                             MessageSendStatus.sending) ...[
                           const SizedBox(width: 8),
-                          const Icon(Icons.access_time,
+                          Icon(Icons.access_time,
                               size: 12, color: AppTokens.gray400),
                         ] else if (widget.status ==
                             MessageSendStatus.failed) ...[
                           const SizedBox(width: 8),
-                          const Icon(Icons.error_outline,
+                          Icon(Icons.error_outline,
                               size: 12, color: AppTokens.error),
                         ],
                       ],
@@ -963,7 +963,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
           PopupMenuItem(
             value: 'pin',
             child: Row(children: [
-              const Icon(Icons.push_pin_outlined,
+              Icon(Icons.push_pin_outlined,
                   size: 18, color: AppTokens.gray500),
               const SizedBox(width: 12),
               Text(l.chatToolPin),
@@ -972,7 +972,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         PopupMenuItem(
           value: 'fav',
           child: Row(children: [
-            const Icon(Icons.bookmark_outline,
+            Icon(Icons.bookmark_outline,
                 size: 18, color: AppTokens.gray500),
             const SizedBox(width: 12),
             Text(l.chatToolSaved),
@@ -1082,7 +1082,7 @@ class _SendBox extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Icon(Icons.emoji_emotions_outlined,
+            Icon(Icons.emoji_emotions_outlined,
                 size: 22, color: AppTokens.gray500),
             const SizedBox(width: 12),
             Expanded(
@@ -1098,7 +1098,7 @@ class _SendBox extends StatelessWidget {
                 onSubmitted: (_) => onSend(),
                 decoration: InputDecoration(
                   hintText: placeholder,
-                  hintStyle: const TextStyle(
+                  hintStyle: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                     color: AppTokens.gray400,
@@ -1113,14 +1113,14 @@ class _SendBox extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             IconButton(
-              icon: const Icon(Icons.code,
+              icon: Icon(Icons.code,
                   size: 22, color: AppTokens.gray500),
               onPressed: () {},
               tooltip: l.chatMarkdown,
               visualDensity: VisualDensity.compact,
             ),
             IconButton(
-              icon: const Icon(Icons.attach_file_outlined,
+              icon: Icon(Icons.attach_file_outlined,
                   size: 22, color: AppTokens.gray500),
               onPressed: () {},
               tooltip: l.chatAttach,
@@ -1131,7 +1131,7 @@ class _SendBox extends StatelessWidget {
               child: canSend
                   ? IconButton(
                       key: const ValueKey('send'),
-                      icon: const Icon(Icons.send_rounded,
+                      icon: Icon(Icons.send_rounded,
                           size: 20, color: AppTokens.primary500),
                       onPressed: onSend,
                       tooltip: l.actionSend,
@@ -1163,17 +1163,17 @@ class _EmptyConversation extends StatelessWidget {
           Container(
             width: 48,
             height: 48,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppTokens.primary50,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.chat_bubble_outline,
+            child: Icon(Icons.chat_bubble_outline,
                 size: 24, color: AppTokens.primary500),
           ),
           const SizedBox(height: 12),
           Text(
             l.chatEmpty,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               color: AppTokens.gray500,
             ),

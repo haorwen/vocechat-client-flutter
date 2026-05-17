@@ -72,7 +72,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
       decoration: BoxDecoration(
         color: AppTokens.surface,
         border: isWide
-            ? const Border(
+            ? Border(
                 right: BorderSide(color: AppTokens.gray200, width: 1),
               )
             : null,
@@ -240,7 +240,7 @@ class _ChatListHeader extends StatelessWidget {
     final l = AppL10n.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppTokens.surface,
         border: Border(
           bottom: BorderSide(color: AppTokens.gray200, width: 1),
@@ -249,8 +249,7 @@ class _ChatListHeader extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Container(
-              height: 40,
+            child: DecoratedBox(
               decoration: BoxDecoration(
                 color: const Color(0x14000000), // black 8%
                 borderRadius: BorderRadius.circular(25),
@@ -258,22 +257,23 @@ class _ChatListHeader extends StatelessWidget {
               child: TextField(
                 controller: controller,
                 onChanged: onChanged,
-                style: const TextStyle(
+                textAlignVertical: TextAlignVertical.center,
+                style: TextStyle(
                   fontSize: 14,
                   color: AppTokens.gray700,
                 ),
                 decoration: InputDecoration(
                   hintText: l.chatListSearch,
-                  hintStyle: const TextStyle(
+                  hintStyle: TextStyle(
                     color: AppTokens.gray400,
                     fontSize: 14,
                   ),
-                  prefixIcon: const Icon(Icons.search,
+                  prefixIcon: Icon(Icons.search,
                       size: 18, color: AppTokens.gray400),
                   prefixIconConstraints:
-                      const BoxConstraints(minWidth: 36, minHeight: 36),
+                      const BoxConstraints(minWidth: 36, minHeight: 0),
                   border: InputBorder.none,
-                  isDense: true,
+                  isCollapsed: true,
                   contentPadding:
                       const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                 ),
@@ -282,7 +282,7 @@ class _ChatListHeader extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           IconButton(
-            icon: const Icon(Icons.add, size: 22, color: AppTokens.gray500),
+            icon: Icon(Icons.add, size: 22, color: AppTokens.gray500),
             onPressed: () {},
             tooltip: l.chatListNewChat,
           ),
@@ -356,7 +356,7 @@ class _ConversationTile extends ConsumerWidget {
                           color: AppTokens.primary50,
                           borderRadius: BorderRadius.circular(50),
                         ),
-                        child: const Icon(Icons.tag,
+                        child: Icon(Icons.tag,
                             size: 20, color: AppTokens.primary500),
                       )
                     else
@@ -397,7 +397,7 @@ class _ConversationTile extends ConsumerWidget {
                             safeText(item.name),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: AppTokens.zinc600,
@@ -410,7 +410,7 @@ class _ConversationTile extends ConsumerWidget {
                             padding: const EdgeInsets.only(left: 4),
                             child: Text(
                               _formatRelativeTime(context, item.lastAt!),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 color: AppTokens.zinc500,
                                 fontWeight: FontWeight.w500,
@@ -428,7 +428,7 @@ class _ConversationTile extends ConsumerWidget {
                             safeText(item.lastPreview ?? ''),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               color: AppTokens.zinc500,
                               height: 18 / 12,
@@ -484,7 +484,7 @@ class _EmptyState extends StatelessWidget {
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppTokens.gray500,
             fontSize: 13,
           ),
@@ -513,13 +513,13 @@ class _EmptyChatPlaceholder extends StatelessWidget {
               color: AppTokens.primary50,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.chat_bubble_rounded,
+            child: Icon(Icons.chat_bubble_rounded,
                 size: 30, color: AppTokens.primary500),
           ),
           const SizedBox(height: 16),
           Text(
             l.chatListSelectTitle,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: AppTokens.gray700,
@@ -528,7 +528,7 @@ class _EmptyChatPlaceholder extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             l.chatListSelectSubtitle,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               color: AppTokens.gray500,
             ),

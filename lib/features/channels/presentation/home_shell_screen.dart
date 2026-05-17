@@ -133,7 +133,7 @@ class _DesktopLeftRail extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(color: AppTokens.gray200),
             ),
-            child: const Icon(Icons.bolt_outlined,
+            child: Icon(Icons.bolt_outlined,
                 size: 22, color: AppTokens.primary500),
           ),
           const SizedBox(height: 16),

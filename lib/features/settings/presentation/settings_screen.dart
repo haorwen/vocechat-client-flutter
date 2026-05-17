@@ -123,7 +123,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
               child: Text(
                 _groupLabel(l, group).toUpperCase(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppTokens.gray400,
@@ -164,7 +164,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ListTile(
             title: Text(
               l.settingsLogout,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppTokens.error,
                 fontWeight: FontWeight.w600,
               ),
@@ -247,7 +247,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           if (showHeader) ...[
             Text(
               _nav.title(l),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: AppTokens.gray700,
@@ -299,7 +299,7 @@ class _SettingsRail extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(0, 0, 0, 32),
               child: Text(
                 l.settingsTitle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: AppTokens.gray800,
@@ -311,7 +311,7 @@ class _SettingsRail extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
                 child: Text(
                   _groupLabel(l, entry.key),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: AppTokens.gray400,
@@ -335,7 +335,7 @@ class _SettingsRail extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 child: Text(
                   l.settingsLogout,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppTokens.error,
@@ -377,7 +377,7 @@ class _RailItem extends StatelessWidget {
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             child: Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: AppTokens.gray600,
@@ -445,7 +445,7 @@ class _LabeledRow extends StatelessWidget {
               children: [
                 Text(
                   label.toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppTokens.gray500,
@@ -455,7 +455,7 @@ class _LabeledRow extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     color: AppTokens.gray700,
                   ),
@@ -487,7 +487,7 @@ class _SecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const fg = AppTokens.gray700;
+    final fg = AppTokens.gray700;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
@@ -550,7 +550,7 @@ class _MyAccountPane extends StatelessWidget {
                 const SizedBox(height: 12),
                 RichText(
                   text: TextSpan(
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                       color: AppTokens.gray800,
@@ -559,7 +559,7 @@ class _MyAccountPane extends StatelessWidget {
                       TextSpan(text: safeText(name)),
                       TextSpan(
                         text: '  #$uid',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w400,
                           color: AppTokens.gray500,
                         ),
@@ -671,7 +671,7 @@ class _SwitchTile extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppTokens.gray700,
@@ -680,7 +680,7 @@ class _SwitchTile extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     color: AppTokens.gray500,
                   ),
@@ -743,7 +743,7 @@ class _AppearancePane extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
                   l.appearanceTheme,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppTokens.gray500,
@@ -781,7 +781,7 @@ class _AppearancePane extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
                   l.appearanceLanguage,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppTokens.gray500,
@@ -873,7 +873,7 @@ class _OptionTile extends StatelessWidget {
                   ),
                 ),
                 if (isSelected)
-                  const Icon(Icons.check,
+                  Icon(Icons.check,
                       size: 16, color: AppTokens.primary500),
               ],
             ),
