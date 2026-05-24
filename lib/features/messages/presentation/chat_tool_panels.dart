@@ -160,10 +160,10 @@ class _ToolHeader extends StatelessWidget {
           children: [
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF1C1C1E),
+                color: AppTokens.textHeading,
               ),
             ),
             const Spacer(),
@@ -357,10 +357,10 @@ class _MembersListPanel extends ConsumerWidget {
           ),
           title: Text(
             safeText(name),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF1C1C1E),
+              color: AppTokens.textHeading,
             ),
           ),
           subtitle: isOwner
@@ -437,10 +437,10 @@ class _MessageListTile extends StatelessWidget {
                         safeText(name),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF1C1C1E),
+                          color: AppTokens.textHeading,
                         ),
                       ),
                     ),
@@ -459,9 +459,9 @@ class _MessageListTile extends StatelessWidget {
                   safeText(_previewContent()),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF4B5563),
+                    color: AppTokens.gray600,
                     height: 1.4,
                   ),
                 ),
@@ -684,8 +684,8 @@ class _SearchPopoverState extends State<_SearchPopover> {
                       autofocus: true,
                       onChanged: (v) => setState(() => _query = v),
                       textAlignVertical: TextAlignVertical.center,
-                      style: const TextStyle(
-                          fontSize: 14, color: Color(0xFF1C1C1E)),
+                      style: TextStyle(
+                          fontSize: 14, color: AppTokens.textHeading),
                       decoration: InputDecoration(
                         isCollapsed: true,
                         border: InputBorder.none,
@@ -768,11 +768,11 @@ class _SearchPopoverState extends State<_SearchPopover> {
                                                 maxLines: 1,
                                                 overflow:
                                                     TextOverflow.ellipsis,
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   fontSize: 13,
                                                   fontWeight:
                                                       FontWeight.w600,
-                                                  color: Color(0xFF1C1C1E),
+                                                  color: AppTokens.textHeading,
                                                 ),
                                               ),
                                             ),
@@ -790,9 +790,9 @@ class _SearchPopoverState extends State<_SearchPopover> {
                                           safeText(content),
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                               fontSize: 13,
-                                              color: Color(0xFF4B5563),
+                                              color: AppTokens.gray600,
                                               height: 1.4),
                                         ),
                                       ],

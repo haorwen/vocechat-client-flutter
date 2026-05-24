@@ -186,7 +186,7 @@ class _ContactsHeader extends StatelessWidget {
           Expanded(
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: const Color(0x14000000),
+                color: AppTokens.gray100,
                 borderRadius: BorderRadius.circular(25),
               ),
               child: TextField(

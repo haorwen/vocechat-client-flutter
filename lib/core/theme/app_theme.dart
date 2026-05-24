@@ -123,40 +123,42 @@ class AppTokens {
 class AppTheme {
   AppTheme._();
 
-  /// Switch [AppTokens] to a given brightness *before* building a [ThemeData].
-  /// Material itself rebuilds whenever the active theme changes, so subsequent
-  /// widget paints see the right tokens.
+  /// Update [AppTokens.brightness] to match the actually-resolved brightness
+  /// of the current frame. Call this from a widget that has access to
+  /// `Theme.of(context).brightness` (e.g. `Builder` directly under
+  /// `MaterialApp`). The previous design — mutating brightness inside the
+  /// `lightTheme` / `darkTheme` getters — broke when MaterialApp evaluated
+  /// both getters per rebuild: whichever ran last won, regardless of the
+  /// active [ThemeMode].
   static void applyBrightness(Brightness b) => AppTokens.brightness = b;
 
   static ThemeData get lightTheme {
-    applyBrightness(Brightness.light);
-
+    // Light palette, frozen — does NOT read [AppTokens], so the global
+    // brightness flag does not interfere with the ThemeData itself.
     final base = ColorScheme.fromSeed(
-      seedColor: AppTokens.primary400,
+      seedColor: const Color(0xFF22CCEE),
       brightness: Brightness.light,
     ).copyWith(
-      primary: AppTokens.primary500,
+      primary: const Color(0xFF06AED4),
       onPrimary: Colors.white,
-      primaryContainer: AppTokens.primary50,
-      onPrimaryContainer: AppTokens.primary500,
-      surface: AppTokens.surface,
-      onSurface: AppTokens.gray800,
-      onSurfaceVariant: AppTokens.gray500,
-      surfaceContainerLow: AppTokens.gray50,
-      surfaceContainer: AppTokens.gray100,
-      surfaceContainerHigh: AppTokens.gray100,
-      surfaceContainerHighest: AppTokens.gray200,
-      outline: AppTokens.gray300,
-      outlineVariant: AppTokens.gray200,
-      error: AppTokens.error,
+      primaryContainer: const Color(0xFFECFDFF),
+      onPrimaryContainer: const Color(0xFF06AED4),
+      surface: const Color(0xFFFFFFFF),
+      onSurface: const Color(0xFF1D2939),
+      onSurfaceVariant: const Color(0xFF667085),
+      surfaceContainerLow: const Color(0xFFF9FAFB),
+      surfaceContainer: const Color(0xFFF2F4F7),
+      surfaceContainerHigh: const Color(0xFFF2F4F7),
+      surfaceContainerHighest: const Color(0xFFEAECF0),
+      outline: const Color(0xFFD0D5DD),
+      outlineVariant: const Color(0xFFEAECF0),
+      error: const Color(0xFFF04438),
     );
 
     return _buildTheme(base, Brightness.light);
   }
 
   static ThemeData get darkTheme {
-    applyBrightness(Brightness.dark);
-
     // Web reference dark palette
     //   bg page    neutral-900  #0A0A0A
     //   bg card    gray-800     #1F2937
@@ -170,7 +172,7 @@ class AppTheme {
     const borderC = Color(0xFF4B5563);
 
     final base = ColorScheme.fromSeed(
-      seedColor: AppTokens.primary400,
+      seedColor: const Color(0xFF22CCEE),
       brightness: Brightness.dark,
     ).copyWith(
       primary: const Color(0xFF22CCEE),

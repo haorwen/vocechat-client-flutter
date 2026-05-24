@@ -251,7 +251,7 @@ class _ChatListHeader extends StatelessWidget {
           Expanded(
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: const Color(0x14000000), // black 8%
+                color: AppTokens.gray100, // theme-aware search field fill
                 borderRadius: BorderRadius.circular(25),
               ),
               child: TextField(

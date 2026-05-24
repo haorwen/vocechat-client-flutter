@@ -18,6 +18,18 @@ class VoceChatApp extends ConsumerWidget {
     final router = ref.watch(goRouterProvider);
     final themeMode = ref.watch(themeModeNotifierProvider);
     final locale = ref.watch(localeNotifierProvider);
+
+    // AppTokens.* getters resolve through a global brightness flag. We must
+    // sync that flag to the brightness MaterialApp actually picks (which
+    // depends on `themeMode` plus, when system, the platform brightness).
+    final platformBrightness = MediaQuery.platformBrightnessOf(context);
+    final resolvedBrightness = switch (themeMode) {
+      ThemeMode.light => Brightness.light,
+      ThemeMode.dark => Brightness.dark,
+      ThemeMode.system => platformBrightness,
+    };
+    AppTheme.applyBrightness(resolvedBrightness);
+
     return MaterialApp.router(
       title: 'VoceChat',
       theme: AppTheme.lightTheme,
