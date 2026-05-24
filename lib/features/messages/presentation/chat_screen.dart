@@ -430,10 +430,10 @@ class _ChatHeader extends StatelessWidget {
               onPressed: () => Navigator.of(context).maybePop(),
             ),
           if (isChannel)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(right: 4),
               child: Icon(Icons.tag,
-                  size: 20, color: Color(0xFF1C1C1E)),
+                  size: 20, color: AppTokens.textHeading),
             )
           else
             Padding(
@@ -470,10 +470,10 @@ class _ChatHeader extends StatelessWidget {
                     safeText(title),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF1C1C1E),
+                      color: AppTokens.textHeading,
                       height: 24 / 16,
                     ),
                   ),
@@ -485,9 +485,9 @@ class _ChatHeader extends StatelessWidget {
                       safeText(subtitle!),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        color: Color(0xFF616161),
+                        color: AppTokens.gray500,
                         height: 24 / 16,
                       ),
                     ),
@@ -685,7 +685,7 @@ class _DateSeparator extends StatelessWidget {
         children: [
           Container(
             height: 1,
-            color: const Color(0xFFE3E5E8),
+            color: AppTokens.borderSubtle,
           ),
           Container(
             color: AppTokens.surface,
@@ -693,10 +693,10 @@ class _DateSeparator extends StatelessWidget {
                 const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             child: Text(
               _formatDate(),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF78787C),
+                color: AppTokens.gray500,
                 height: 18 / 12,
               ),
             ),
@@ -771,9 +771,9 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         content = MarkdownBody(
           data: safeText(detail.content),
           styleSheet: MarkdownStyleSheet(
-            p: const TextStyle(
+            p: TextStyle(
               fontSize: 14,
-              color: Color(0xFF374151),
+              color: AppTokens.gray700,
               height: 20 / 14,
             ),
           ),
@@ -781,9 +781,9 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
       } else {
         content = Text(
           safeText(detail.content),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
-            color: Color(0xFF374151),
+            color: AppTokens.gray700,
             height: 20 / 14,
           ),
         );
@@ -800,9 +800,9 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         ),
         child: Text(
           safeText(detail.content),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
-            color: Color(0xFF374151),
+            color: AppTokens.gray700,
             height: 20 / 14,
           ),
         ),
@@ -869,20 +869,20 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                       children: [
                         Text(
                           safeText(senderName),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF06B6D4),
+                            color: AppTokens.primary600,
                             height: 20 / 14,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           dateLabel,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFFBFBFBF),
+                            color: AppTokens.gray400,
                             height: 18 / 12,
                           ),
                         ),
@@ -1076,7 +1076,7 @@ class _SendBox extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFE5E7EB),
+          color: AppTokens.borderSubtle,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -1090,9 +1090,9 @@ class _SendBox extends StatelessWidget {
                 controller: controller,
                 minLines: 1,
                 maxLines: 5,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF374151),
+                  color: AppTokens.gray700,
                   height: 20 / 14,
                 ),
                 onSubmitted: (_) => onSend(),
