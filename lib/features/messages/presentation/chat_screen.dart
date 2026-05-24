@@ -741,6 +741,7 @@ class _MessageRow extends ConsumerStatefulWidget {
 
 class _MessageRowState extends ConsumerState<_MessageRow> {
   bool _hovered = false;
+  final GlobalKey _toolbarKey = GlobalKey();
 
   bool get _isPinned {
     final p = (widget.message.detail is NormalMessageDetail)
@@ -916,16 +917,21 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: Stack(
-        clipBehavior: Clip.none,
         children: [
           mainRow,
           if (_hovered)
             Positioned(
-              top: -16,
+              // Anchor toolbar to the top-right of the message row so it
+              // stays inside the MouseRegion's hit-test bounds. Floating
+              // it above the row (negative top) makes the cursor exit
+              // the MouseRegion when it moves up, which causes the
+              // toolbar to jump to the previous message.
+              top: 0,
               right: 10,
               child: _ReplyActionsBar(
+                key: _toolbarKey,
                 onEmojiTap: widget.message.mid > 0
-                    ? () => _openReactionPicker(context)
+                    ? () => _openReactionPicker()
                     : null,
               ),
             ),
@@ -950,16 +956,24 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
     return row;
   }
 
-  Future<void> _openReactionPicker(BuildContext anchorContext) async {
+  Future<void> _openReactionPicker() async {
     final mid = widget.message.mid;
     if (mid <= 0) return;
-    // Position the picker as a popup beneath the message row, centered on
-    // the tap target. Mirrors the web `Tippy` placement="right-start".
+    // Anchor the picker to the floating toolbar so it appears flush
+    // beneath it (matches the web reference's Tippy popover that hugs
+    // its trigger). Falling back to the row bounds would place it
+    // far below the message — visually disconnected from the toolbar.
+    final anchorContext =
+        _toolbarKey.currentContext ?? context;
     final overlay =
         Overlay.of(anchorContext).context.findRenderObject() as RenderBox;
     final box = anchorContext.findRenderObject() as RenderBox?;
     if (box == null) return;
     final offset = box.localToGlobal(Offset.zero);
+    const pickerWidth = 220.0;
+    const pickerHeight = 220.0;
+    const gap = 4.0;
+    final rightEdge = offset.dx + box.size.width;
     await showDialog<void>(
       context: anchorContext,
       barrierColor: Colors.transparent,
@@ -974,13 +988,15 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
               ),
             ),
             Positioned(
-              left: (offset.dx + box.size.width - 220)
-                  .clamp(8.0, overlay.size.width - 220 - 8)
+              // Right-align with the toolbar's right edge.
+              left: (rightEdge - pickerWidth)
+                  .clamp(8.0, overlay.size.width - pickerWidth - 8)
                   .toDouble(),
-              top: (offset.dy + box.size.height + 6)
-                  .clamp(8.0, overlay.size.height - 220 - 8)
+              // Place flush beneath the toolbar with a small gap.
+              top: (offset.dy + box.size.height + gap)
+                  .clamp(8.0, overlay.size.height - pickerHeight - 8)
                   .toDouble(),
-              width: 220,
+              width: pickerWidth,
               child: Material(
                 color: Colors.transparent,
                 child: ReactionPicker(
@@ -1042,7 +1058,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
     );
     if (!mounted || selection == null) return;
     if (selection == 'react') {
-      _openReactionPicker(context);
+      _openReactionPicker();
     } else if (selection == 'pin') {
       final gid = widget.target.map<int>(
         user: (_) => 0,
@@ -1072,7 +1088,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
 // ---------------------------------------------------------------------------
 
 class _ReplyActionsBar extends StatelessWidget {
-  const _ReplyActionsBar({this.onEmojiTap});
+  const _ReplyActionsBar({super.key, this.onEmojiTap});
 
   final VoidCallback? onEmojiTap;
 
