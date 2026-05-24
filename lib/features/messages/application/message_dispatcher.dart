@@ -6,6 +6,7 @@ import '../../../core/network/sse_client.dart';
 import '../../channels/application/conversation_providers.dart';
 import '../../contacts/application/presence_provider.dart';
 import '../domain/message_models.dart';
+import 'reactions_provider.dart';
 
 part 'message_dispatcher.g.dart';
 
@@ -29,6 +30,16 @@ class MessageDispatcher extends _$MessageDispatcher {
       next.whenData((event) {
         if (event is ChatEventChat) {
           final msg = event.message;
+
+          // Reaction events arrive as chat messages with type=reaction.
+          // Route them to the reactions provider; do NOT add them to chat
+          // history (they're not displayable on their own — they mutate the
+          // target message's reaction set).
+          final detail = msg.detail;
+          if (detail is ReactionMessageDetail) {
+            _handleReaction(msg, detail);
+            return;
+          }
 
           // Update the conversation list preview/timestamp.
           ref
@@ -90,5 +101,27 @@ class MessageDispatcher extends _$MessageDispatcher {
       if (v is Map<String, dynamic>) return v;
     } catch (_) {}
     return null;
+  }
+
+  /// Dispatch a reaction-type chat message:
+  ///   - `like` → toggle the emoji on the target message
+  ///   - `delete` → strip reactions for the deleted target
+  ///   - `edit` → ignored here (chat content edits live in ChatController)
+  void _handleReaction(ChatMessage msg, ReactionMessageDetail detail) {
+    final inner = detail.detail;
+    final type = inner['type'];
+    if (type == 'like') {
+      final action = inner['action'];
+      if (action is String && action.isNotEmpty) {
+        ref.read(reactionsProvider.notifier).applyLike(
+              reactionMid: msg.mid,
+              targetMid: detail.mid,
+              fromUid: msg.fromUid,
+              emoji: action,
+            );
+      }
+    } else if (type == 'delete') {
+      ref.read(reactionsProvider.notifier).removeFor(detail.mid);
+    }
   }
 }

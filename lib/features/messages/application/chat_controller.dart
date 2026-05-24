@@ -49,6 +49,10 @@ class ChatController extends _$ChatController {
   /// Coalesces bursts: SSE replay on reconnect can deliver dozens of
   /// messages back-to-back, and emitting state per message hitches the UI.
   void applyIncomingMessage(ChatMessage msg) {
+    // Reactions are sidecar events on existing messages, not their own row.
+    // They're handled by MessageDispatcher → ReactionsNotifier.
+    if (msg.detail is ReactionMessageDetail) return;
+
     final currentUid = _currentUid();
 
     // DM session id is always the OTHER user's uid:

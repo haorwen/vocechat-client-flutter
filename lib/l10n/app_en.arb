@@ -15,6 +15,7 @@
   "actionRetry": "Retry",
 
   "chatToolPin": "Pinned",
+  "chatActionReact": "Add reaction",
   "chatToolSaved": "Saved",
   "chatToolMembers": "Members",
   "chatToolEmpty": "No content yet.",

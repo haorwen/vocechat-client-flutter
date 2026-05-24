@@ -161,6 +161,12 @@ abstract class AppL10n {
   /// **'Pinned'**
   String get chatToolPin;
 
+  /// No description provided for @chatActionReact.
+  ///
+  /// In en, this message translates to:
+  /// **'Add reaction'**
+  String get chatActionReact;
+
   /// No description provided for @chatToolSaved.
   ///
   /// In en, this message translates to:

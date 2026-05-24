@@ -40,6 +40,9 @@ class AppL10nEn extends AppL10n {
   String get chatToolPin => 'Pinned';
 
   @override
+  String get chatActionReact => 'Add reaction';
+
+  @override
   String get chatToolSaved => 'Saved';
 
   @override

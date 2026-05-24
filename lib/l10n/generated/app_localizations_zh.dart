@@ -40,6 +40,9 @@ class AppL10nZh extends AppL10n {
   String get chatToolPin => '置顶';
 
   @override
+  String get chatActionReact => '添加表情';
+
+  @override
   String get chatToolSaved => '收藏';
 
   @override

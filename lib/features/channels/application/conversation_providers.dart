@@ -476,6 +476,11 @@ class Conversations extends _$Conversations {
   /// can replay dozens of messages in one tick, and rebuilding the entire
   /// chat list per message visibly hitches the UI.
   void applyIncomingMessage(ChatMessage msg) {
+    // Reactions are sidecar events: they don't bump the conversation preview
+    // or recency. Match the web client which routes reaction messages to the
+    // reaction slice but not the chat list.
+    if (msg.detail is ReactionMessageDetail) return;
+
     // DM session id is always the OTHER user's uid:
     //   - outgoing  → msg.target.uid is the peer
     //   - incoming  → msg.target.uid is OURSELF; the peer is msg.fromUid

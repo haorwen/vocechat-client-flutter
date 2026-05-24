@@ -19,6 +19,7 @@ import '../application/chat_tools_provider.dart';
 import '../domain/message_models.dart';
 import '../domain/message_status.dart';
 import 'chat_tool_panels.dart';
+import 'reaction_widgets.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String id;
@@ -901,6 +902,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                     ),
                     const SizedBox(height: 8),
                     content,
+                    if (msg.mid > 0) ReactionBar(mid: msg.mid),
                   ],
                 ),
               ),
@@ -921,7 +923,11 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
             Positioned(
               top: -16,
               right: 10,
-              child: const _ReplyActionsBar(),
+              child: _ReplyActionsBar(
+                onEmojiTap: widget.message.mid > 0
+                    ? () => _openReactionPicker(context)
+                    : null,
+              ),
             ),
         ],
       ),
@@ -944,6 +950,51 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
     return row;
   }
 
+  Future<void> _openReactionPicker(BuildContext anchorContext) async {
+    final mid = widget.message.mid;
+    if (mid <= 0) return;
+    // Position the picker as a popup beneath the message row, centered on
+    // the tap target. Mirrors the web `Tippy` placement="right-start".
+    final overlay =
+        Overlay.of(anchorContext).context.findRenderObject() as RenderBox;
+    final box = anchorContext.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final offset = box.localToGlobal(Offset.zero);
+    await showDialog<void>(
+      context: anchorContext,
+      barrierColor: Colors.transparent,
+      builder: (ctx) {
+        return Stack(
+          children: [
+            // Transparent overlay that dismisses the picker on outside tap.
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => Navigator.of(ctx).pop(),
+              ),
+            ),
+            Positioned(
+              left: (offset.dx + box.size.width - 220)
+                  .clamp(8.0, overlay.size.width - 220 - 8)
+                  .toDouble(),
+              top: (offset.dy + box.size.height + 6)
+                  .clamp(8.0, overlay.size.height - 220 - 8)
+                  .toDouble(),
+              width: 220,
+              child: Material(
+                color: Colors.transparent,
+                child: ReactionPicker(
+                  mid: mid,
+                  onPicked: () => Navigator.of(ctx).pop(),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _openContextMenu(Offset globalPos) async {
     final l = AppL10n.of(context);
     final isChannel = widget.target.map<bool>(
@@ -959,6 +1010,15 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         Offset.zero & overlay.size,
       ),
       items: [
+        PopupMenuItem(
+          value: 'react',
+          child: Row(children: [
+            Icon(Icons.emoji_emotions_outlined,
+                size: 18, color: AppTokens.gray500),
+            const SizedBox(width: 12),
+            Text(l.chatActionReact),
+          ]),
+        ),
         if (isChannel)
           PopupMenuItem(
             value: 'pin',
@@ -981,7 +1041,9 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
       ],
     );
     if (!mounted || selection == null) return;
-    if (selection == 'pin') {
+    if (selection == 'react') {
+      _openReactionPicker(context);
+    } else if (selection == 'pin') {
       final gid = widget.target.map<int>(
         user: (_) => 0,
         group: (t) => t.gid,
@@ -1010,7 +1072,9 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
 // ---------------------------------------------------------------------------
 
 class _ReplyActionsBar extends StatelessWidget {
-  const _ReplyActionsBar();
+  const _ReplyActionsBar({this.onEmojiTap});
+
+  final VoidCallback? onEmojiTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1022,11 +1086,14 @@ class _ReplyActionsBar extends StatelessWidget {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: const [
-          _ReplyIcon(icon: Icons.emoji_emotions_outlined),
-          _ReplyIcon(icon: Icons.reply_outlined),
-          _ReplyIcon(icon: Icons.bookmark_add_outlined),
-          _ReplyIcon(icon: Icons.more_horiz),
+        children: [
+          _ReplyIcon(
+            icon: Icons.emoji_emotions_outlined,
+            onTap: onEmojiTap,
+          ),
+          const _ReplyIcon(icon: Icons.reply_outlined),
+          const _ReplyIcon(icon: Icons.bookmark_add_outlined),
+          const _ReplyIcon(icon: Icons.more_horiz),
         ],
       ),
     );
@@ -1034,13 +1101,14 @@ class _ReplyActionsBar extends StatelessWidget {
 }
 
 class _ReplyIcon extends StatelessWidget {
-  const _ReplyIcon({required this.icon});
+  const _ReplyIcon({required this.icon, this.onTap});
   final IconData icon;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap ?? () {},
       child: Padding(
         padding: const EdgeInsets.all(4),
         child: Icon(icon, size: 20, color: AppTokens.gray500),

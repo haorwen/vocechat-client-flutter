@@ -14,6 +14,7 @@
   "actionRetry": "重试",
 
   "chatToolPin": "置顶",
+  "chatActionReact": "添加表情",
   "chatToolSaved": "收藏",
   "chatToolMembers": "成员",
   "chatToolEmpty": "暂无内容",
