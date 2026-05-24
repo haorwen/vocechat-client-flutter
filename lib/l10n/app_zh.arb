@@ -167,6 +167,7 @@
   "chatUnsupported": "[不支持的消息]",
   "chatMarkdown": "Markdown",
   "chatAttach": "附件",
+  "chatEmoji": "表情",
   "chatUserFallback": "用户 {uid}",
   "chatGroupFallback": "群组 {gid}",
 

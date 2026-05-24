@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -1134,8 +1135,11 @@ class _ReplyIcon extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// _SendBox — Figma "Send / Input / Send". gray-200 bg, 16px radius,
-// emoji left, placeholder, markdown + attach actions right.
+// _SendBox — matches the web client `Send` component:
+//   • outer `bg-gray-200` rounded pill, 8px radius
+//   • emoji picker pinned bottom-left (absolute), input padded behind it
+//   • right-side toolbar: markdown, attach (+), send (zoom-in when text)
+//   • icons are flat gray — no IconButton ripple boxes, no primary fill
 // ---------------------------------------------------------------------------
 
 class _SendBox extends StatelessWidget {
@@ -1154,76 +1158,144 @@ class _SendBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
+    // Web: outer wrapper is `px-2 py-0 md:p-4` (16px desktop padding all
+    // sides), Send itself is `w-full bg-gray-200 rounded-lg` with no extra
+    // margin. Inner: `px-4 py-3.5` = 16px / 14px. We match that here.
     return Container(
       color: AppTokens.surface,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
         decoration: BoxDecoration(
           color: AppTokens.borderSubtle,
           borderRadius: BorderRadius.circular(8),
         ),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(Icons.emoji_emotions_outlined,
-                size: 22, color: AppTokens.gray500),
+            _SendIcon(
+              icon: Icons.emoji_emotions_outlined,
+              tooltip: l.chatEmoji,
+              onTap: () {},
+            ),
             const SizedBox(width: 12),
             Expanded(
-              child: TextField(
-                controller: controller,
-                minLines: 1,
-                maxLines: 5,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppTokens.gray700,
-                  height: 20 / 14,
-                ),
-                onSubmitted: (_) => onSend(),
-                decoration: InputDecoration(
-                  hintText: placeholder,
-                  hintStyle: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppTokens.gray400,
-                    height: 20 / 14,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 200),
+                child: CallbackShortcuts(
+                  bindings: <ShortcutActivator, VoidCallback>{
+                    // Bare Enter sends. Shift+Enter falls through to the
+                    // TextField and inserts a newline.
+                    const SingleActivator(LogicalKeyboardKey.enter): () {
+                      if (canSend) onSend();
+                    },
+                    const SingleActivator(LogicalKeyboardKey.numpadEnter): () {
+                      if (canSend) onSend();
+                    },
+                  },
+                  child: TextField(
+                    controller: controller,
+                    minLines: 1,
+                    maxLines: null,
+                    keyboardType: TextInputType.multiline,
+                    textInputAction: TextInputAction.newline,
+                    cursorColor: AppTokens.primary500,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppTokens.gray700,
+                      height: 20 / 14,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: placeholder,
+                      hintStyle: TextStyle(
+                        fontSize: 14,
+                        color: AppTokens.gray400,
+                        height: 20 / 14,
+                      ),
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
+                      isCollapsed: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 8),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: Icon(Icons.code,
-                  size: 22, color: AppTokens.gray500),
-              onPressed: () {},
+            const SizedBox(width: 14),
+            _SendIcon(
+              icon: Icons.code,
               tooltip: l.chatMarkdown,
-              visualDensity: VisualDensity.compact,
+              onTap: () {},
             ),
-            IconButton(
-              icon: Icon(Icons.attach_file_outlined,
-                  size: 22, color: AppTokens.gray500),
-              onPressed: () {},
+            const SizedBox(width: 10),
+            _SendIcon(
+              icon: Icons.add_circle,
               tooltip: l.chatAttach,
-              visualDensity: VisualDensity.compact,
+              onTap: () {},
             ),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 150),
-              child: canSend
-                  ? IconButton(
-                      key: const ValueKey('send'),
-                      icon: Icon(Icons.send_rounded,
-                          size: 20, color: AppTokens.primary500),
-                      onPressed: onSend,
-                      tooltip: l.actionSend,
-                      visualDensity: VisualDensity.compact,
-                    )
-                  : const SizedBox(width: 0),
+            ClipRect(
+              child: AnimatedAlign(
+                alignment: Alignment.centerRight,
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                widthFactor: canSend ? 1 : 0,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 10),
+                  child: AnimatedScale(
+                    scale: canSend ? 1 : 0.6,
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutBack,
+                    child: AnimatedOpacity(
+                      opacity: canSend ? 1 : 0,
+                      duration: const Duration(milliseconds: 120),
+                      child: _SendIcon(
+                        icon: Icons.send_rounded,
+                        tooltip: l.actionSend,
+                        onTap: canSend ? onSend : null,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// Flat gray icon used inside the send pill. No ripple box, tight hit area
+// (28px) so the icons sit close together like the web toolbar.
+class _SendIcon extends StatelessWidget {
+  const _SendIcon({
+    required this.icon,
+    required this.tooltip,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final iconWidget = Icon(icon, size: 22, color: AppTokens.gray500);
+    return Tooltip(
+      message: tooltip,
+      child: InkResponse(
+        onTap: onTap,
+        radius: 18,
+        containedInkWell: false,
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: Center(child: iconWidget),
         ),
       ),
     );

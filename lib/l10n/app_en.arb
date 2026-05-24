@@ -195,6 +195,7 @@
   "chatUnsupported": "[unsupported message]",
   "chatMarkdown": "Markdown",
   "chatAttach": "Attach",
+  "chatEmoji": "Emoji",
   "chatUserFallback": "User {uid}",
   "@chatUserFallback": {
     "placeholders": {"uid": {"type": "int"}}

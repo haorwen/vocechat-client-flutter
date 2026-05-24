@@ -475,6 +475,9 @@ class AppL10nEn extends AppL10n {
   String get chatAttach => 'Attach';
 
   @override
+  String get chatEmoji => 'Emoji';
+
+  @override
   String chatUserFallback(int uid) {
     return 'User $uid';
   }

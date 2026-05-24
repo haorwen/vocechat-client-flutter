@@ -475,6 +475,9 @@ class AppL10nZh extends AppL10n {
   String get chatAttach => '附件';
 
   @override
+  String get chatEmoji => '表情';
+
+  @override
   String chatUserFallback(int uid) {
     return '用户 $uid';
   }

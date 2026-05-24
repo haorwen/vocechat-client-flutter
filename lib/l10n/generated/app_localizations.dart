@@ -995,6 +995,12 @@ abstract class AppL10n {
   /// **'Attach'**
   String get chatAttach;
 
+  /// No description provided for @chatEmoji.
+  ///
+  /// In en, this message translates to:
+  /// **'Emoji'**
+  String get chatEmoji;
+
   /// No description provided for @chatUserFallback.
   ///
   /// In en, this message translates to:
