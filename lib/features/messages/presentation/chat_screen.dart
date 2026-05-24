@@ -311,11 +311,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               final msg = messages[index];
                               final showSep =
                                   _showDateSeparator(messages, index);
+                              // reverse:true → Column children render top→bottom
+                              // visually above→below the row. Date separator
+                              // belongs ABOVE the day's first message (oldest
+                              // of that day), so it must come BEFORE the row
+                              // in the Column.
                               return Column(
                                 key: ValueKey<int>(msg.mid),
                                 crossAxisAlignment:
                                     CrossAxisAlignment.stretch,
                                 children: [
+                                  if (showSep)
+                                    _DateSeparator(
+                                        createdAt: msg.createdAt),
                                   _MessageRow(
                                     message: msg,
                                     currentUid: currentUid,
@@ -335,9 +343,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                             .retrySend(msg.mid)
                                         : null,
                                   ),
-                                  if (showSep)
-                                    _DateSeparator(
-                                        createdAt: msg.createdAt),
                                 ],
                               );
                             },
