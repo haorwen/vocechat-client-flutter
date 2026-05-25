@@ -44,6 +44,15 @@ dependencies:
   cached_network_image: ^3.4.1
   image_picker: ^1.1.2
   file_picker: ^8.1.4
+  photo_view: ^0.15.0
+
+  # Media playback
+  video_player: ^2.9.2
+  chewie: ^1.8.5
+  just_audio: ^0.9.42
+
+  # External
+  url_launcher: ^6.3.1
 
   # Markdown
   flutter_markdown: ^0.7.4+3

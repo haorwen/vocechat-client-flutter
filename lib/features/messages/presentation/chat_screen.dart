@@ -22,6 +22,7 @@ import '../application/chat_tools_provider.dart';
 import '../domain/message_models.dart';
 import '../domain/message_status.dart';
 import 'chat_tool_panels.dart';
+import 'file_message_content.dart';
 import 'reaction_widgets.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -943,7 +944,13 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         onCancel: widget.onEditCancel ?? () {},
       );
     } else if (detail is NormalMessageDetail || msg.isEdited) {
-      if (displayContentType == 'text/markdown') {
+      if (displayContentType == 'vocechat/file') {
+        final props = detail is NormalMessageDetail ? detail.properties : null;
+        content = FileMessageContent(
+          content: displayContent,
+          properties: props,
+        );
+      } else if (displayContentType == 'text/markdown') {
         content = MarkdownBody(
           data: safeText(displayContent),
           styleSheet: MarkdownStyleSheet(
@@ -978,10 +985,23 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
           ? widget.userDir[original.fromUid]
           : null;
       final originalName = originalAuthor?.name ?? '#${detail.mid}';
-      final originalSnippet = original?.displayContent
-              .replaceAll('\n', ' ')
-              .trim() ??
-          '';
+      String originalSnippet = '';
+      if (original != null) {
+        if (original.displayContentType == 'vocechat/file') {
+          final originalDetail = original.detail;
+          final originalProps = originalDetail is NormalMessageDetail
+              ? originalDetail.properties
+              : null;
+          originalSnippet = fileMessageReplySnippet(
+                original.displayContent,
+                originalProps,
+              ) ??
+              '';
+        } else {
+          originalSnippet =
+              original.displayContent.replaceAll('\n', ' ').trim();
+        }
+      }
       final clippedSnippet = originalSnippet.length > 80
           ? '${originalSnippet.substring(0, 80)}…'
           : originalSnippet;
@@ -1037,14 +1057,20 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            safeText(displayContent),
-            style: TextStyle(
-              fontSize: 14,
-              color: AppTokens.gray700,
-              height: 20 / 14,
+          if (displayContentType == 'vocechat/file')
+            FileMessageContent(
+              content: displayContent,
+              properties: detail.properties,
+            )
+          else
+            Text(
+              safeText(displayContent),
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTokens.gray700,
+                height: 20 / 14,
+              ),
             ),
-          ),
         ],
       );
     } else {
