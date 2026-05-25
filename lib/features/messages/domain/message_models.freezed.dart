@@ -1165,7 +1165,15 @@ mixin _$ChatMessage {
   @JsonKey(fromJson: _messageTargetFromJson, toJson: _messageTargetToJson)
   MessageTarget get target => throw _privateConstructorUsedError;
   @JsonKey(fromJson: _messageDetailFromJson, toJson: _messageDetailToJson)
-  MessageDetail get detail => throw _privateConstructorUsedError;
+  MessageDetail get detail =>
+      throw _privateConstructorUsedError; // Client-derived: populated when an edit-reaction echo arrives for this
+// message. Never sent by the server on initial delivery; round-tripped
+// through the SQLite payload via toJson/fromJson so an edit survives an
+// app restart.
+  @JsonKey(name: 'edited_content')
+  String? get editedContent => throw _privateConstructorUsedError;
+  @JsonKey(name: 'edited_content_type')
+  String? get editedContentType => throw _privateConstructorUsedError;
 
   /// Serializes this ChatMessage to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -1190,7 +1198,9 @@ abstract class $ChatMessageCopyWith<$Res> {
       @JsonKey(fromJson: _messageTargetFromJson, toJson: _messageTargetToJson)
       MessageTarget target,
       @JsonKey(fromJson: _messageDetailFromJson, toJson: _messageDetailToJson)
-      MessageDetail detail});
+      MessageDetail detail,
+      @JsonKey(name: 'edited_content') String? editedContent,
+      @JsonKey(name: 'edited_content_type') String? editedContentType});
 
   $MessageTargetCopyWith<$Res> get target;
   $MessageDetailCopyWith<$Res> get detail;
@@ -1216,6 +1226,8 @@ class _$ChatMessageCopyWithImpl<$Res, $Val extends ChatMessage>
     Object? createdAt = null,
     Object? target = null,
     Object? detail = null,
+    Object? editedContent = freezed,
+    Object? editedContentType = freezed,
   }) {
     return _then(_value.copyWith(
       mid: null == mid
@@ -1238,6 +1250,14 @@ class _$ChatMessageCopyWithImpl<$Res, $Val extends ChatMessage>
           ? _value.detail
           : detail // ignore: cast_nullable_to_non_nullable
               as MessageDetail,
+      editedContent: freezed == editedContent
+          ? _value.editedContent
+          : editedContent // ignore: cast_nullable_to_non_nullable
+              as String?,
+      editedContentType: freezed == editedContentType
+          ? _value.editedContentType
+          : editedContentType // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 
@@ -1277,7 +1297,9 @@ abstract class _$$ChatMessageImplCopyWith<$Res>
       @JsonKey(fromJson: _messageTargetFromJson, toJson: _messageTargetToJson)
       MessageTarget target,
       @JsonKey(fromJson: _messageDetailFromJson, toJson: _messageDetailToJson)
-      MessageDetail detail});
+      MessageDetail detail,
+      @JsonKey(name: 'edited_content') String? editedContent,
+      @JsonKey(name: 'edited_content_type') String? editedContentType});
 
   @override
   $MessageTargetCopyWith<$Res> get target;
@@ -1303,6 +1325,8 @@ class __$$ChatMessageImplCopyWithImpl<$Res>
     Object? createdAt = null,
     Object? target = null,
     Object? detail = null,
+    Object? editedContent = freezed,
+    Object? editedContentType = freezed,
   }) {
     return _then(_$ChatMessageImpl(
       mid: null == mid
@@ -1325,13 +1349,21 @@ class __$$ChatMessageImplCopyWithImpl<$Res>
           ? _value.detail
           : detail // ignore: cast_nullable_to_non_nullable
               as MessageDetail,
+      editedContent: freezed == editedContent
+          ? _value.editedContent
+          : editedContent // ignore: cast_nullable_to_non_nullable
+              as String?,
+      editedContentType: freezed == editedContentType
+          ? _value.editedContentType
+          : editedContentType // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
 
 /// @nodoc
 @JsonSerializable()
-class _$ChatMessageImpl implements _ChatMessage {
+class _$ChatMessageImpl extends _ChatMessage {
   const _$ChatMessageImpl(
       {required this.mid,
       @JsonKey(name: 'from_uid') required this.fromUid,
@@ -1339,7 +1371,10 @@ class _$ChatMessageImpl implements _ChatMessage {
       @JsonKey(fromJson: _messageTargetFromJson, toJson: _messageTargetToJson)
       required this.target,
       @JsonKey(fromJson: _messageDetailFromJson, toJson: _messageDetailToJson)
-      required this.detail});
+      required this.detail,
+      @JsonKey(name: 'edited_content') this.editedContent,
+      @JsonKey(name: 'edited_content_type') this.editedContentType})
+      : super._();
 
   factory _$ChatMessageImpl.fromJson(Map<String, dynamic> json) =>
       _$$ChatMessageImplFromJson(json);
@@ -1359,10 +1394,20 @@ class _$ChatMessageImpl implements _ChatMessage {
   @override
   @JsonKey(fromJson: _messageDetailFromJson, toJson: _messageDetailToJson)
   final MessageDetail detail;
+// Client-derived: populated when an edit-reaction echo arrives for this
+// message. Never sent by the server on initial delivery; round-tripped
+// through the SQLite payload via toJson/fromJson so an edit survives an
+// app restart.
+  @override
+  @JsonKey(name: 'edited_content')
+  final String? editedContent;
+  @override
+  @JsonKey(name: 'edited_content_type')
+  final String? editedContentType;
 
   @override
   String toString() {
-    return 'ChatMessage(mid: $mid, fromUid: $fromUid, createdAt: $createdAt, target: $target, detail: $detail)';
+    return 'ChatMessage(mid: $mid, fromUid: $fromUid, createdAt: $createdAt, target: $target, detail: $detail, editedContent: $editedContent, editedContentType: $editedContentType)';
   }
 
   @override
@@ -1375,13 +1420,17 @@ class _$ChatMessageImpl implements _ChatMessage {
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.target, target) || other.target == target) &&
-            (identical(other.detail, detail) || other.detail == detail));
+            (identical(other.detail, detail) || other.detail == detail) &&
+            (identical(other.editedContent, editedContent) ||
+                other.editedContent == editedContent) &&
+            (identical(other.editedContentType, editedContentType) ||
+                other.editedContentType == editedContentType));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, mid, fromUid, createdAt, target, detail);
+  int get hashCode => Object.hash(runtimeType, mid, fromUid, createdAt, target,
+      detail, editedContent, editedContentType);
 
   /// Create a copy of ChatMessage
   /// with the given fields replaced by the non-null parameter values.
@@ -1399,7 +1448,7 @@ class _$ChatMessageImpl implements _ChatMessage {
   }
 }
 
-abstract class _ChatMessage implements ChatMessage {
+abstract class _ChatMessage extends ChatMessage {
   const factory _ChatMessage(
       {required final int mid,
       @JsonKey(name: 'from_uid') required final int fromUid,
@@ -1407,7 +1456,11 @@ abstract class _ChatMessage implements ChatMessage {
       @JsonKey(fromJson: _messageTargetFromJson, toJson: _messageTargetToJson)
       required final MessageTarget target,
       @JsonKey(fromJson: _messageDetailFromJson, toJson: _messageDetailToJson)
-      required final MessageDetail detail}) = _$ChatMessageImpl;
+      required final MessageDetail detail,
+      @JsonKey(name: 'edited_content') final String? editedContent,
+      @JsonKey(name: 'edited_content_type')
+      final String? editedContentType}) = _$ChatMessageImpl;
+  const _ChatMessage._() : super._();
 
   factory _ChatMessage.fromJson(Map<String, dynamic> json) =
       _$ChatMessageImpl.fromJson;
@@ -1425,7 +1478,17 @@ abstract class _ChatMessage implements ChatMessage {
   MessageTarget get target;
   @override
   @JsonKey(fromJson: _messageDetailFromJson, toJson: _messageDetailToJson)
-  MessageDetail get detail;
+  MessageDetail
+      get detail; // Client-derived: populated when an edit-reaction echo arrives for this
+// message. Never sent by the server on initial delivery; round-tripped
+// through the SQLite payload via toJson/fromJson so an edit survives an
+// app restart.
+  @override
+  @JsonKey(name: 'edited_content')
+  String? get editedContent;
+  @override
+  @JsonKey(name: 'edited_content_type')
+  String? get editedContentType;
 
   /// Create a copy of ChatMessage
   /// with the given fields replaced by the non-null parameter values.

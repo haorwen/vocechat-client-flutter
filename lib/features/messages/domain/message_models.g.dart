@@ -13,6 +13,8 @@ _$ChatMessageImpl _$$ChatMessageImplFromJson(Map<String, dynamic> json) =>
       createdAt: (json['created_at'] as num).toInt(),
       target: _messageTargetFromJson(json['target'] as Map<String, dynamic>),
       detail: _messageDetailFromJson(json['detail'] as Map<String, dynamic>),
+      editedContent: json['edited_content'] as String?,
+      editedContentType: json['edited_content_type'] as String?,
     );
 
 Map<String, dynamic> _$$ChatMessageImplToJson(_$ChatMessageImpl instance) =>
@@ -22,4 +24,6 @@ Map<String, dynamic> _$$ChatMessageImplToJson(_$ChatMessageImpl instance) =>
       'created_at': instance.createdAt,
       'target': _messageTargetToJson(instance.target),
       'detail': _messageDetailToJson(instance.detail),
+      'edited_content': instance.editedContent,
+      'edited_content_type': instance.editedContentType,
     };

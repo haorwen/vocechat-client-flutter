@@ -1,5 +1,7 @@
+import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/network/dio_client.dart';
 import '../../../core/network/sse_client.dart';
 import '../../../core/utils/app_log.dart';
 import '../../../features/auth/application/auth_controller.dart';
@@ -147,7 +149,13 @@ class ChatController extends _$ChatController {
     _cache = cache;
 
     // 1. Seed from disk (single async query — sqlite is fast).
-    final cached = await cache.read(target);
+    // Reaction-type messages (edit/delete/like echoes) may have leaked into
+    // the cache from earlier builds; strip them on read so they never reach
+    // the chat list as "unsupported" rows.
+    final cachedRaw = await cache.read(target);
+    final cached = cachedRaw
+        .where((m) => m.detail is! ReactionMessageDetail)
+        .toList(growable: false);
     _seenMids
       ..clear()
       ..addAll(cached.where((m) => m.mid > 0).map((m) => m.mid));
@@ -159,11 +167,20 @@ class ChatController extends _$ChatController {
       state = AsyncData(cached);
       _backgroundRefresh(cache);
       // Drain any SSE events that arrived during this await.
-      return _drainPending(cached);
+      final drained = _drainPending(cached);
+      // Persist the filtered snapshot so the cache stops carrying reaction
+      // rows forward across launches.
+      if (cachedRaw.length != cached.length) {
+        cache.scheduleWrite(target, drained);
+      }
+      return drained;
     }
 
     // 2. No cache: fetch history from server.
-    final messages = await _loadHistory();
+    final messagesRaw = await _loadHistory();
+    final messages = messagesRaw
+        .where((m) => m.detail is! ReactionMessageDetail)
+        .toList(growable: false);
     _seenMids.addAll(messages.where((m) => m.mid > 0).map((m) => m.mid));
 
     // Drain pending SSE messages that arrived during the await.
@@ -178,9 +195,16 @@ class ChatController extends _$ChatController {
   /// net for missed deltas.
   Future<void> _backgroundRefresh(MessageCache cache) async {
     try {
-      final fresh = await ref
+      final freshRaw = await ref
           .read(messageApiProvider)
           .getHistory(target, limit: _initialLimit);
+      if (freshRaw.isEmpty) return;
+      // Strip reaction rows: they're sidecar events, not displayable history.
+      // The dispatcher applies their effect (edit content / delete row) via
+      // applyEditEcho/applyDeleteEcho instead.
+      final fresh = freshRaw
+          .where((m) => m.detail is! ReactionMessageDetail)
+          .toList(growable: false);
       if (fresh.isEmpty) return;
 
       final current = state.valueOrNull ?? const <ChatMessage>[];
@@ -204,6 +228,136 @@ class ChatController extends _$ChatController {
     } catch (_) {
       // ignore — cache is still valid
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // edit / delete / reply
+  // ---------------------------------------------------------------------------
+
+  /// Edit a previously-sent text/markdown message authored by the current user.
+  /// On success the row is mutated in place and persisted; the server will also
+  /// fan out an edit-reaction event, but [applyEditEcho] is idempotent.
+  Future<void> editText(int mid, String newText, {bool markdown = false}) async {
+    if (mid <= 0) return;
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final idx = current.indexWhere((m) => m.mid == mid);
+    if (idx < 0) return;
+
+    final api = ref.read(messageApiProvider);
+    if (markdown) {
+      await api.editMessageMarkdown(mid, newText);
+    } else {
+      await api.editMessage(mid, newText);
+    }
+    applyEditEcho(
+      mid,
+      newText,
+      markdown ? 'text/markdown' : 'text/plain',
+    );
+  }
+
+  /// Delete a message. On success the row is removed locally and persisted.
+  /// Treats a 404 as already-deleted (still removes locally).
+  Future<void> deleteMessage(int mid) async {
+    if (mid <= 0) return;
+    try {
+      await ref.read(messageApiProvider).deleteMessage(mid);
+    } on DioException catch (e) {
+      final status = e.response?.statusCode ??
+          (e.error is ApiException ? (e.error as ApiException).status : null);
+      if (status != 404) rethrow;
+      // 404 = already gone on the server; fall through to local removal so
+      // our state catches up.
+    }
+    applyDeleteEcho(mid);
+  }
+
+  /// Send a reply to [targetMid]. Optimistically inserts a reply row with a
+  /// temp mid; replaces it with the server-confirmed mid on success.
+  Future<void> sendReply(
+    int targetMid,
+    String text, {
+    bool markdown = false,
+  }) async {
+    if (targetMid <= 0) return;
+    final currentUid = _currentUid() ?? -1;
+    final tempMid = -DateTime.now().microsecondsSinceEpoch;
+
+    final optimistic = ChatMessage(
+      mid: tempMid,
+      fromUid: currentUid,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      target: target,
+      detail: MessageDetail.reply(
+        mid: targetMid,
+        contentType: markdown ? 'text/markdown' : 'text/plain',
+        content: text,
+      ),
+    );
+
+    final current = state.valueOrNull ?? [];
+    _statuses[tempMid] = MessageSendStatus.sending;
+    state = AsyncData([optimistic, ...current]);
+
+    try {
+      final realMid = await ref
+          .read(messageApiProvider)
+          .replyMessage(targetMid, text, markdown: markdown);
+
+      final after = state.valueOrNull ?? [];
+      final idx = after.indexWhere((m) => m.mid == tempMid);
+      if (idx >= 0) {
+        final confirmed = optimistic.copyWith(mid: realMid);
+        final updated = List<ChatMessage>.from(after);
+        updated[idx] = confirmed;
+        state = AsyncData(updated);
+        _seenMids.add(realMid);
+        _persist(updated);
+        _cache?.setCursor(realMid);
+      }
+      _statuses.remove(tempMid);
+      _statuses[realMid] = MessageSendStatus.sent;
+    } catch (_) {
+      _statuses[tempMid] = MessageSendStatus.failed;
+      final snapshot = state.valueOrNull;
+      if (snapshot != null) state = AsyncData(List.from(snapshot));
+      rethrow;
+    }
+  }
+
+  /// Apply an edit echo (from SSE or local optimistic). Idempotent: re-applying
+  /// the same edit is a no-op.
+  void applyEditEcho(int targetMid, String content, String contentType) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final idx = current.indexWhere((m) => m.mid == targetMid);
+    if (idx < 0) return;
+    final existing = current[idx];
+    if (existing.editedContent == content &&
+        existing.editedContentType == contentType) {
+      return;
+    }
+    final updated = List<ChatMessage>.from(current);
+    updated[idx] = existing.copyWith(
+      editedContent: content,
+      editedContentType: contentType,
+    );
+    state = AsyncData(updated);
+    _persist(updated);
+  }
+
+  /// Apply a delete echo (from SSE or local optimistic). Idempotent.
+  void applyDeleteEcho(int targetMid) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final idx = current.indexWhere((m) => m.mid == targetMid);
+    if (idx < 0) return;
+    final updated = List<ChatMessage>.from(current)..removeAt(idx);
+    state = AsyncData(updated);
+    _seenMids.remove(targetMid);
+    _statuses.remove(targetMid);
+    _persist(updated);
   }
 
   List<ChatMessage> _drainPending(List<ChatMessage> base) {
@@ -353,7 +507,10 @@ class ChatController extends _$ChatController {
     if (oldestMid == null) return;
 
     try {
-      final older = await _loadHistory(beforeMid: oldestMid);
+      final olderRaw = await _loadHistory(beforeMid: oldestMid);
+      final older = olderRaw
+          .where((m) => m.detail is! ReactionMessageDetail)
+          .toList(growable: false);
       if (older.isNotEmpty) {
         // Filter out any older messages already in state (the SSE replay /
         // history boundary can overlap). Track new mids in the dedup set.

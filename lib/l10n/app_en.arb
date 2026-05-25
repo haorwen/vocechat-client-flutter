@@ -16,6 +16,30 @@
 
   "chatToolPin": "Pinned",
   "chatActionReact": "Add reaction",
+  "chatActionReply": "Reply",
+  "chatActionEdit": "Edit",
+  "chatActionDelete": "Delete",
+  "chatEditMarker": "(edited)",
+  "chatReplyingTo": "Replying to {name}",
+  "@chatReplyingTo": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "chatDeleteConfirmTitle": "Delete message?",
+  "chatDeleteConfirmBody": "This cannot be undone.",
+  "chatEditCancel": "Cancel",
+  "chatEditSave": "Save",
+  "chatEditFailed": "Edit failed: {error}",
+  "@chatEditFailed": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "chatDeleteFailed": "Delete failed: {error}",
+  "@chatDeleteFailed": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "chatReplyFailed": "Reply failed: {error}",
+  "@chatReplyFailed": {
+    "placeholders": {"error": {"type": "String"}}
+  },
   "chatToolSaved": "Saved",
   "chatToolMembers": "Members",
   "chatToolEmpty": "No content yet.",

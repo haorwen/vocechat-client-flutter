@@ -177,7 +177,7 @@ class _MessageReactionsProviderElement
   int get mid => (origin as MessageReactionsProvider).mid;
 }
 
-String _$reactionsHash() => r'e04e46af6ebc22444b3057752d8d9380b3cecb6e';
+String _$reactionsHash() => r'125610f7c0baf2a8a46bc4687dc2d5a13cb893f9';
 
 /// Per-message reaction state: { mid -> { emoji -> [uid, ...] } }.
 ///

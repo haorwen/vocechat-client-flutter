@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/sse_client.dart';
+import '../../auth/application/auth_controller.dart';
 import '../../channels/application/conversation_providers.dart';
 import '../../contacts/application/presence_provider.dart';
 import '../domain/message_models.dart';
+import 'chat_controller.dart';
 import 'reactions_provider.dart';
 
 part 'message_dispatcher.g.dart';
@@ -105,11 +107,18 @@ class MessageDispatcher extends _$MessageDispatcher {
 
   /// Dispatch a reaction-type chat message:
   ///   - `like` → toggle the emoji on the target message
-  ///   - `delete` → strip reactions for the deleted target
-  ///   - `edit` → ignored here (chat content edits live in ChatController)
+  ///   - `delete` → remove the target message from chat + strip its reactions
+  ///   - `edit` → patch the target message's content in chat
   void _handleReaction(ChatMessage msg, ReactionMessageDetail detail) {
     final inner = detail.detail;
     final type = inner['type'];
+    // Resolve the *conversation-scoped* target for ChatController. In DMs,
+    // `msg.target` is always the recipient, so when an edit/delete echo
+    // arrives for the other end of the conversation we'd otherwise route to a
+    // ChatController keyed on our own uid — which isn't the one the chat
+    // screen is mounted against. Translate to the peer's uid when we are the
+    // recipient. Group targets are already symmetric and don't need this.
+    final chatTarget = _conversationTargetFor(msg);
     if (type == 'like') {
       final action = inner['action'];
       if (action is String && action.isNotEmpty) {
@@ -122,6 +131,46 @@ class MessageDispatcher extends _$MessageDispatcher {
       }
     } else if (type == 'delete') {
       ref.read(reactionsProvider.notifier).removeFor(detail.mid);
+      ref
+          .read(chatControllerProvider(chatTarget).notifier)
+          .applyDeleteEcho(detail.mid);
+      ref
+          .read(conversationsProvider.notifier)
+          .applyDeleteEcho(msg.target, detail.mid, fromUid: msg.fromUid);
+    } else if (type == 'edit') {
+      final content = inner['content'];
+      final contentType = inner['content_type'];
+      if (content is String && contentType is String) {
+        ref
+            .read(chatControllerProvider(chatTarget).notifier)
+            .applyEditEcho(detail.mid, content, contentType);
+        ref
+            .read(conversationsProvider.notifier)
+            .applyEditEcho(msg.target, detail.mid, content,
+                fromUid: msg.fromUid);
+      }
     }
+  }
+
+  /// Translate a server-perspective [ChatMessage.target] into the
+  /// conversation-scoped target the chat screen mounts against. Group targets
+  /// pass through unchanged; DM targets are flipped to the peer's uid when
+  /// the recipient is ourselves (i.e. an incoming event), matching the same
+  /// rule used by `ChatController.applyIncomingMessage` and the conversation
+  /// list peer-resolution logic.
+  MessageTarget _conversationTargetFor(ChatMessage msg) {
+    return msg.target.map(
+      user: (t) {
+        final authState = ref.read(authControllerProvider).valueOrNull;
+        final currentUid =
+            authState is AuthStateAuthenticated ? authState.user.uid : null;
+        final peerUid =
+            currentUid != null && msg.fromUid != currentUid && t.uid == currentUid
+                ? msg.fromUid
+                : t.uid;
+        return MessageTarget.user(uid: peerUid);
+      },
+      group: (t) => MessageTarget.group(gid: t.gid),
+    );
   }
 }

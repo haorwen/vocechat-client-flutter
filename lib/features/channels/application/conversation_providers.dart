@@ -574,6 +574,75 @@ class Conversations extends _$Conversations {
     Future.microtask(_flushPendingPatches);
   }
 
+  /// Apply an edit echo: when the last message of a conversation is edited,
+  /// refresh its preview text. If the edited message isn't the head of the
+  /// conversation, this is a no-op (older messages don't drive the preview).
+  ///
+  /// [fromUid] is the uid of the user who authored the edit (i.e. the
+  /// originator of the reaction message). For DMs, this is required to
+  /// resolve which conversation the edit belongs to.
+  void applyEditEcho(
+    MessageTarget target,
+    int editedMid,
+    String newContent, {
+    required int fromUid,
+  }) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final targetKey = _conversationKeyFor(target, fromUid);
+    final idx = current.indexWhere((c) => c.key == targetKey);
+    if (idx < 0) return;
+    final item = current[idx];
+    if (item.lastMid != editedMid) return; // not the visible preview
+    final next = List<ConversationItem>.from(current);
+    next[idx] = item.copyWith(
+      lastPreview: newContent.replaceAll('\n', ' ').trim(),
+    );
+    state = AsyncData(next);
+    final cache = _cache;
+    if (cache != null) _persist(cache, next);
+  }
+
+  /// Apply a delete echo: if the deleted message drives the conversation
+  /// preview, kick a background refresh so we get the next-most-recent
+  /// message. Otherwise no-op.
+  void applyDeleteEcho(
+    MessageTarget target,
+    int deletedMid, {
+    required int fromUid,
+  }) {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final targetKey = _conversationKeyFor(target, fromUid);
+    final idx = current.indexWhere((c) => c.key == targetKey);
+    if (idx < 0) return;
+    final item = current[idx];
+    if (item.lastMid != deletedMid) return;
+    // The preview row was deleted — fall back to a refresh which re-pulls the
+    // last message via getHistory(limit:1). Non-blocking.
+    final cache = _cache;
+    if (cache == null) return;
+    Future.microtask(() => _refreshFromNetwork(cache));
+  }
+
+  ConversationKey _conversationKeyFor(MessageTarget target, int fromUid) {
+    final authState = ref.read(authControllerProvider).valueOrNull;
+    final currentUid =
+        authState is AuthStateAuthenticated ? authState.user.uid : null;
+    return target.map<ConversationKey>(
+      user: (t) {
+        // DM peer resolution mirrors `applyIncomingMessage`:
+        //   - outgoing  → t.uid is the peer (we're the originator)
+        //   - incoming  → t.uid is OURSELF; the peer is fromUid
+        final peerUid = currentUid != null && fromUid != currentUid
+            ? fromUid
+            : t.uid;
+        return UserConversationKey(peerUid);
+      },
+      group: (t) => GroupConversationKey(t.gid),
+    );
+  }
+
   static List<ConversationItem> _sorted(List<ConversationItem> items) {
     final sorted = List<ConversationItem>.from(items);
     sorted.sort((a, b) {

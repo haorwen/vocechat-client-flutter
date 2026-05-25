@@ -133,9 +133,35 @@ class MessageApi {
     return (resp.data as num).toInt();
   }
 
+  Future<int> editMessageMarkdown(int mid, String md) async {
+    final resp = await _dio.put(
+      '/api/message/$mid/edit',
+      data: md,
+      options: Options(contentType: 'text/markdown'),
+    );
+    return (resp.data as num).toInt();
+  }
+
   Future<int> deleteMessage(int mid) async {
     final resp = await _dio.delete('/api/message/$mid');
     // Server returns raw i64 (the new reaction mid).
+    return (resp.data as num).toInt();
+  }
+
+  /// Post a reply to the message identified by [targetMid]. Server returns the
+  /// new reply message's mid.
+  Future<int> replyMessage(
+    int targetMid,
+    String text, {
+    bool markdown = false,
+  }) async {
+    final resp = await _dio.post(
+      '/api/message/$targetMid/reply',
+      data: text,
+      options: Options(
+        contentType: markdown ? 'text/markdown' : 'text/plain',
+      ),
+    );
     return (resp.data as num).toInt();
   }
 

@@ -43,6 +43,50 @@ class AppL10nZh extends AppL10n {
   String get chatActionReact => '添加表情';
 
   @override
+  String get chatActionReply => '回复';
+
+  @override
+  String get chatActionEdit => '编辑';
+
+  @override
+  String get chatActionDelete => '删除';
+
+  @override
+  String get chatEditMarker => '（已编辑）';
+
+  @override
+  String chatReplyingTo(String name) {
+    return '正在回复 $name';
+  }
+
+  @override
+  String get chatDeleteConfirmTitle => '删除消息？';
+
+  @override
+  String get chatDeleteConfirmBody => '此操作无法撤销。';
+
+  @override
+  String get chatEditCancel => '取消';
+
+  @override
+  String get chatEditSave => '保存';
+
+  @override
+  String chatEditFailed(String error) {
+    return '编辑失败：$error';
+  }
+
+  @override
+  String chatDeleteFailed(String error) {
+    return '删除失败：$error';
+  }
+
+  @override
+  String chatReplyFailed(String error) {
+    return '回复失败：$error';
+  }
+
+  @override
   String get chatToolSaved => '收藏';
 
   @override

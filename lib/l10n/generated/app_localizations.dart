@@ -167,6 +167,78 @@ abstract class AppL10n {
   /// **'Add reaction'**
   String get chatActionReact;
 
+  /// No description provided for @chatActionReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply'**
+  String get chatActionReply;
+
+  /// No description provided for @chatActionEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get chatActionEdit;
+
+  /// No description provided for @chatActionDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get chatActionDelete;
+
+  /// No description provided for @chatEditMarker.
+  ///
+  /// In en, this message translates to:
+  /// **'(edited)'**
+  String get chatEditMarker;
+
+  /// No description provided for @chatReplyingTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Replying to {name}'**
+  String chatReplyingTo(String name);
+
+  /// No description provided for @chatDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete message?'**
+  String get chatDeleteConfirmTitle;
+
+  /// No description provided for @chatDeleteConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This cannot be undone.'**
+  String get chatDeleteConfirmBody;
+
+  /// No description provided for @chatEditCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get chatEditCancel;
+
+  /// No description provided for @chatEditSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get chatEditSave;
+
+  /// No description provided for @chatEditFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit failed: {error}'**
+  String chatEditFailed(String error);
+
+  /// No description provided for @chatDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete failed: {error}'**
+  String chatDeleteFailed(String error);
+
+  /// No description provided for @chatReplyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply failed: {error}'**
+  String chatReplyFailed(String error);
+
   /// No description provided for @chatToolSaved.
   ///
   /// In en, this message translates to:

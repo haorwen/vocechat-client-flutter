@@ -43,6 +43,50 @@ class AppL10nEn extends AppL10n {
   String get chatActionReact => 'Add reaction';
 
   @override
+  String get chatActionReply => 'Reply';
+
+  @override
+  String get chatActionEdit => 'Edit';
+
+  @override
+  String get chatActionDelete => 'Delete';
+
+  @override
+  String get chatEditMarker => '(edited)';
+
+  @override
+  String chatReplyingTo(String name) {
+    return 'Replying to $name';
+  }
+
+  @override
+  String get chatDeleteConfirmTitle => 'Delete message?';
+
+  @override
+  String get chatDeleteConfirmBody => 'This cannot be undone.';
+
+  @override
+  String get chatEditCancel => 'Cancel';
+
+  @override
+  String get chatEditSave => 'Save';
+
+  @override
+  String chatEditFailed(String error) {
+    return 'Edit failed: $error';
+  }
+
+  @override
+  String chatDeleteFailed(String error) {
+    return 'Delete failed: $error';
+  }
+
+  @override
+  String chatReplyFailed(String error) {
+    return 'Reply failed: $error';
+  }
+
+  @override
   String get chatToolSaved => 'Saved';
 
   @override

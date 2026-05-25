@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
+import '../../../core/network/dio_client.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/safe_text.dart';
@@ -32,6 +34,7 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _textCtrl = TextEditingController();
+  final _editCtrl = TextEditingController();
   final _searchAnchorKey = GlobalKey();
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ItemPositionsListener _itemPositionsListener =
@@ -39,6 +42,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _canSend = false;
   int? _highlightMid;
   Timer? _highlightTimer;
+  int? _editingMid;
+  int? _replyToMid;
+  ChatMessage? _replyTarget;
 
   late MessageTarget _target;
 
@@ -68,6 +74,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void dispose() {
     _textCtrl.dispose();
+    _editCtrl.dispose();
     _highlightTimer?.cancel();
     _itemPositionsListener.itemPositions.removeListener(_onPositionsChanged);
     super.dispose();
@@ -106,18 +113,144 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (!_canSend) return;
     final text = _textCtrl.text.trim();
     final l = AppL10n.of(context);
+    final replyMid = _replyToMid;
     _textCtrl.clear();
-    setState(() => _canSend = false);
+    setState(() {
+      _canSend = false;
+      _replyToMid = null;
+      _replyTarget = null;
+    });
+    try {
+      final notifier = ref.read(chatControllerProvider(_target).notifier);
+      if (replyMid != null) {
+        await notifier.sendReply(replyMid, text);
+      } else {
+        await notifier.sendText(text);
+      }
+    } catch (e) {
+      if (mounted) {
+        final msg = replyMid != null
+            ? l.chatReplyFailed(_friendlyError(e))
+            : l.chatSendFailed(_friendlyError(e));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(safeText(msg))));
+      }
+    }
+  }
+
+  void _startReply(ChatMessage msg) {
+    setState(() {
+      _replyToMid = msg.mid;
+      _replyTarget = msg;
+      _editingMid = null;
+    });
+  }
+
+  void _cancelReply() {
+    setState(() {
+      _replyToMid = null;
+      _replyTarget = null;
+    });
+  }
+
+  void _startEdit(ChatMessage msg) {
+    final text = msg.displayContent;
+    _editCtrl.text = text;
+    // Place the caret at the end so editing picks up where the message left
+    // off; default selection of a freshly-assigned value is offset 0.
+    _editCtrl.selection =
+        TextSelection.collapsed(offset: _editCtrl.text.length);
+    setState(() {
+      _editingMid = msg.mid;
+      _replyToMid = null;
+      _replyTarget = null;
+    });
+  }
+
+  void _cancelEdit() {
+    setState(() => _editingMid = null);
+    _editCtrl.clear();
+  }
+
+  Future<void> _saveEdit() async {
+    final mid = _editingMid;
+    if (mid == null) return;
+    final newText = _editCtrl.text.trim();
+    if (newText.isEmpty) {
+      _cancelEdit();
+      return;
+    }
+    final l = AppL10n.of(context);
+    // Preserve the original content-type rather than sniffing markdown from
+    // the edited text (sniffing would silently upgrade "5 > 3" to markdown).
+    final messages =
+        ref.read(chatControllerProvider(_target)).valueOrNull ?? const [];
+    final original = messages.firstWhere(
+      (m) => m.mid == mid,
+      orElse: () => messages.first,
+    );
+    final isMarkdown = original.displayContentType == 'text/markdown';
     try {
       await ref
           .read(chatControllerProvider(_target).notifier)
-          .sendText(text);
+          .editText(mid, newText, markdown: isMarkdown);
+      if (mounted) setState(() => _editingMid = null);
+      _editCtrl.clear();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(safeText(l.chatSendFailed(e.toString())))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content:
+                Text(safeText(l.chatEditFailed(_friendlyError(e))))));
       }
     }
+  }
+
+  Future<void> _confirmDelete(ChatMessage msg) async {
+    final l = AppL10n.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.chatDeleteConfirmTitle),
+        content: Text(l.chatDeleteConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l.actionCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l.chatActionDelete,
+                style: TextStyle(color: AppTokens.error)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await ref
+          .read(chatControllerProvider(_target).notifier)
+          .deleteMessage(msg.mid);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content:
+                Text(safeText(l.chatDeleteFailed(_friendlyError(e))))));
+      }
+    }
+  }
+
+  /// Extract a short user-safe error message from a thrown error. `Dio` and
+  /// the redacting interceptor scrub headers from logs, but `.toString()` on a
+  /// `DioException` still contains the request URL, status line, and raw
+  /// response body — too verbose for a snackbar, and a leak risk if
+  /// screenshots get shared.
+  static String _friendlyError(Object e) {
+    if (e is DioException) {
+      final inner = e.error;
+      if (inner is ApiException) return inner.message;
+      return e.message ?? 'Request failed';
+    }
+    return 'Request failed';
   }
 
   bool _showDateSeparator(List<ChatMessage> msgs, int index) {
@@ -333,6 +466,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     target: _target,
                                     highlighted:
                                         msg.mid == _highlightMid,
+                                    isEditing: _editingMid == msg.mid,
+                                    editController: _editCtrl,
+                                    onEditSave: _saveEdit,
+                                    onEditCancel: _cancelEdit,
+                                    onReply: () => _startReply(msg),
+                                    onEdit: () => _startEdit(msg),
+                                    onDelete: () => _confirmDelete(msg),
                                     onRetry: msg.mid < 0 &&
                                             statuses[msg.mid] ==
                                                 MessageSendStatus.failed
@@ -357,6 +497,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       placeholder: isChannel
                           ? l.chatMessagePlaceholderChannel(title)
                           : l.chatMessagePlaceholderUser(title),
+                      replyTarget: _replyTarget,
+                      replyTargetName: _replyTarget == null
+                          ? null
+                          : (userDir[_replyTarget!.fromUid]?.name ??
+                              l.chatUserFallback(_replyTarget!.fromUid)),
+                      onCancelReply: _cancelReply,
                     ),
                   ],
                 ),
@@ -730,6 +876,13 @@ class _MessageRow extends ConsumerStatefulWidget {
     this.status,
     this.onRetry,
     this.highlighted = false,
+    this.isEditing = false,
+    this.editController,
+    this.onEditSave,
+    this.onEditCancel,
+    this.onReply,
+    this.onEdit,
+    this.onDelete,
   });
 
   final ChatMessage message;
@@ -740,6 +893,13 @@ class _MessageRow extends ConsumerStatefulWidget {
   final MessageTarget target;
   final VoidCallback? onRetry;
   final bool highlighted;
+  final bool isEditing;
+  final TextEditingController? editController;
+  final VoidCallback? onEditSave;
+  final VoidCallback? onEditCancel;
+  final VoidCallback? onReply;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   ConsumerState<_MessageRow> createState() => _MessageRowState();
@@ -773,11 +933,19 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
 
     final detail = msg.detail;
+    final displayContent = msg.displayContent;
+    final displayContentType = msg.displayContentType;
     Widget content;
-    if (detail is NormalMessageDetail) {
-      if (detail.contentType == 'text/markdown') {
+    if (widget.isEditing && widget.editController != null) {
+      content = _EditForm(
+        controller: widget.editController!,
+        onSave: widget.onEditSave ?? () {},
+        onCancel: widget.onEditCancel ?? () {},
+      );
+    } else if (detail is NormalMessageDetail || msg.isEdited) {
+      if (displayContentType == 'text/markdown') {
         content = MarkdownBody(
-          data: safeText(detail.content),
+          data: safeText(displayContent),
           styleSheet: MarkdownStyleSheet(
             p: TextStyle(
               fontSize: 14,
@@ -788,7 +956,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         );
       } else {
         content = Text(
-          safeText(detail.content),
+          safeText(displayContent),
           style: TextStyle(
             fontSize: 14,
             color: AppTokens.gray700,
@@ -797,23 +965,87 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         );
       }
     } else if (detail is ReplyMessageDetail) {
-      content = Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppTokens.gray50,
-          borderRadius: BorderRadius.circular(6),
-          border: Border(
-            left: BorderSide(color: AppTokens.primary500, width: 3),
+      // Try to resolve the original message from the current chat list so we
+      // can render a real preview ("↩ replying to <name>: <snippet>") instead
+      // of a bare mid. Falls back to the mid alone if we don't have history.
+      final chatMessages =
+          ref.watch(chatControllerProvider(widget.target)).valueOrNull ??
+              const <ChatMessage>[];
+      final original = chatMessages
+          .where((m) => m.mid == detail.mid)
+          .firstOrNull;
+      final originalAuthor = original != null
+          ? widget.userDir[original.fromUid]
+          : null;
+      final originalName = originalAuthor?.name ?? '#${detail.mid}';
+      final originalSnippet = original?.displayContent
+              .replaceAll('\n', ' ')
+              .trim() ??
+          '';
+      final clippedSnippet = originalSnippet.length > 80
+          ? '${originalSnippet.substring(0, 80)}…'
+          : originalSnippet;
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTokens.gray50,
+              borderRadius: BorderRadius.circular(6),
+              border: Border(
+                left: BorderSide(color: AppTokens.primary500, width: 3),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.reply, size: 12, color: AppTokens.gray400),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        safeText(originalName),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppTokens.primary600,
+                          height: 18 / 12,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                if (clippedSnippet.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    safeText(clippedSnippet),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTokens.gray500,
+                      height: 18 / 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
-        ),
-        child: Text(
-          safeText(detail.content),
-          style: TextStyle(
-            fontSize: 14,
-            color: AppTokens.gray700,
-            height: 20 / 14,
+          const SizedBox(height: 4),
+          Text(
+            safeText(displayContent),
+            style: TextStyle(
+              fontSize: 14,
+              color: AppTokens.gray700,
+              height: 20 / 14,
+            ),
           ),
-        ),
+        ],
       );
     } else {
       content = Text(
@@ -894,6 +1126,18 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                             height: 18 / 12,
                           ),
                         ),
+                        if (msg.isEdited) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            l.chatEditMarker,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: AppTokens.gray400,
+                              height: 18 / 12,
+                            ),
+                          ),
+                        ],
                         if (widget.status ==
                             MessageSendStatus.sending) ...[
                           const SizedBox(width: 8),
@@ -1023,6 +1267,13 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
       user: (_) => false,
       group: (_) => true,
     );
+    final msg = widget.message;
+    final isMine = msg.fromUid == widget.currentUid && widget.currentUid > 0;
+    final detail = msg.detail;
+    final canEdit = isMine &&
+        (detail is NormalMessageDetail || detail is ReplyMessageDetail) &&
+        (msg.displayContentType == 'text/plain' ||
+            msg.displayContentType == 'text/markdown');
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox;
     final selection = await showMenu<String>(
@@ -1041,6 +1292,25 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
             Text(l.chatActionReact),
           ]),
         ),
+        PopupMenuItem(
+          value: 'reply',
+          child: Row(children: [
+            Icon(Icons.reply_outlined,
+                size: 18, color: AppTokens.gray500),
+            const SizedBox(width: 12),
+            Text(l.chatActionReply),
+          ]),
+        ),
+        if (canEdit)
+          PopupMenuItem(
+            value: 'edit',
+            child: Row(children: [
+              Icon(Icons.edit_outlined,
+                  size: 18, color: AppTokens.gray500),
+              const SizedBox(width: 12),
+              Text(l.chatActionEdit),
+            ]),
+          ),
         if (isChannel)
           PopupMenuItem(
             value: 'pin',
@@ -1060,11 +1330,28 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
             Text(l.chatToolSaved),
           ]),
         ),
+        if (isMine)
+          PopupMenuItem(
+            value: 'delete',
+            child: Row(children: [
+              Icon(Icons.delete_outline,
+                  size: 18, color: AppTokens.error),
+              const SizedBox(width: 12),
+              Text(l.chatActionDelete,
+                  style: TextStyle(color: AppTokens.error)),
+            ]),
+          ),
       ],
     );
     if (!mounted || selection == null) return;
     if (selection == 'react') {
       _openReactionPicker();
+    } else if (selection == 'reply') {
+      widget.onReply?.call();
+    } else if (selection == 'edit') {
+      widget.onEdit?.call();
+    } else if (selection == 'delete') {
+      widget.onDelete?.call();
     } else if (selection == 'pin') {
       final gid = widget.target.map<int>(
         user: (_) => 0,
@@ -1153,12 +1440,18 @@ class _SendBox extends StatelessWidget {
     required this.canSend,
     required this.onSend,
     required this.placeholder,
+    this.replyTarget,
+    this.replyTargetName,
+    this.onCancelReply,
   });
 
   final TextEditingController controller;
   final bool canSend;
   final VoidCallback onSend;
   final String placeholder;
+  final ChatMessage? replyTarget;
+  final String? replyTargetName;
+  final VoidCallback? onCancelReply;
 
   @override
   Widget build(BuildContext context) {
@@ -1169,108 +1462,265 @@ class _SendBox extends StatelessWidget {
     return Container(
       color: AppTokens.surface,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppTokens.borderSubtle,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            _SendIcon(
-              icon: Icons.emoji_emotions_outlined,
-              tooltip: l.chatEmoji,
-              onTap: () {},
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (replyTarget != null)
+            _ReplyChip(
+              target: replyTarget!,
+              targetName: replyTargetName ?? '',
+              onCancel: onCancelReply ?? () {},
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 200),
-                child: CallbackShortcuts(
-                  bindings: <ShortcutActivator, VoidCallback>{
-                    // Bare Enter sends. Shift+Enter falls through to the
-                    // TextField and inserts a newline.
-                    const SingleActivator(LogicalKeyboardKey.enter): () {
-                      if (canSend) onSend();
-                    },
-                    const SingleActivator(LogicalKeyboardKey.numpadEnter): () {
-                      if (canSend) onSend();
-                    },
-                  },
-                  child: TextField(
-                    controller: controller,
-                    minLines: 1,
-                    maxLines: null,
-                    keyboardType: TextInputType.multiline,
-                    textInputAction: TextInputAction.newline,
-                    cursorColor: AppTokens.primary500,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppTokens.gray700,
-                      height: 20 / 14,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: placeholder,
-                      hintStyle: TextStyle(
-                        fontSize: 14,
-                        color: AppTokens.gray400,
-                        height: 20 / 14,
+          Container(
+            decoration: BoxDecoration(
+              color: AppTokens.borderSubtle,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _SendIcon(
+                  icon: Icons.emoji_emotions_outlined,
+                  tooltip: l.chatEmoji,
+                  onTap: () {},
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 200),
+                    child: CallbackShortcuts(
+                      bindings: <ShortcutActivator, VoidCallback>{
+                        const SingleActivator(LogicalKeyboardKey.enter): () {
+                          if (canSend) onSend();
+                        },
+                        const SingleActivator(LogicalKeyboardKey.numpadEnter):
+                            () {
+                          if (canSend) onSend();
+                        },
+                      },
+                      child: TextField(
+                        controller: controller,
+                        minLines: 1,
+                        maxLines: null,
+                        keyboardType: TextInputType.multiline,
+                        textInputAction: TextInputAction.newline,
+                        cursorColor: AppTokens.primary500,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTokens.gray700,
+                          height: 20 / 14,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: placeholder,
+                          hintStyle: TextStyle(
+                            fontSize: 14,
+                            color: AppTokens.gray400,
+                            height: 20 / 14,
+                          ),
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          focusedErrorBorder: InputBorder.none,
+                          isCollapsed: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
-                      filled: false,
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      disabledBorder: InputBorder.none,
-                      errorBorder: InputBorder.none,
-                      focusedErrorBorder: InputBorder.none,
-                      isCollapsed: true,
-                      contentPadding: EdgeInsets.zero,
                     ),
                   ),
                 ),
+                const SizedBox(width: 14),
+                _SendIcon(
+                  icon: Icons.code,
+                  tooltip: l.chatMarkdown,
+                  onTap: () {},
+                ),
+                const SizedBox(width: 10),
+                _SendIcon(
+                  icon: Icons.add_circle,
+                  tooltip: l.chatAttach,
+                  onTap: () {},
+                ),
+                ClipRect(
+                  child: AnimatedAlign(
+                    alignment: Alignment.centerRight,
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    widthFactor: canSend ? 1 : 0,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 10),
+                      child: AnimatedScale(
+                        scale: canSend ? 1 : 0.6,
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutBack,
+                        child: AnimatedOpacity(
+                          opacity: canSend ? 1 : 0,
+                          duration: const Duration(milliseconds: 120),
+                          child: _SendIcon(
+                            icon: Icons.send_rounded,
+                            tooltip: l.actionSend,
+                            onTap: canSend ? onSend : null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReplyChip extends StatelessWidget {
+  const _ReplyChip({
+    required this.target,
+    required this.targetName,
+    required this.onCancel,
+  });
+
+  final ChatMessage target;
+  final String targetName;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    final preview = target.displayContent.replaceAll('\n', ' ').trim();
+    final clipped = preview.length > 80 ? '${preview.substring(0, 80)}…' : preview;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppTokens.gray50,
+          borderRadius: BorderRadius.circular(6),
+          border: Border(
+            left: BorderSide(color: AppTokens.primary500, width: 3),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.reply, size: 14, color: AppTokens.gray500),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    safeText(l.chatReplyingTo(targetName)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTokens.primary600,
+                      height: 18 / 12,
+                    ),
+                  ),
+                  if (clipped.isNotEmpty)
+                    Text(
+                      safeText(clipped),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTokens.gray500,
+                        height: 18 / 12,
+                      ),
+                    ),
+                ],
               ),
             ),
-            const SizedBox(width: 14),
-            _SendIcon(
-              icon: Icons.code,
-              tooltip: l.chatMarkdown,
-              onTap: () {},
-            ),
-            const SizedBox(width: 10),
-            _SendIcon(
-              icon: Icons.add_circle,
-              tooltip: l.chatAttach,
-              onTap: () {},
-            ),
-            ClipRect(
-              child: AnimatedAlign(
-                alignment: Alignment.centerRight,
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOutCubic,
-                widthFactor: canSend ? 1 : 0,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 10),
-                  child: AnimatedScale(
-                    scale: canSend ? 1 : 0.6,
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutBack,
-                    child: AnimatedOpacity(
-                      opacity: canSend ? 1 : 0,
-                      duration: const Duration(milliseconds: 120),
-                      child: _SendIcon(
-                        icon: Icons.send_rounded,
-                        tooltip: l.actionSend,
-                        onTap: canSend ? onSend : null,
-                      ),
-                    ),
-                  ),
-                ),
+            InkWell(
+              onTap: onCancel,
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(Icons.close, size: 16, color: AppTokens.gray500),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _EditForm extends StatelessWidget {
+  const _EditForm({
+    required this.controller,
+    required this.onSave,
+    required this.onCancel,
+  });
+
+  final TextEditingController controller;
+  final VoidCallback onSave;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: AppTokens.surface,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTokens.gray200, width: 1),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: CallbackShortcuts(
+            bindings: <ShortcutActivator, VoidCallback>{
+              const SingleActivator(LogicalKeyboardKey.enter): onSave,
+              const SingleActivator(LogicalKeyboardKey.numpadEnter): onSave,
+              const SingleActivator(LogicalKeyboardKey.escape): onCancel,
+            },
+            child: TextField(
+              controller: controller,
+              autofocus: true,
+              minLines: 1,
+              maxLines: 6,
+              keyboardType: TextInputType.multiline,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTokens.gray700,
+                height: 20 / 14,
+              ),
+              decoration: InputDecoration(
+                isCollapsed: true,
+                contentPadding: EdgeInsets.zero,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: onCancel,
+              child: Text(l.chatEditCancel),
+            ),
+            const SizedBox(width: 6),
+            ElevatedButton(
+              onPressed: onSave,
+              child: Text(l.chatEditSave),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

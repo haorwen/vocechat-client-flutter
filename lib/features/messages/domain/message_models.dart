@@ -152,6 +152,8 @@ sealed class MessageDetail with _$MessageDetail {
 
 @freezed
 class ChatMessage with _$ChatMessage {
+  const ChatMessage._();
+
   const factory ChatMessage({
     required int mid,
     @JsonKey(name: 'from_uid') required int fromUid,
@@ -167,10 +169,40 @@ class ChatMessage with _$ChatMessage {
       toJson: _messageDetailToJson,
     )
     required MessageDetail detail,
+    // Client-derived: populated when an edit-reaction echo arrives for this
+    // message. Never sent by the server on initial delivery; round-tripped
+    // through the SQLite payload via toJson/fromJson so an edit survives an
+    // app restart.
+    @JsonKey(name: 'edited_content') String? editedContent,
+    @JsonKey(name: 'edited_content_type') String? editedContentType,
   }) = _ChatMessage;
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) =>
       _$ChatMessageFromJson(json);
+
+  /// True when an edit echo has been applied client-side.
+  bool get isEdited => editedContent != null;
+
+  /// The text shown in the chat row — edited content if present, otherwise
+  /// the original `detail.content` for normal/reply messages. Returns empty
+  /// string for variants without textual content (reaction).
+  String get displayContent {
+    if (editedContent != null) return editedContent!;
+    return detail.map(
+      normal: (d) => d.content,
+      reply: (d) => d.content,
+      reaction: (_) => '',
+    );
+  }
+
+  String get displayContentType {
+    if (editedContentType != null) return editedContentType!;
+    return detail.map(
+      normal: (d) => d.contentType,
+      reply: (d) => d.contentType,
+      reaction: (_) => 'text/plain',
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
