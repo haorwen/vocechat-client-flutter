@@ -19,17 +19,14 @@ class VoceChatApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeNotifierProvider);
     final locale = ref.watch(localeNotifierProvider);
 
-    // AppTokens.* getters resolve through a global brightness flag. We must
-    // sync that flag to the brightness MaterialApp actually picks (which
-    // depends on `themeMode` plus, when system, the platform brightness).
-    final platformBrightness = MediaQuery.platformBrightnessOf(context);
-    final resolvedBrightness = switch (themeMode) {
-      ThemeMode.light => Brightness.light,
-      ThemeMode.dark => Brightness.dark,
-      ThemeMode.system => platformBrightness,
-    };
-    AppTheme.applyBrightness(resolvedBrightness);
-
+    // AppTokens.* getters resolve through a global brightness flag. Sync it
+    // from the brightness MaterialApp actually picked (which depends on
+    // `themeMode` plus, when system, the platform brightness). We must do
+    // this inside a Builder under MaterialApp so Theme.of(context) reflects
+    // the just-applied ThemeData — applying it in the parent build runs
+    // *before* MaterialApp reconciles the new theme, so colors captured by
+    // widgets on the current frame would still come from the stale flag and
+    // only refresh on the next navigation/rebuild.
     return MaterialApp.router(
       title: 'VoceChat',
       theme: AppTheme.lightTheme,
@@ -39,6 +36,17 @@ class VoceChatApp extends ConsumerWidget {
       localizationsDelegates: AppL10n.localizationsDelegates,
       supportedLocales: AppL10n.supportedLocales,
       routerConfig: router,
+      builder: (context, child) {
+        final brightness = Theme.of(context).brightness;
+        AppTheme.applyBrightness(brightness);
+        // Key the subtree by brightness so every descendant rebuilds (and
+        // re-reads AppTokens.*) the instant the resolved theme flips —
+        // otherwise widgets that don't watch themeMode keep cached colors.
+        return KeyedSubtree(
+          key: ValueKey(brightness),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }
