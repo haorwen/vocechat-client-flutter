@@ -1,3 +1,5 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -423,6 +425,22 @@ class AppL10nZh extends AppL10n {
 
   @override
   String get chatListSelectSubtitle => '从左侧面板选择一个会话开始聊天';
+
+  @override
+  String get chatListPin => '置顶聊天';
+
+  @override
+  String get chatListUnpin => '取消置顶';
+
+  @override
+  String chatListPinFailed(String error) {
+    return '置顶失败：$error';
+  }
+
+  @override
+  String chatListUnpinFailed(String error) {
+    return '取消置顶失败：$error';
+  }
 
   @override
   String get timeJustNow => '刚刚';

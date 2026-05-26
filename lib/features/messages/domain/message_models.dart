@@ -240,6 +240,20 @@ sealed class ChatEvent with _$ChatEvent {
   const factory ChatEvent.serverConfigChanged(
       {required Map<String, dynamic> data}) = ChatEventServerConfigChanged;
 
+  /// Initial `user_settings` envelope sent right after `ready`. Carries the
+  /// user's persisted preferences — read-marks, mutes, pinned chats, etc.
+  /// We keep the raw map so consumers can pick out only the fields they care
+  /// about without adding a Freezed field per setting.
+  const factory ChatEvent.userSettings(
+      {required Map<String, dynamic> data}) = ChatEventUserSettings;
+
+  /// Delta updates to user settings — emits when another device toggles a
+  /// pin / read-mark / mute. Same payload shape as `userSettings` but
+  /// containing only the changed fields (`add_pin_chats`, `remove_pin_chats`,
+  /// `read_index_users`, etc.).
+  const factory ChatEvent.userSettingsChanged(
+      {required Map<String, dynamic> data}) = ChatEventUserSettingsChanged;
+
   const factory ChatEvent.unknown({
     required String type,
     required String raw,
@@ -295,6 +309,12 @@ ChatEvent parseSseEvent(String eventType, String rawData) {
       case 'server_config_changed':
         final decoded = _decodeMap(rawData) ?? {};
         return ChatEvent.serverConfigChanged(data: decoded);
+      case 'user_settings':
+        final decoded = _decodeMap(rawData) ?? {};
+        return ChatEvent.userSettings(data: decoded);
+      case 'user_settings_changed':
+        final decoded = _decodeMap(rawData) ?? {};
+        return ChatEvent.userSettingsChanged(data: decoded);
     }
   } catch (_) {
     // Fall through to unknown

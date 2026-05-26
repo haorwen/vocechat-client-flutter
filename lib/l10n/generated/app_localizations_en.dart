@@ -1,3 +1,5 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -168,7 +170,8 @@ class AppL10nEn extends AppL10n {
   String get settingsLogoutConfirmTitle => 'Log out?';
 
   @override
-  String get settingsLogoutConfirmContent => 'You will need to sign in again to access this server.';
+  String get settingsLogoutConfirmContent =>
+      'You will need to sign in again to access this server.';
 
   @override
   String get accountEmail => 'Email';
@@ -186,7 +189,8 @@ class AppL10nEn extends AppL10n {
   String get notificationsPush => 'Push notifications';
 
   @override
-  String get notificationsPushSubtitle => 'Get notified about new messages and mentions.';
+  String get notificationsPushSubtitle =>
+      'Get notified about new messages and mentions.';
 
   @override
   String get notificationsSound => 'Notification sounds';
@@ -351,7 +355,8 @@ class AppL10nEn extends AppL10n {
   String get serverPickerEmptyTitle => 'Connect to a VoceChat server';
 
   @override
-  String get serverPickerEmptySubtitle => 'Add a server to get started chatting with your team.';
+  String get serverPickerEmptySubtitle =>
+      'Add a server to get started chatting with your team.';
 
   @override
   String get serverPickerAddFirst => 'Add your first server';
@@ -375,7 +380,8 @@ class AppL10nEn extends AppL10n {
   String get serverUrlMustHttps => 'Must start with https://';
 
   @override
-  String get serverUrlHttpNotAllowed => 'Only https:// is allowed (http not permitted for remote servers)';
+  String get serverUrlHttpNotAllowed =>
+      'Only https:// is allowed (http not permitted for remote servers)';
 
   @override
   String get serverAlias => 'Alias (optional)';
@@ -422,7 +428,24 @@ class AppL10nEn extends AppL10n {
   String get chatListSelectTitle => 'Select a conversation';
 
   @override
-  String get chatListSelectSubtitle => 'Pick a chat from the left panel to start messaging';
+  String get chatListSelectSubtitle =>
+      'Pick a chat from the left panel to start messaging';
+
+  @override
+  String get chatListPin => 'Pin to top';
+
+  @override
+  String get chatListUnpin => 'Unpin';
+
+  @override
+  String chatListPinFailed(String error) {
+    return 'Pin failed: $error';
+  }
+
+  @override
+  String chatListUnpinFailed(String error) {
+    return 'Unpin failed: $error';
+  }
 
   @override
   String get timeJustNow => 'just now';
@@ -468,7 +491,8 @@ class AppL10nEn extends AppL10n {
   String get contactsSelectTitle => 'Select a contact';
 
   @override
-  String get contactsSelectSubtitle => 'Pick someone from the list to see their profile';
+  String get contactsSelectSubtitle =>
+      'Pick someone from the list to see their profile';
 
   @override
   String get contactsMessage => 'Message';

@@ -150,6 +150,16 @@
   "chatListNoResults": "没有找到与“{query}”相关的结果",
   "chatListSelectTitle": "选择一个会话",
   "chatListSelectSubtitle": "从左侧面板选择一个会话开始聊天",
+  "chatListPin": "置顶聊天",
+  "chatListUnpin": "取消置顶",
+  "chatListPinFailed": "置顶失败：{error}",
+  "@chatListPinFailed": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "chatListUnpinFailed": "取消置顶失败：{error}",
+  "@chatListUnpinFailed": {
+    "placeholders": {"error": {"type": "String"}}
+  },
 
   "timeJustNow": "刚刚",
   "timeMinutesAgo": "{count} 分钟前",

@@ -34,6 +34,7 @@ class MessageCache {
   static const String _kConversationsKey = 'conversations';
   static const String _kUserDirectoryKey = 'user_directory';
   static const String _kGroupDirectoryKey = 'group_directory';
+  static const String _kPinnedChatsKey = 'pinned_chats';
 
   /// In-memory write coalescing per target.
   final Map<String, Timer> _flushTimers = {};
@@ -194,6 +195,21 @@ class MessageCache {
     try {
       final encoded = await _encodeInIsolate(groups);
       await _writeMeta(_kGroupDirectoryKey, encoded);
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  Future<List<Map<String, dynamic>>?> readPinnedChats() async {
+    final raw = await _readMeta(_kPinnedChatsKey);
+    if (raw == null || raw.isEmpty) return null;
+    return _decodeListInIsolate(raw);
+  }
+
+  Future<void> writePinnedChats(List<Map<String, dynamic>> pins) async {
+    try {
+      final encoded = await _encodeInIsolate(pins);
+      await _writeMeta(_kPinnedChatsKey, encoded);
     } catch (_) {
       // ignore
     }

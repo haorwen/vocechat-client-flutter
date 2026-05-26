@@ -166,6 +166,16 @@
   },
   "chatListSelectTitle": "Select a conversation",
   "chatListSelectSubtitle": "Pick a chat from the left panel to start messaging",
+  "chatListPin": "Pin to top",
+  "chatListUnpin": "Unpin",
+  "chatListPinFailed": "Pin failed: {error}",
+  "@chatListPinFailed": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "chatListUnpinFailed": "Unpin failed: {error}",
+  "@chatListUnpinFailed": {
+    "placeholders": {"error": {"type": "String"}}
+  },
 
   "timeJustNow": "just now",
   "timeMinutesAgo": "{count} mins ago",

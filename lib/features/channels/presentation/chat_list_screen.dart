@@ -12,6 +12,9 @@ import '../../../features/contacts/application/presence_provider.dart';
 import '../../../features/contacts/application/user_directory_provider.dart';
 import '../../../features/messages/presentation/chat_screen.dart';
 import '../application/conversation_providers.dart';
+import '../application/pinned_chats_provider.dart';
+import '../data/pin_chat_api.dart';
+import '../domain/pin_chat_models.dart';
 
 class ChatListScreen extends ConsumerStatefulWidget {
   const ChatListScreen({super.key});
@@ -52,6 +55,14 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     final l = AppL10n.of(context);
     final asyncConvs = ref.watch(conversationsProvider);
     final refreshing = ref.watch(conversationsRefreshingProvider);
+    final pinnedAsync = ref.watch(pinnedChatsProvider);
+    final pinnedList = pinnedAsync.valueOrNull ?? const <PinChat>[];
+    // Build an order map so the pinned section can render in the exact order
+    // the pinned-chats provider holds (newest-pinned first, mirroring web).
+    final pinOrder = <ConversationKey, int>{
+      for (int i = 0; i < pinnedList.length; i++)
+        pinnedList[i].target.conversationKey: i,
+    };
 
     // Pre-compute the per-build context shared by every visible tile:
     // baseUrl + avatar metadata maps + the global "show online dots" flag.
@@ -110,23 +121,60 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                       return _EmptyState(
                           message: l.chatListNoResults(_query));
                     }
+
+                    // Partition filtered conversations into pinned + normal
+                    // and sort pinned by their pin-order index (newest pin
+                    // at the top). Normal items keep the existing recency
+                    // ordering from `conversationsProvider`.
+                    final pinned = <ConversationItem>[];
+                    final normal = <ConversationItem>[];
+                    for (final c in filtered) {
+                      if (pinOrder.containsKey(c.key)) {
+                        pinned.add(c);
+                      } else {
+                        normal.add(c);
+                      }
+                    }
+                    pinned.sort((a, b) =>
+                        (pinOrder[a.key] ?? 0).compareTo(pinOrder[b.key] ?? 0));
+
                     return RefreshIndicator(
                       onRefresh: () async => ref
                           .read(conversationsProvider.notifier)
                           .refresh(),
                       child: ListView.builder(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        itemCount: filtered.length,
-                        itemBuilder: (context, i) => _buildTile(
-                          context,
-                          filtered[i],
-                          isWide: isWide,
-                          userDir: userDir,
-                          groupDir: groupDir,
-                          baseUrl: baseUrl,
-                          showStatus: showStatus,
-                        ),
+                            horizontal: 0, vertical: 4),
+                        // One slot for the pinned-section container (if any)
+                        // plus one slot per normal item.
+                        itemCount:
+                            (pinned.isNotEmpty ? 1 : 0) + normal.length,
+                        itemBuilder: (context, i) {
+                          if (pinned.isNotEmpty && i == 0) {
+                            return _PinnedSection(
+                              items: pinned,
+                              isWide: isWide,
+                              userDir: userDir,
+                              groupDir: groupDir,
+                              baseUrl: baseUrl,
+                              showStatus: showStatus,
+                              buildTile: _buildTile,
+                            );
+                          }
+                          final idx = pinned.isNotEmpty ? i - 1 : i;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: _buildTile(
+                              context,
+                              normal[idx],
+                              isWide: isWide,
+                              userDir: userDir,
+                              groupDir: groupDir,
+                              baseUrl: baseUrl,
+                              showStatus: showStatus,
+                            ),
+                          );
+                        },
                       ),
                     );
                   },
@@ -217,6 +265,120 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
             context.go('/home/chat/$routeId');
           }
         },
+        onLongPress: () => _showPinMenu(context, item),
+        onSecondaryTap: () => _showPinMenu(context, item),
+      ),
+    );
+  }
+
+  Future<void> _showPinMenu(
+      BuildContext context, ConversationItem item) async {
+    final l = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final pinned = ref.read(pinnedChatsProvider.notifier);
+    final target = switch (item.key) {
+      UserConversationKey(uid: final uid) => PinChatTargetUser(uid),
+      GroupConversationKey(gid: final gid) => PinChatTargetGroup(gid),
+    };
+    final isPinned = pinned.isPinned(target);
+
+    final picked = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: ListTile(
+            leading: Icon(
+              isPinned ? Icons.push_pin_outlined : Icons.push_pin,
+              color: AppTokens.gray700,
+            ),
+            title: Text(isPinned ? l.chatListUnpin : l.chatListPin),
+            onTap: () => Navigator.of(ctx).pop(true),
+          ),
+        );
+      },
+    );
+    if (picked != true || !mounted) return;
+
+    final api = ref.read(pinChatApiProvider);
+    try {
+      if (isPinned) {
+        await api.unpin(target);
+      } else {
+        await api.pin(target);
+      }
+      // The SSE `user_settings_changed` echo updates `pinnedChatsProvider`;
+      // no local mutation needed here.
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(safeText(
+            isPinned
+                ? l.chatListUnpinFailed(e.toString())
+                : l.chatListPinFailed(e.toString()),
+          )),
+        ),
+      );
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _PinnedSection — Figma-aligned sticky container for pinned chats. The web
+// reference uses `bg-primary-500/10` (10% primary tint) wrapping a flex
+// column. We match that with a tinted, rounded panel and reuse the same
+// _ConversationTile that powers the normal list.
+// ---------------------------------------------------------------------------
+
+class _PinnedSection extends ConsumerWidget {
+  const _PinnedSection({
+    required this.items,
+    required this.isWide,
+    required this.userDir,
+    required this.groupDir,
+    required this.baseUrl,
+    required this.showStatus,
+    required this.buildTile,
+  });
+
+  final List<ConversationItem> items;
+  final bool isWide;
+  final Map<int, dynamic> userDir;
+  final Map<int, dynamic> groupDir;
+  final String baseUrl;
+  final bool showStatus;
+  final Widget Function(
+    BuildContext context,
+    ConversationItem item, {
+    required bool isWide,
+    required Map<int, dynamic> userDir,
+    required Map<int, dynamic> groupDir,
+    required String baseUrl,
+    required bool showStatus,
+  }) buildTile;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTokens.primary50,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          for (final item in items)
+            buildTile(
+              context,
+              item,
+              isWide: isWide,
+              userDir: userDir,
+              groupDir: groupDir,
+              baseUrl: baseUrl,
+              showStatus: showStatus,
+            ),
+        ],
       ),
     );
   }
@@ -305,12 +467,16 @@ class _ConversationTile extends ConsumerWidget {
     required this.onTap,
     required this.showStatus,
     this.avatarUrl,
+    this.onLongPress,
+    this.onSecondaryTap,
   });
 
   final ConversationItem item;
   final int unread;
   final bool isSelected;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onSecondaryTap;
   final String? avatarUrl;
   final bool showStatus;
 
@@ -334,6 +500,8 @@ class _ConversationTile extends ConsumerWidget {
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
+        onSecondaryTap: onSecondaryTap,
         borderRadius: BorderRadius.circular(8),
         hoverColor: AppTokens.hover,
         child: Padding(

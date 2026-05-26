@@ -5,6 +5,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/network/sse_client.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../channels/application/conversation_providers.dart';
+import '../../channels/application/pinned_chats_provider.dart';
+import '../../channels/domain/pin_chat_models.dart';
 import '../../contacts/application/presence_provider.dart';
 import '../domain/message_models.dart';
 import 'chat_controller.dart';
@@ -69,6 +71,14 @@ class MessageDispatcher extends _$MessageDispatcher {
           }
           return;
         }
+        if (event is ChatEventUserSettings) {
+          _applyPinnedChatsSnapshot(event.data);
+          return;
+        }
+        if (event is ChatEventUserSettingsChanged) {
+          _applyPinnedChatsDelta(event.data);
+          return;
+        }
         if (event is ChatEventUnknown) {
           switch (event.type) {
             case 'users_state':
@@ -95,6 +105,47 @@ class MessageDispatcher extends _$MessageDispatcher {
         }
       });
     });
+  }
+
+  /// Initial `user_settings` snapshot: replace the pinned-chats list with
+  /// whatever the server says. Mirrors the web reference's
+  /// `upsertPinChats({ pins, override: true })`.
+  void _applyPinnedChatsSnapshot(Map<String, dynamic> data) {
+    final raw = data['pinned_chats'];
+    if (raw is! List) return;
+    final pins = raw
+        .whereType<Map>()
+        .map((m) => PinChat.fromJson(Map<String, dynamic>.from(m)))
+        .whereType<PinChat>()
+        .toList();
+    ref.read(pinnedChatsProvider.notifier).setAll(pins);
+  }
+
+  /// Delta `user_settings_changed`: apply `add_pin_chats` / `remove_pin_chats`
+  /// without touching the rest of the pinned list.
+  void _applyPinnedChatsDelta(Map<String, dynamic> data) {
+    final add = data['add_pin_chats'];
+    if (add is List && add.isNotEmpty) {
+      final pins = add
+          .whereType<Map>()
+          .map((m) => PinChat.fromJson(Map<String, dynamic>.from(m)))
+          .whereType<PinChat>()
+          .toList();
+      if (pins.isNotEmpty) {
+        ref.read(pinnedChatsProvider.notifier).upsertAll(pins);
+      }
+    }
+    final remove = data['remove_pin_chats'];
+    if (remove is List && remove.isNotEmpty) {
+      final targets = remove
+          .whereType<Map>()
+          .map((m) => PinChatTarget.fromJson(Map<String, dynamic>.from(m)))
+          .whereType<PinChatTarget>()
+          .toList();
+      if (targets.isNotEmpty) {
+        ref.read(pinnedChatsProvider.notifier).removeAll(targets);
+      }
+    }
   }
 
   Map<String, dynamic>? _decode(String raw) {
