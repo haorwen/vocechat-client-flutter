@@ -8,6 +8,7 @@ import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/loading_capsule.dart';
 import '../../../shared/widgets/voce_avatar.dart';
+import '../../channels/application/pending_chat_selection.dart';
 import '../application/contacts_provider.dart';
 import '../application/presence_provider.dart';
 import '../application/user_directory_provider.dart';
@@ -152,7 +153,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
     if (isWide) {
       setState(() => _selectedUid = c.uid);
     } else {
-      context.push('/chat/u-${c.uid}');
+      context.go('/home/chat/u-${c.uid}');
     }
   }
 }
@@ -443,7 +444,21 @@ class _ContactProfile extends ConsumerWidget {
                   icon: Icons.chat_bubble_outline,
                   label: l.contactsMessage,
                   isPrimary: true,
-                  onTap: () => context.push('/chat/u-${contact.uid}'),
+                  onTap: () {
+                    final width = MediaQuery.sizeOf(context).width;
+                    final isWide = width >= 700;
+                    if (isWide) {
+                      // Tell the chat list which conversation to select, then
+                      // switch to the home tab — the list's didChangeDependencies
+                      // picks up the request and renders the two-pane view.
+                      ref
+                          .read(pendingChatSelectionProvider.notifier)
+                          .request('u-${contact.uid}');
+                      context.go('/home');
+                    } else {
+                      context.go('/home/chat/u-${contact.uid}');
+                    }
+                  },
                 ),
                 const SizedBox(width: 8),
                 _ProfileAction(

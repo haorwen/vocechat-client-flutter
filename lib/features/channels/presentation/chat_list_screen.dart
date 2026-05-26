@@ -12,6 +12,7 @@ import '../../../features/contacts/application/presence_provider.dart';
 import '../../../features/contacts/application/user_directory_provider.dart';
 import '../../../features/messages/presentation/chat_screen.dart';
 import '../application/conversation_providers.dart';
+import '../application/pending_chat_selection.dart';
 import '../application/pinned_chats_provider.dart';
 import '../data/pin_chat_api.dart';
 import '../domain/pin_chat_models.dart';
@@ -47,6 +48,30 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Cross-screen selection request (e.g. from the contacts profile "message"
+    // button on wide layouts). Listen here rather than in didChangeDependencies
+    // because StatefulShellRoute keeps this branch's State alive between tab
+    // switches, so didChangeDependencies will not fire when we revisit /home.
+    ref.listen<String?>(pendingChatSelectionProvider, (prev, next) {
+      if (next == null || next == _selectedId) return;
+      setState(() => _selectedId = next);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(pendingChatSelectionProvider.notifier).clear();
+      });
+    });
+    // Also consume any pending value that was set before this widget mounted
+    // (e.g. the very first time the user opens the home tab after tapping the
+    // contacts "message" button). ref.listen only fires on subsequent changes.
+    final initialPending = ref.read(pendingChatSelectionProvider);
+    if (initialPending != null && _selectedId != initialPending) {
+      _selectedId = initialPending;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(pendingChatSelectionProvider.notifier).clear();
+      });
+    }
+
     // Drive the breakpoint off MediaQuery so desktop window resizes flip the
     // single-pane / two-pane layout reliably (LayoutBuilder inside a Scaffold
     // body can lag behind window metrics during a drag on Windows/Linux).
