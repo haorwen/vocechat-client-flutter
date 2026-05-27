@@ -199,5 +199,9 @@
   "previewImage": "[图片]",
   "previewReaction": "[表情回应]",
 
-  "errorPrefix": "错误：{message}"
+  "errorPrefix": "错误：{message}",
+
+  "authKickedFromOtherDevice": "已退出登录：你的账号刚在另一台设备上登录。",
+  "authAccountDeleted": "你的账号已被删除。",
+  "authSessionEnded": "登录已失效，请重新登录。"
 }

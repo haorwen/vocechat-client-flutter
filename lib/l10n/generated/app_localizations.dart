@@ -1146,6 +1146,24 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Error: {message}'**
   String errorPrefix(String message);
+
+  /// No description provided for @authKickedFromOtherDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed out: your account just signed in on another device.'**
+  String get authKickedFromOtherDevice;
+
+  /// No description provided for @authAccountDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account has been deleted.'**
+  String get authAccountDeleted;
+
+  /// No description provided for @authSessionEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Your session ended. Please sign in again.'**
+  String get authSessionEnded;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

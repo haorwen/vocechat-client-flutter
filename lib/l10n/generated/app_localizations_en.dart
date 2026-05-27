@@ -574,4 +574,14 @@ class AppL10nEn extends AppL10n {
   String errorPrefix(String message) {
     return 'Error: $message';
   }
+
+  @override
+  String get authKickedFromOtherDevice =>
+      'Signed out: your account just signed in on another device.';
+
+  @override
+  String get authAccountDeleted => 'Your account has been deleted.';
+
+  @override
+  String get authSessionEnded => 'Your session ended. Please sign in again.';
 }

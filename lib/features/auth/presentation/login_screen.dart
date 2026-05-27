@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/utils/safe_text.dart';
+import '../../../features/messages/application/message_dispatcher.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../application/auth_controller.dart';
@@ -89,6 +90,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         },
       );
     });
+
+    // Surface any pending kick reason from the SSE stream. Mirrors the web
+    // reference: a `kick` event has just logged us out and we want the user
+    // to know why before they re-enter credentials.
+    final kickReason = ref.watch(kickReasonProvider);
+    if (kickReason != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final l = AppL10n.of(context);
+        final text = switch (kickReason) {
+          'login_from_other_device' => l.authKickedFromOtherDevice,
+          'delete_user' => l.authAccountDeleted,
+          _ => l.authSessionEnded,
+        };
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(safeText(text))));
+        ref.read(kickReasonProvider.notifier).clear();
+      });
+    }
 
     final isLoading =
         ref.watch(authControllerProvider).isLoading;

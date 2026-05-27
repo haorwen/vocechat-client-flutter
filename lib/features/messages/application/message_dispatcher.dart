@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/sse_client.dart';
+import '../../../core/utils/app_log.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../channels/application/conversation_providers.dart';
 import '../../channels/application/pinned_chats_provider.dart';
 import '../../channels/domain/pin_chat_models.dart';
 import '../../contacts/application/presence_provider.dart';
+import '../data/message_cache.dart';
 import '../domain/message_models.dart';
 import 'chat_controller.dart';
 import 'reactions_provider.dart';
@@ -45,6 +47,26 @@ class MessageDispatcher extends _$MessageDispatcher {
             return;
           }
 
+          // Persist EVERY incoming chat message to the cache the moment it
+          // arrives — not when the user opens the chat screen. This is what
+          // makes "open a chat for the first time and immediately see the
+          // latest messages" work: the cache is the single source of truth
+          // for [ChatController.build], so by the time the user navigates
+          // in, the freshest messages are already on disk.
+          //
+          // Schedule before touching conversations so a build() that races
+          // this microtask still observes the row.
+          //
+          // We also bump the SSE cursor here so a relaunch right after this
+          // call doesn't replay messages we've already durably stored.
+          final cacheAsync = ref.read(messageCacheProvider);
+          final cache = cacheAsync.valueOrNull;
+          if (cache != null) {
+            // Fire-and-forget — appendOne handles its own errors.
+            cache.appendOne(msg.target, msg);
+            if (msg.mid > 0) cache.setCursor(msg.mid);
+          }
+
           // Update the conversation list preview/timestamp.
           ref
               .read(conversationsProvider.notifier)
@@ -61,7 +83,8 @@ class MessageDispatcher extends _$MessageDispatcher {
           // across dozens of targets, this snowballs into hundreds of
           // concurrent provider builds, each awaiting messageCache + disk
           // reads, and saturates the microtask queue until the UI hangs.
-          // A fresh controller will catch up via getHistory on first open.
+          // Unbuilt controllers catch up via the cache write above the next
+          // time the user opens the screen.
           return;
         }
         if (event is ChatEventServerConfigChanged) {
@@ -77,6 +100,10 @@ class MessageDispatcher extends _$MessageDispatcher {
         }
         if (event is ChatEventUserSettingsChanged) {
           _applyPinnedChatsDelta(event.data);
+          return;
+        }
+        if (event is ChatEventKick) {
+          _handleKick(event.reason);
           return;
         }
         if (event is ChatEventUnknown) {
@@ -156,6 +183,23 @@ class MessageDispatcher extends _$MessageDispatcher {
     return null;
   }
 
+  /// Server-initiated kick. Mirrors the web reference's `case "kick"` block
+  /// in `useStreaming.ts`: clear auth state so the router boots us back to
+  /// the login screen, and surface the reason so the next screen can toast.
+  ///
+  /// Known reasons (from the Rust server source):
+  ///   - `login_from_other_device` — same account signed in elsewhere
+  ///   - `delete_user` — account deleted by admin
+  ///   - other strings should still result in logout (fail-safe)
+  void _handleKick(String? reason) {
+    AppLog.w(LogTag.sse, () => '👢 SSE kick received: reason=$reason');
+    ref.read(kickReasonProvider.notifier).set(reason);
+    // Fire-and-forget logout: tokens get wiped, auth state flips to
+    // unauthenticated, and the GoRouter redirect chain sends the user to
+    // /login. The SSE provider will tear down on its own when auth flips.
+    Future.microtask(() => ref.read(authControllerProvider.notifier).logout());
+  }
+
   /// Dispatch a reaction-type chat message:
   ///   - `like` → toggle the emoji on the target message
   ///   - `delete` → remove the target message from chat + strip its reactions
@@ -224,4 +268,19 @@ class MessageDispatcher extends _$MessageDispatcher {
       group: (t) => MessageTarget.group(gid: t.gid),
     );
   }
+}
+
+/// Last-seen kick reason from a server `kick` event. Login screen / banner
+/// reads this to surface a toast ("kicked from another device" / "your
+/// account has been deleted"). `null` when there is no pending reason.
+/// Set back to `null` by the consumer after displaying.
+@Riverpod(keepAlive: true)
+class KickReason extends _$KickReason {
+  @override
+  String? build() => null;
+
+  // ignore: use_setters_to_change_properties
+  void set(String? reason) => state = reason;
+
+  void clear() => state = null;
 }

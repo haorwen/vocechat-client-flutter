@@ -248,5 +248,9 @@
   "errorPrefix": "Error: {message}",
   "@errorPrefix": {
     "placeholders": {"message": {"type": "String"}}
-  }
+  },
+
+  "authKickedFromOtherDevice": "Signed out: your account just signed in on another device.",
+  "authAccountDeleted": "Your account has been deleted.",
+  "authSessionEnded": "Your session ended. Please sign in again."
 }

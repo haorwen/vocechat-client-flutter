@@ -50,6 +50,14 @@ class ChatController extends _$ChatController {
   ///
   /// Coalesces bursts: SSE replay on reconnect can deliver dozens of
   /// messages back-to-back, and emitting state per message hitches the UI.
+  ///
+  /// Multi-device note: messages authored by the current user MUST NOT be
+  /// dropped here just because `fromUid == currentUid`. The same account
+  /// can be logged in on web + mobile + desktop simultaneously; a message
+  /// sent from another client must still appear locally. We rely on
+  /// [_flushPendingApply] to merge with any optimistic row (same target +
+  /// content, negative temp mid) so a local `sendText` echo upgrades the
+  /// placeholder instead of duplicating it.
   void applyIncomingMessage(ChatMessage msg) {
     // Reactions are sidecar events on existing messages, not their own row.
     // They're handled by MessageDispatcher → ReactionsNotifier.
@@ -76,8 +84,6 @@ class ChatController extends _$ChatController {
           target.map(user: (_) => false, group: (tt) => tt.gid == t.gid),
     );
     if (!matches) return;
-
-    if (currentUid != null && msg.fromUid == currentUid) return;
 
     if (msg.mid > 0 && _seenMids.contains(msg.mid)) return;
 
@@ -110,27 +116,93 @@ class ChatController extends _$ChatController {
     final batch = List<ChatMessage>.from(_pendingApply);
     _pendingApply.clear();
 
+    final currentUid = _currentUid();
+
+    // Two output piles:
+    //   - `merged` mutates `current` in place by upgrading an optimistic row
+    //     to its server-confirmed mid (only ever fired when this client is
+    //     the original sender).
+    //   - `fresh` is prepended (newest-first).
+    // We can mix both in one batch: optimistic-merge for SSE echoes of our
+    // own `sendText`, fresh-insert for messages from other clients (incl.
+    // the same account on a different device).
+    final updated = List<ChatMessage>.from(current);
     final fresh = <ChatMessage>[];
     int maxMid = 0;
+
     for (final m in batch) {
       if (m.mid > 0 && _seenMids.contains(m.mid)) continue;
-      fresh.add(m);
+
+      // Optimistic-merge path: this is OUR send, echoed back via SSE. Find
+      // a same-target placeholder row (negative mid, same content, status
+      // sending/sent) and replace it in place so we don't duplicate.
+      bool mergedInPlace = false;
+      if (currentUid != null && m.fromUid == currentUid && m.mid > 0) {
+        final idx = _findOptimisticMatch(updated, m, currentUid);
+        if (idx >= 0) {
+          final placeholder = updated[idx];
+          final placeholderMid = placeholder.mid;
+          updated[idx] = m;
+          if (placeholderMid < 0) {
+            _statuses.remove(placeholderMid);
+            _statuses[m.mid] = MessageSendStatus.sent;
+          }
+          mergedInPlace = true;
+        }
+      }
+
+      if (!mergedInPlace) fresh.add(m);
+
       if (m.mid > 0) {
         _seenMids.add(m.mid);
         if (m.mid > maxMid) maxMid = m.mid;
       }
     }
-    if (fresh.isEmpty) return;
+
+    if (fresh.isEmpty && identical(updated, current)) return;
 
     // Newest message at index 0 (matches reverse:true ListView contract).
     fresh.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    final next = <ChatMessage>[...fresh, ...current];
+    final next = <ChatMessage>[...fresh, ...updated];
 
     state = AsyncData(next);
     _persist(next);
     if (maxMid > 0) {
       _cache?.setCursor(maxMid);
     }
+  }
+
+  /// Find the index of an optimistic placeholder row that [echo] should
+  /// replace. Match criteria, in order:
+  ///   1. Same author (already filtered by caller).
+  ///   2. Negative mid (placeholder; real rows have positive mids).
+  ///   3. Same surface content (text/markdown/file URL) and content-type —
+  ///      this is the only signal we have since temp mids aren't echoed by
+  ///      the server.
+  ///   4. Reply target mid matches if [echo] is a reply.
+  /// Returns -1 if no candidate found.
+  int _findOptimisticMatch(
+      List<ChatMessage> rows, ChatMessage echo, int currentUid) {
+    final echoContent = echo.displayContent;
+    final echoContentType = echo.displayContentType;
+    final echoReplyMid = switch (echo.detail) {
+      ReplyMessageDetail(mid: final m) => m,
+      _ => null,
+    };
+    for (int i = 0; i < rows.length; i++) {
+      final r = rows[i];
+      if (r.mid >= 0) continue;
+      if (r.fromUid != currentUid) continue;
+      if (r.displayContent != echoContent) continue;
+      if (r.displayContentType != echoContentType) continue;
+      final rReplyMid = switch (r.detail) {
+        ReplyMessageDetail(mid: final m) => m,
+        _ => null,
+      };
+      if (rReplyMid != echoReplyMid) continue;
+      return i;
+    }
+    return -1;
   }
 
   @override

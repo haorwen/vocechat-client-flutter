@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/network/sse_lifecycle.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../messages/application/message_dispatcher.dart';
 
@@ -27,6 +28,11 @@ class HomeShellScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Activate the global SSE → ChatController/Conversations dispatcher.
     ref.watch(messageDispatcherProvider);
+    // Activate SSE lifecycle watchers: token rotation, network up/down,
+    // and app foreground/background. Each is keepAlive and self-managing.
+    ref.watch(sseTokenWatcherProvider);
+    ref.watch(sseConnectivityWatcherProvider);
+    ref.watch(sseLifecycleWatcherProvider);
 
     // Match web behavior: hide the bottom nav while inside a chat
     // conversation (matches `isChattingPage && "hidden"` in MobileNavs.tsx).

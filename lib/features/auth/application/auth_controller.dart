@@ -151,6 +151,23 @@ class AuthController extends _$AuthController {
     }
   }
 
+  /// Public wrapper around [_tryRefresh] for callers (e.g. the SSE provider)
+  /// that need to proactively renew the access token before opening a new
+  /// long-lived connection. Returns `true` if the token store now holds a
+  /// fresh token, `false` if renewal failed (network error, refresh token
+  /// rejected, etc.). Idempotent: returns `false` quietly when there is no
+  /// configured server or no stored refresh token.
+  Future<bool> renewIfPossible() async {
+    final serverId =
+        ref.read(serverStoreProvider).valueOrNull?.currentServerId;
+    if (serverId == null) return false;
+    final tokenStore = ref.read(secureTokenStoreProvider(serverId));
+    final tokens = await tokenStore.readTokens();
+    if (tokens == null) return false;
+    return _tryRefresh(
+        ref.read(authApiProvider), tokenStore, tokens.refreshToken);
+  }
+
   /// Login with email + password (MD5-hashed internally).
   Future<void> login(String email, String password) async {
     state = const AsyncLoading();

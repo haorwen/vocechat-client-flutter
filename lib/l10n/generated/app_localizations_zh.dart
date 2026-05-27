@@ -568,4 +568,13 @@ class AppL10nZh extends AppL10n {
   String errorPrefix(String message) {
     return '错误：$message';
   }
+
+  @override
+  String get authKickedFromOtherDevice => '已退出登录：你的账号刚在另一台设备上登录。';
+
+  @override
+  String get authAccountDeleted => '你的账号已被删除。';
+
+  @override
+  String get authSessionEnded => '登录已失效，请重新登录。';
 }

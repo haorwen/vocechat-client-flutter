@@ -41,6 +41,12 @@ class MessageCache {
   final Map<String, List<ChatMessage>> _pendingWrites = {};
   static const Duration _flushDelay = Duration(milliseconds: 400);
 
+  /// Per-target counter of `appendOne` writes since the last trim. Used to
+  /// amortize the trim DELETE over many inserts: trimming costs an index
+  /// scan, so doing it every write would dominate SSE-burst throughput.
+  final Map<String, int> _appendSinceTrim = {};
+  static const int _trimEvery = 50;
+
   static String _keyFor(MessageTarget target) {
     return target.map(
       user: (t) => 'u-${t.uid}',
@@ -222,6 +228,71 @@ class MessageCache {
     _pendingWrites[key] = messages;
     _flushTimers[key]?.cancel();
     _flushTimers[key] = Timer(_flushDelay, () => _flush(key, target));
+  }
+
+  /// Append a single message immediately (no debounce). Used by the SSE
+  /// dispatcher: every incoming chat event is durably persisted as soon as
+  /// it arrives, so a chat screen opened later — even cold-start, even on
+  /// a target the user has never visited before — can paint the freshest
+  /// messages straight from disk without waiting on a history fetch.
+  ///
+  /// Skips placeholder rows (negative mids) and reaction sidecars; both
+  /// would corrupt the cache surface that [ChatController] reads back.
+  ///
+  /// The `PRIMARY KEY(target_key, mid)` constraint with `ConflictAlgorithm.
+  /// replace` makes this an UPSERT — duplicate SSE echoes and `after_mid`
+  /// replay are absorbed without producing extra rows.
+  Future<void> appendOne(MessageTarget target, ChatMessage msg) async {
+    if (msg.mid <= 0) return;
+    if (msg.detail is ReactionMessageDetail) return;
+    final key = _keyFor(target);
+    try {
+      await _db.insert(
+        'messages',
+        {
+          'target_key': key,
+          'mid': msg.mid,
+          'from_uid': msg.fromUid,
+          'created_at': msg.createdAt,
+          'payload': jsonEncode(msg.toJson()),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      // Amortized trim: only run the DELETE every [_trimEvery] inserts per
+      // target. A single target can otherwise grow unbounded under SSE
+      // burst load.
+      final n = (_appendSinceTrim[key] ?? 0) + 1;
+      if (n >= _trimEvery) {
+        _appendSinceTrim[key] = 0;
+        await _trimTarget(key);
+      } else {
+        _appendSinceTrim[key] = n;
+      }
+    } catch (e) {
+      AppLog.w(LogTag.chat, () => '⚠️ cache.appendOne failed: $e');
+    }
+  }
+
+  /// Delete rows for [key] beyond the most-recent [_maxPerConversation] mids.
+  /// Idempotent; cheap as a no-op when already trimmed.
+  Future<void> _trimTarget(String key) async {
+    try {
+      await _db.rawDelete(
+        '''
+        DELETE FROM messages
+        WHERE target_key = ?
+          AND mid NOT IN (
+            SELECT mid FROM messages
+            WHERE target_key = ?
+            ORDER BY mid DESC
+            LIMIT ?
+          )
+        ''',
+        [key, key, _maxPerConversation],
+      );
+    } catch (_) {
+      // best-effort
+    }
   }
 
   Future<void> _flush(String key, MessageTarget target) async {
