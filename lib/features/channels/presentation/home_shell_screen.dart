@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/sse_lifecycle.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../messages/application/message_dispatcher.dart';
 
 /// Width threshold above which the desktop left rail layout is used.
@@ -34,17 +35,22 @@ class HomeShellScreen extends ConsumerWidget {
     ref.watch(sseConnectivityWatcherProvider);
     ref.watch(sseLifecycleWatcherProvider);
 
-    // Match web behavior: hide the bottom nav while inside a chat
-    // conversation (matches `isChattingPage && "hidden"` in MobileNavs.tsx).
-    final location = GoRouterState.of(context).matchedLocation;
-    final isChatting = RegExp(r'^/home/chat/').hasMatch(location);
-
     // Use MediaQuery instead of LayoutBuilder for the breakpoint: on desktop
     // (Windows/macOS/Linux) resizing the window must flip the layout reliably,
     // and a LayoutBuilder placed inside a Scaffold body can lag behind window
     // metrics during a drag. MediaQuery.sizeOf rebuilds on every metric change.
     final width = MediaQuery.sizeOf(context).width;
     final isWide = width >= _kWideBreakpoint;
+
+    // Match web behavior: hide the bottom nav while inside a chat conversation
+    // (matches `isChattingPage && "hidden"` in MobileNavs.tsx). Only applies
+    // on narrow layouts — on wide layouts the chat list keeps URL at /home
+    // and renders the conversation in a right pane via internal state, so the
+    // /home/chat/* URL only appears when the user is actually on the detail
+    // view (true mobile / narrow desktop).
+    final location = GoRouterState.of(context).matchedLocation;
+    final isChatting =
+        !isWide && RegExp(r'^/home/chat/').hasMatch(location);
 
     if (isWide) {
       return Scaffold(
@@ -85,21 +91,21 @@ class HomeShellScreen extends ConsumerWidget {
               onDestinationSelected: _onDestinationSelected,
               indicatorColor:
                   Theme.of(context).colorScheme.primaryContainer,
-              destinations: const [
+              destinations: [
                 NavigationDestination(
-                  icon: Icon(Icons.chat_bubble_outline),
-                  selectedIcon: Icon(Icons.chat_bubble),
-                  label: 'Chats',
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  selectedIcon: const Icon(Icons.chat_bubble),
+                  label: AppL10n.of(context).navChats,
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.people_outline),
-                  selectedIcon: Icon(Icons.people),
-                  label: 'Contacts',
+                  icon: const Icon(Icons.people_outline),
+                  selectedIcon: const Icon(Icons.people),
+                  label: AppL10n.of(context).navContacts,
                 ),
                 NavigationDestination(
-                  icon: Icon(Icons.settings_outlined),
-                  selectedIcon: Icon(Icons.settings),
-                  label: 'Settings',
+                  icon: const Icon(Icons.settings_outlined),
+                  selectedIcon: const Icon(Icons.settings),
+                  label: AppL10n.of(context).navSettings,
                 ),
               ],
             ),

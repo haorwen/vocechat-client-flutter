@@ -140,6 +140,15 @@ class AppL10nEn extends AppL10n {
   String get chatSearchEmpty => 'No matching messages.';
 
   @override
+  String get navChats => 'Chats';
+
+  @override
+  String get navContacts => 'Contacts';
+
+  @override
+  String get navSettings => 'Settings';
+
+  @override
   String get settingsTitle => 'Settings';
 
   @override

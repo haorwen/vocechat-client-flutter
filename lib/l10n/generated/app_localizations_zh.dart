@@ -140,6 +140,15 @@ class AppL10nZh extends AppL10n {
   String get chatSearchEmpty => '未找到匹配消息';
 
   @override
+  String get navChats => '聊天';
+
+  @override
+  String get navContacts => '联系人';
+
+  @override
+  String get navSettings => '设置';
+
+  @override
   String get settingsTitle => '设置';
 
   @override

@@ -343,6 +343,24 @@ abstract class AppL10n {
   /// **'No matching messages.'**
   String get chatSearchEmpty;
 
+  /// No description provided for @navChats.
+  ///
+  /// In en, this message translates to:
+  /// **'Chats'**
+  String get navChats;
+
+  /// No description provided for @navContacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Contacts'**
+  String get navContacts;
+
+  /// No description provided for @navSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get navSettings;
+
   /// No description provided for @settingsTitle.
   ///
   /// In en, this message translates to:

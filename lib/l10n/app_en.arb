@@ -59,6 +59,10 @@
   "chatSearchEmpty": "No matching messages.",
 
 
+  "navChats": "Chats",
+  "navContacts": "Contacts",
+  "navSettings": "Settings",
+
   "settingsTitle": "Settings",
   "settingsGroupGeneral": "general",
   "settingsGroupAbout": "about",

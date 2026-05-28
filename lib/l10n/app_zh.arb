@@ -46,6 +46,10 @@
   "chatSearchEmpty": "未找到匹配消息",
 
 
+  "navChats": "聊天",
+  "navContacts": "联系人",
+  "navSettings": "设置",
+
   "settingsTitle": "设置",
   "settingsGroupGeneral": "通用",
   "settingsGroupAbout": "关于",
