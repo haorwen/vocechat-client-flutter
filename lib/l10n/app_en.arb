@@ -145,6 +145,7 @@
   "serverPickerEmptySubtitle": "Add a server to get started chatting with your team.",
   "serverPickerAddFirst": "Add your first server",
   "serverPickerAdd": "Add server",
+  "serverPickerContinue": "Continue",
   "serverAddTitle": "Add Server",
   "serverUrl": "Server URL",
   "serverUrlHint": "https://chat.example.com",

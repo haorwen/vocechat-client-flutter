@@ -805,6 +805,12 @@ abstract class AppL10n {
   /// **'Add server'**
   String get serverPickerAdd;
 
+  /// No description provided for @serverPickerContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get serverPickerContinue;
+
   /// No description provided for @serverAddTitle.
   ///
   /// In en, this message translates to:

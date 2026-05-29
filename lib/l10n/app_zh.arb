@@ -132,6 +132,7 @@
   "serverPickerEmptySubtitle": "添加一台服务器，开始和你的团队聊天。",
   "serverPickerAddFirst": "添加第一台服务器",
   "serverPickerAdd": "添加服务器",
+  "serverPickerContinue": "下一步",
   "serverAddTitle": "添加服务器",
   "serverUrl": "服务器地址",
   "serverUrlHint": "https://chat.example.com",

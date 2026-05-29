@@ -20,6 +20,22 @@ class ServerPickerScreen extends ConsumerStatefulWidget {
 
 class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
   String? _selectedId;
+  bool _switching = false;
+
+  Future<void> _continueWithSelected(
+      List<ServerConfig> servers, String? currentServerId) async {
+    final id = _selectedId ??
+        (servers.any((s) => s.id == currentServerId)
+            ? currentServerId
+            : (servers.isNotEmpty ? servers.first.id : null));
+    if (id == null) return;
+    final config = servers.firstWhere((s) => s.id == id);
+    setState(() => _switching = true);
+    final notifier = ref.read(serverStoreProvider.notifier);
+    await notifier.selectServer(config.id);
+    VoceDioClient.setBaseUrl(config.baseUrl);
+    if (mounted) context.go('/login');
+  }
 
   void _showAddSheet() {
     showModalBottomSheet(
@@ -163,6 +179,19 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
             icon: const Icon(Icons.add),
             label: Text(l.serverPickerAdd),
           ),
+          bottomNavigationBar: servers.isEmpty
+              ? null
+              : SafeArea(
+                  minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  child: PrimaryButton(
+                    label: l.serverPickerContinue,
+                    isLoading: _switching,
+                    onPressed: _switching
+                        ? null
+                        : () => _continueWithSelected(
+                            servers, state.currentServerId),
+                  ),
+                ),
         );
       },
     );

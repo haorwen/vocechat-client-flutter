@@ -371,6 +371,9 @@ class AppL10nZh extends AppL10n {
   String get serverPickerAdd => '添加服务器';
 
   @override
+  String get serverPickerContinue => '下一步';
+
+  @override
   String get serverAddTitle => '添加服务器';
 
   @override

@@ -374,6 +374,9 @@ class AppL10nEn extends AppL10n {
   String get serverPickerAdd => 'Add server';
 
   @override
+  String get serverPickerContinue => 'Continue';
+
+  @override
   String get serverAddTitle => 'Add Server';
 
   @override
