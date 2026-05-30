@@ -65,6 +65,9 @@ dependencies:
   # External
   url_launcher: ^6.3.1
 
+  # App metadata (version/build number for the About page)
+  package_info_plus: ^8.0.0
+
   # Markdown
   flutter_markdown: ^0.7.4+3
 

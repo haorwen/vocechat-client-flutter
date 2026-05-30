@@ -9,6 +9,7 @@ import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../../auth/application/auth_controller.dart';
+import '../application/app_info_provider.dart';
 
 // ---------------------------------------------------------------------------
 // SettingsScreen — port of vocechat-web's settings page.
@@ -925,17 +926,24 @@ class _StoragePane extends StatelessWidget {
 // _AboutPane — version / website / bug report.
 // ---------------------------------------------------------------------------
 
-class _AboutPane extends StatelessWidget {
+class _AboutPane extends ConsumerWidget {
   const _AboutPane();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l = AppL10n.of(context);
+    final infoAsync = ref.watch(appPackageInfoProvider);
+    final version = infoAsync.maybeWhen(
+      data: (info) => info.buildNumber.isEmpty
+          ? info.version
+          : '${info.version} (${info.buildNumber})',
+      orElse: () => '-',
+    );
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _LabeledRow(label: l.aboutAppVersion, value: '1.0.0'),
+          _LabeledRow(label: l.aboutAppVersion, value: version),
           _LabeledRow(
             label: l.aboutWebsite,
             value: 'voce.chat',
