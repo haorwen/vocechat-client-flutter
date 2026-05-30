@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import '../../../core/config/env.dart';
 import '../../../core/utils/app_log.dart';
 import '../domain/message_models.dart';
 
@@ -385,9 +386,26 @@ Future<Database> _openDb() async {
     databaseFactory = databaseFactoryFfi;
   }
 
-  bootLog('12 _openDb: getApplicationDocumentsDirectory');
-  final dir = await getApplicationDocumentsDirectory();
-  final dbPath = '${dir.path}${Platform.pathSeparator}voce_messages.db';
+  bootLog('12 _openDb: resolve base directory');
+  // Mobile (Android/iOS): use the app's private support directory — it is
+  // sandboxed, hidden from the user's file browser, and semantically meant for
+  // private app data like databases.
+  // Desktop (Windows/Linux/macOS): getApplicationDocumentsDirectory() points at
+  // the user-visible Documents folder, so namespace under VoceChat/ to avoid
+  // littering it.
+  final sep = Platform.pathSeparator;
+  late final Directory dbDir;
+  if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    final base = await getApplicationSupportDirectory();
+    dbDir = Directory('${base.path}${sep}databases');
+  } else {
+    final base = await getApplicationDocumentsDirectory();
+    dbDir = Directory('${base.path}$sep${Env.appName}${sep}databases');
+  }
+  if (!await dbDir.exists()) {
+    await dbDir.create(recursive: true);
+  }
+  final dbPath = '${dbDir.path}${sep}voce_messages.db';
   bootLog('13 _openDb: openDatabase path=$dbPath');
   final db = await openDatabase(
     dbPath,
