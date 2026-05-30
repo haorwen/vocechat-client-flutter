@@ -1945,9 +1945,12 @@ class _SendBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
+    // Lift the composer above the system navigation bar (gesture/3-button nav)
+    // so the input isn't obscured at the bottom of the screen on phones.
+    final navInset = MediaQuery.viewPaddingOf(context).bottom;
     return Container(
       color: AppTokens.surface,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + navInset),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
