@@ -26,9 +26,13 @@ part 'message_cache.g.dart';
 ///            payload TEXT, PRIMARY KEY(target_key, mid))
 ///   meta(key TEXT PRIMARY KEY, value TEXT)
 class MessageCache {
-  MessageCache._(this._db);
+  MessageCache._(this._db, this._dbPath);
 
   final Database _db;
+
+  /// Absolute path to the SQLite file backing [_db]. Tracked so the settings
+  /// "storage usage" readout can measure the cache's real on-disk footprint.
+  final String _dbPath;
 
   static const int _maxPerConversation = 500;
   static const String _kCursorMetaKey = 'cursor';
@@ -477,13 +481,32 @@ class MessageCache {
       AppLog.w(LogTag.chat, () => '⚠️ cache.clearAll failed: $e');
     }
   }
+
+  /// Total on-disk size of the SQLite database, including the `-wal` / `-shm`
+  /// sidecar files when present (they can hold a meaningful amount of
+  /// uncommitted data). Best-effort: any missing file or stat error counts as
+  /// zero so a partial read never throws.
+  Future<int> diskSizeBytes() async {
+    var total = 0;
+    for (final path in [_dbPath, '$_dbPath-wal', '$_dbPath-shm']) {
+      try {
+        final f = File(path);
+        if (await f.exists()) total += await f.length();
+      } catch (_) {
+        // best-effort
+      }
+    }
+    return total;
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Database initialization
 // ---------------------------------------------------------------------------
 
-Future<Database> _openDb() async {
+/// Opens the SQLite database and also returns its absolute path, so callers
+/// that need to measure on-disk size don't have to re-derive the path.
+Future<(Database, String)> _openDbWithPath() async {
   bootLog('10 _openDb: enter');
   // sqflite uses platform-native sqlite on Android/iOS/macOS, but Linux/
   // Windows need the FFI implementation explicitly.
@@ -544,15 +567,62 @@ Future<Database> _openDb() async {
     },
   );
   bootLog('16 _openDb: openDatabase done');
-  return db;
+  return (db, dbPath);
 }
 
 @Riverpod(keepAlive: true)
 Future<MessageCache> messageCache(Ref ref) async {
   bootLog('9 messageCacheProvider.build: enter');
-  final db = await _openDb();
+  final (db, dbPath) = await _openDbWithPath();
   bootLog('17 messageCacheProvider.build: db ready');
-  return MessageCache._(db);
+  return MessageCache._(db, dbPath);
+}
+
+/// Total on-disk bytes used by the app's caches: the SQLite message/meta
+/// database plus the `flutter_cache_manager` image/file store. Recomputed on
+/// each watch (not kept alive) so the settings readout reflects clears and
+/// growth; `ref.invalidate` after "clear cache" drops it back to ~0.
+@riverpod
+Future<int> cacheUsageBytes(Ref ref) async {
+  final cache = await ref.watch(messageCacheProvider.future);
+  final dbBytes = await cache.diskSizeBytes();
+  final imgBytes = await _imageCacheDirSize();
+  return dbBytes + imgBytes;
+}
+
+/// Size of `flutter_cache_manager`'s default on-disk store. Its files live
+/// under `<temp>/libCachedImageData` (the `DefaultCacheManager` store key).
+/// Best-effort: missing dir or any IO error counts as zero.
+Future<int> _imageCacheDirSize() async {
+  try {
+    final tmp = await getTemporaryDirectory();
+    final sep = Platform.pathSeparator;
+    final dir = Directory('${tmp.path}${sep}libCachedImageData');
+    return _dirSizeBytes(dir);
+  } catch (_) {
+    return 0;
+  }
+}
+
+/// Recursively sum the sizes of all files under [dir]. Best-effort: unreadable
+/// entries are skipped rather than throwing.
+Future<int> _dirSizeBytes(Directory dir) async {
+  var total = 0;
+  try {
+    if (!await dir.exists()) return 0;
+    await for (final entity in dir.list(recursive: true, followLinks: false)) {
+      if (entity is File) {
+        try {
+          total += await entity.length();
+        } catch (_) {
+          // skip unreadable file
+        }
+      }
+    }
+  } catch (_) {
+    // best-effort
+  }
+  return total;
 }
 
 // ---------------------------------------------------------------------------

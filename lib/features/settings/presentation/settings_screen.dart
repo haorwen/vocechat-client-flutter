@@ -936,6 +936,8 @@ class _StoragePaneState extends ConsumerState<_StoragePane> {
       // Rebuild the conversation list from the now-empty cache; it falls back
       // to a network refresh (see Conversations.build no-cache path).
       ref.invalidate(conversationsProvider);
+      // Recompute the storage readout from the now-empty caches.
+      ref.invalidate(cacheUsageBytesProvider);
     } finally {
       if (mounted) {
         setState(() => _clearing = false);
@@ -946,16 +948,33 @@ class _StoragePaneState extends ConsumerState<_StoragePane> {
     }
   }
 
+  /// Human-readable byte count (B / KB / MB / GB), one decimal place above KB.
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    const units = ['KB', 'MB', 'GB', 'TB'];
+    var value = bytes / 1024;
+    var i = 0;
+    while (value >= 1024 && i < units.length - 1) {
+      value /= 1024;
+      i++;
+    }
+    return '${value.toStringAsFixed(1)} ${units[i]}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
+    final usageAsync = ref.watch(cacheUsageBytesProvider);
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _LabeledRow(
             label: l.storageUsage,
-            value: '42 MB',
+            value: usageAsync.maybeWhen(
+              data: _formatBytes,
+              orElse: () => '…',
+            ),
           ),
           _LabeledRow(
             label: l.storageAutoDownload,
