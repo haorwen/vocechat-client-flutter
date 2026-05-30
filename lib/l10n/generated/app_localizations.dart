@@ -253,6 +253,18 @@ abstract class AppL10n {
   /// **'Reply failed: {error}'**
   String chatReplyFailed(String error);
 
+  /// No description provided for @chatReplyDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'This message has been deleted.'**
+  String get chatReplyDeleted;
+
+  /// No description provided for @chatReplyVoiceMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'[Voice Message]'**
+  String get chatReplyVoiceMessage;
+
   /// No description provided for @chatToolSaved.
   ///
   /// In en, this message translates to:

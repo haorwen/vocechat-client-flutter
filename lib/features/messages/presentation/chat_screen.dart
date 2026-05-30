@@ -1391,78 +1391,74 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
       final originalAuthor = original != null
           ? widget.userDir[original.fromUid]
           : null;
-      final originalName = originalAuthor?.name ?? '#${detail.mid}';
-      String originalSnippet = '';
-      if (original != null) {
-        if (original.displayContentType == 'vocechat/file') {
-          final originalDetail = original.detail;
-          final originalProps = originalDetail is NormalMessageDetail
-              ? originalDetail.properties
-              : null;
-          originalSnippet = fileMessageReplySnippet(
-                original.displayContent,
-                originalProps,
-              ) ??
-              '';
-        } else {
-          originalSnippet =
-              original.displayContent.replaceAll('\n', ' ').trim();
-        }
-      }
-      final clippedSnippet = originalSnippet.length > 80
-          ? '${originalSnippet.substring(0, 80)}…'
-          : originalSnippet;
       content = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppTokens.gray50,
-              borderRadius: BorderRadius.circular(6),
-              border: Border(
-                left: BorderSide(color: AppTokens.primary500, width: 3),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.reply, size: 12, color: AppTokens.gray400),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        safeText(originalName),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppTokens.primary600,
-                          height: 18 / 12,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                if (clippedSnippet.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    safeText(clippedSnippet),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+          // Quoted original — mirrors the web client's <Reply>: a w-fit
+          // gray-100 rounded box with the original author's avatar, name in
+          // the primary color, and the original content rendered by its real
+          // content type (image thumbnail, [Voice Message], file, or text).
+          // No left-accent border and no reply icon (web has neither).
+          original == null || originalAuthor == null
+              ? Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTokens.gray100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    l.chatReplyDeleted,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
+                      fontStyle: FontStyle.italic,
                       color: AppTokens.gray500,
-                      height: 18 / 12,
                     ),
                   ),
-                ],
-              ],
-            ),
-          ),
+                )
+              : Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTokens.gray100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        VoceAvatar(
+                          name: originalAuthor.name,
+                          imageUrl: widget.avatarUrlBuilder(
+                            original.fromUid,
+                            originalAuthor.avatarUpdatedAt,
+                          ),
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                safeText(originalAuthor.name),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppTokens.primary500,
+                                  height: 18 / 13,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              _ReplyQuotePreview(original: original),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
           const SizedBox(height: 4),
           if (displayContentType == 'vocechat/file')
             FileMessageContent(
@@ -1806,6 +1802,62 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         content: Text(ok ? l.chatToolSavedAdded : l.chatToolSaveFail),
       ));
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _ReplyQuotePreview — renders the quoted original inside a reply bubble,
+// mirroring the web client's <Reply> renderContent: image originals show a
+// thumbnail, audio shows a voice-message label, files show an icon + name,
+// and text/markdown show a single clipped line.
+// ---------------------------------------------------------------------------
+
+class _ReplyQuotePreview extends StatelessWidget {
+  const _ReplyQuotePreview({required this.original});
+
+  final ChatMessage original;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    final type = original.displayContentType;
+    final content = original.displayContent;
+
+    if (type == 'vocechat/file') {
+      final detail = original.detail;
+      final props =
+          detail is NormalMessageDetail ? detail.properties : null;
+      // Reuse the shared file/image renderer so image originals show a real
+      // thumbnail and other files show the icon + filename row, identical to
+      // a normal file message. Constrain it so a quoted image stays compact.
+      return ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 220, maxHeight: 160),
+        child: FileMessageContent(content: content, properties: props),
+      );
+    }
+
+    if (type == 'text/audio' || type.startsWith('audio')) {
+      return Text(
+        l.chatReplyVoiceMessage,
+        style: TextStyle(
+          fontSize: 13,
+          color: AppTokens.primary500,
+          height: 18 / 13,
+        ),
+      );
+    }
+
+    final snippet = content.replaceAll('\n', ' ').trim();
+    return Text(
+      safeText(snippet),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: 13,
+        color: AppTokens.gray700,
+        height: 18 / 13,
+      ),
+    );
   }
 }
 

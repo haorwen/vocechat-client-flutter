@@ -95,6 +95,12 @@ class AppL10nZh extends AppL10n {
   }
 
   @override
+  String get chatReplyDeleted => '被回复的消息已删除！';
+
+  @override
+  String get chatReplyVoiceMessage => '[语音消息]';
+
+  @override
   String get chatToolSaved => '收藏';
 
   @override

@@ -1172,22 +1172,3 @@ class _ExpiredCard extends StatelessWidget {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// Reply snippet helper
-// ---------------------------------------------------------------------------
-
-String? fileMessageReplySnippet(
-  String content,
-  Map<String, dynamic>? properties,
-) {
-  final parsed = _parseFileMessage(content, properties);
-  if (parsed == null) return null;
-  if (parsed.contentType.startsWith('image')) return '[Image]';
-  if (parsed.contentType.startsWith('video')) return '[Video]';
-  if (parsed.contentType.startsWith('audio')) return '[Audio]';
-  final name = parsed.name.isEmpty
-      ? parsed.path.split('/').last
-      : parsed.name;
-  return '[File: $name]';
-}

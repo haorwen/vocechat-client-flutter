@@ -29,6 +29,8 @@
   "chatEditFailed": "编辑失败：{error}",
   "chatDeleteFailed": "删除失败：{error}",
   "chatReplyFailed": "回复失败：{error}",
+  "chatReplyDeleted": "被回复的消息已删除！",
+  "chatReplyVoiceMessage": "[语音消息]",
   "chatToolSaved": "收藏",
   "chatToolMembers": "成员",
   "chatToolEmpty": "暂无内容",

@@ -95,6 +95,12 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String get chatReplyDeleted => 'This message has been deleted.';
+
+  @override
+  String get chatReplyVoiceMessage => '[Voice Message]';
+
+  @override
   String get chatToolSaved => 'Saved';
 
   @override

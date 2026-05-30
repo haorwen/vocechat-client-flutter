@@ -42,6 +42,8 @@
   "@chatReplyFailed": {
     "placeholders": {"error": {"type": "String"}}
   },
+  "chatReplyDeleted": "This message has been deleted.",
+  "chatReplyVoiceMessage": "[Voice Message]",
   "chatToolSaved": "Saved",
   "chatToolMembers": "Members",
   "chatToolEmpty": "No content yet.",
