@@ -561,6 +561,14 @@ class AppL10nEn extends AppL10n {
   String get chatAttach => 'Attach';
 
   @override
+  String chatDropOverlayTitle(String name) {
+    return 'Send to $name';
+  }
+
+  @override
+  String get chatDropOverlayHint => 'Drop files here to send them';
+
+  @override
   String get chatEmoji => 'Emoji';
 
   @override

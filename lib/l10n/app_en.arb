@@ -236,6 +236,11 @@
   "chatUnsupported": "[unsupported message]",
   "chatMarkdown": "Markdown",
   "chatAttach": "Attach",
+  "chatDropOverlayTitle": "Send to {name}",
+  "@chatDropOverlayTitle": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "chatDropOverlayHint": "Drop files here to send them",
   "chatEmoji": "Emoji",
   "chatUserFallback": "User {uid}",
   "@chatUserFallback": {

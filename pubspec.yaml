@@ -51,6 +51,12 @@ dependencies:
   # flutter/services cannot read image bytes)
   super_clipboard: ^0.8.24
 
+  # Native file drag-and-drop onto the chat surface (web parity with the
+  # `DnDTip` drop overlay). Desktop + web; mobile has no native DnD.
+  desktop_drop: ^0.7.1
+  # XFile type used by desktop_drop's drop payload.
+  cross_file: ^0.3.4+2
+
   # Media playback
   video_player: ^2.9.2
   chewie: ^1.8.5

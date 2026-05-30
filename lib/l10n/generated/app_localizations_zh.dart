@@ -555,6 +555,14 @@ class AppL10nZh extends AppL10n {
   String get chatAttach => '附件';
 
   @override
+  String chatDropOverlayTitle(String name) {
+    return '发送到 $name';
+  }
+
+  @override
+  String get chatDropOverlayHint => '拖放文件到此处以发送';
+
+  @override
   String get chatEmoji => '表情';
 
   @override

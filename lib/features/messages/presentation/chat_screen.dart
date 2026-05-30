@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:cross_file/cross_file.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -57,6 +59,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// and paste add here; the actual upload+send fires only on send (web parity
   /// with the `UploadFileList` staging area). Supports any file type.
   final List<_StagedFile> _staged = [];
+
+  /// True while a native file drag hovers over the chat surface — drives the
+  /// dashed-border drop overlay (web parity with `DnDTip`).
+  bool _dragActive = false;
 
   late MessageTarget _target;
 
@@ -250,6 +256,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 : null);
         if (bytes == null || bytes.isEmpty) continue;
         _stageFile(bytes, picked.name);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(safeText(l.chatSendFailed(_friendlyError(e))))));
+      }
+    }
+  }
+
+  /// Stage files dropped onto the chat surface via native drag-and-drop.
+  /// Reuses the same staging entry point as the picker/clipboard paths, so
+  /// dropped files flow through the existing preview + upload-on-send logic.
+  Future<void> _stageDroppedFiles(List<XFile> files) async {
+    final l = AppL10n.of(context);
+    try {
+      for (final file in files) {
+        final bytes = await file.readAsBytes();
+        if (bytes.isEmpty) continue;
+        final name = file.name.isNotEmpty
+            ? file.name
+            : (file.path.split(RegExp(r'[\\/]')).lastOrNull ?? 'file');
+        _stageFile(bytes, name);
       }
     } catch (e) {
       if (mounted) {
@@ -588,116 +616,134 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: Column(
-                  children: [
-                    _ChatHeader(
-                      title: title,
-                      subtitle: subtitle,
-                      avatarUrl: avatarUrl,
-                      isChannel: isChannel,
-                      canPop: Navigator.of(context).canPop(),
-                      isOnline: dmOnline,
-                      showStatus: showStatus,
-                      showMoreMenu: !isWide,
-                      searchAnchorKey: _searchAnchorKey,
-                      onSearch: _openSearchOverlay,
-                      onPin: isChannel
-                          ? () => _showToolPanel(ChatTool.pin)
-                          : null,
-                      onSaved: () => _showToolPanel(ChatTool.saved),
-                      onMembers: isChannel
-                          ? () => _showToolPanel(ChatTool.members)
-                          : null,
-                    ),
-                    Expanded(
-                      child: messagesAsync.when(
-                        loading: () => Center(
-                          child: LoadingCapsule(label: l.chatLoadingMessages),
-                        ),
-                        error: (e, _) => Center(
-                            child:
-                                Text(safeText(l.errorPrefix(e.toString())))),
-                        data: (messages) {
-                          if (messages.isEmpty) {
-                            return const _EmptyConversation();
-                          }
-                          return ScrollablePositionedList.builder(
-                            itemScrollController: _itemScrollController,
-                            itemPositionsListener: _itemPositionsListener,
-                            reverse: true,
-                            padding:
-                                const EdgeInsets.fromLTRB(8, 16, 8, 16),
-                            itemCount: messages.length,
-                            itemBuilder: (context, index) {
-                              final msg = messages[index];
-                              final showSep =
-                                  _showDateSeparator(messages, index);
-                              // reverse:true → Column children render top→bottom
-                              // visually above→below the row. Date separator
-                              // belongs ABOVE the day's first message (oldest
-                              // of that day), so it must come BEFORE the row
-                              // in the Column.
-                              return Column(
-                                key: ValueKey<int>(msg.mid),
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.stretch,
-                                children: [
-                                  if (showSep)
-                                    _DateSeparator(
-                                        createdAt: msg.createdAt),
-                                  _MessageRow(
-                                    message: msg,
-                                    currentUid: currentUid,
-                                    status: statuses[msg.mid],
-                                    userDir: userDir,
-                                    avatarUrlBuilder: _avatarUrl,
-                                    target: _target,
-                                    highlighted:
-                                        msg.mid == _highlightMid,
-                                    isEditing: _editingMid == msg.mid,
-                                    editController: _editCtrl,
-                                    onEditSave: _saveEdit,
-                                    onEditCancel: _cancelEdit,
-                                    onReply: () => _startReply(msg),
-                                    onEdit: () => _startEdit(msg),
-                                    onDelete: () => _confirmDelete(msg),
-                                    onRetry: msg.mid < 0 &&
-                                            statuses[msg.mid] ==
-                                                MessageSendStatus.failed
-                                        ? () => ref
-                                            .read(chatControllerProvider(
-                                                    _target)
-                                                .notifier)
-                                            .retrySend(msg.mid)
-                                        : null,
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-                        },
+                child: DropTarget(
+                  onDragEntered: (_) => setState(() => _dragActive = true),
+                  onDragExited: (_) => setState(() => _dragActive = false),
+                  onDragDone: (detail) {
+                    setState(() => _dragActive = false);
+                    _stageDroppedFiles(detail.files);
+                  },
+                  child: Stack(
+                    children: [
+                      Column(
+                        children: [
+                          _ChatHeader(
+                            title: title,
+                            subtitle: subtitle,
+                            avatarUrl: avatarUrl,
+                            isChannel: isChannel,
+                            canPop: Navigator.of(context).canPop(),
+                            isOnline: dmOnline,
+                            showStatus: showStatus,
+                            showMoreMenu: !isWide,
+                            searchAnchorKey: _searchAnchorKey,
+                            onSearch: _openSearchOverlay,
+                            onPin: isChannel
+                                ? () => _showToolPanel(ChatTool.pin)
+                                : null,
+                            onSaved: () => _showToolPanel(ChatTool.saved),
+                            onMembers: isChannel
+                                ? () => _showToolPanel(ChatTool.members)
+                                : null,
+                          ),
+                          Expanded(
+                            child: messagesAsync.when(
+                              loading: () => Center(
+                                child: LoadingCapsule(
+                                    label: l.chatLoadingMessages),
+                              ),
+                              error: (e, _) => Center(
+                                  child: Text(
+                                      safeText(l.errorPrefix(e.toString())))),
+                              data: (messages) {
+                                if (messages.isEmpty) {
+                                  return const _EmptyConversation();
+                                }
+                                return ScrollablePositionedList.builder(
+                                  itemScrollController: _itemScrollController,
+                                  itemPositionsListener:
+                                      _itemPositionsListener,
+                                  reverse: true,
+                                  padding: const EdgeInsets.fromLTRB(
+                                      8, 16, 8, 16),
+                                  itemCount: messages.length,
+                                  itemBuilder: (context, index) {
+                                    final msg = messages[index];
+                                    final showSep =
+                                        _showDateSeparator(messages, index);
+                                    // reverse:true → Column children render
+                                    // top→bottom visually above→below the row.
+                                    // Date separator belongs ABOVE the day's
+                                    // first message (oldest of that day), so it
+                                    // must come BEFORE the row in the Column.
+                                    return Column(
+                                      key: ValueKey<int>(msg.mid),
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        if (showSep)
+                                          _DateSeparator(
+                                              createdAt: msg.createdAt),
+                                        _MessageRow(
+                                          message: msg,
+                                          currentUid: currentUid,
+                                          status: statuses[msg.mid],
+                                          userDir: userDir,
+                                          avatarUrlBuilder: _avatarUrl,
+                                          target: _target,
+                                          highlighted:
+                                              msg.mid == _highlightMid,
+                                          isEditing: _editingMid == msg.mid,
+                                          editController: _editCtrl,
+                                          onEditSave: _saveEdit,
+                                          onEditCancel: _cancelEdit,
+                                          onReply: () => _startReply(msg),
+                                          onEdit: () => _startEdit(msg),
+                                          onDelete: () => _confirmDelete(msg),
+                                          onRetry: msg.mid < 0 &&
+                                                  statuses[msg.mid] ==
+                                                      MessageSendStatus.failed
+                                              ? () => ref
+                                                  .read(chatControllerProvider(
+                                                          _target)
+                                                      .notifier)
+                                                  .retrySend(msg.mid)
+                                              : null,
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                          _SendBox(
+                            controller: _textCtrl,
+                            canSend: _canSend,
+                            onSend: _sendMessage,
+                            onAttach: _pickAndStageFile,
+                            onPasteImage: _pasteFromClipboard,
+                            staged: _staged,
+                            onRemoveStaged: _removeStaged,
+                            onRenameStaged: _showRenameDialog,
+                            placeholder: isChannel
+                                ? l.chatMessagePlaceholderChannel(title)
+                                : l.chatMessagePlaceholderUser(title),
+                            replyTarget: _replyTarget,
+                            replyTargetName: _replyTarget == null
+                                ? null
+                                : (userDir[_replyTarget!.fromUid]?.name ??
+                                    l.chatUserFallback(_replyTarget!.fromUid)),
+                            onCancelReply: _cancelReply,
+                          ),
+                        ],
                       ),
-                    ),
-                    _SendBox(
-                      controller: _textCtrl,
-                      canSend: _canSend,
-                      onSend: _sendMessage,
-                      onAttach: _pickAndStageFile,
-                      onPasteImage: _pasteFromClipboard,
-                      staged: _staged,
-                      onRemoveStaged: _removeStaged,
-                      onRenameStaged: _showRenameDialog,
-                      placeholder: isChannel
-                          ? l.chatMessagePlaceholderChannel(title)
-                          : l.chatMessagePlaceholderUser(title),
-                      replyTarget: _replyTarget,
-                      replyTargetName: _replyTarget == null
-                          ? null
-                          : (userDir[_replyTarget!.fromUid]?.name ??
-                              l.chatUserFallback(_replyTarget!.fromUid)),
-                      onCancelReply: _cancelReply,
-                    ),
-                  ],
+                      if (_dragActive)
+                        Positioned.fill(
+                          child: _DropOverlay(targetName: title),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               if (isWide)
@@ -717,6 +763,115 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// _DropOverlay — shown over the chat surface while a native file drag hovers
+// (web parity with `DnDTip`). Semi-transparent scrim + centered dashed-border
+// card naming the drop target.
+// ---------------------------------------------------------------------------
+
+class _DropOverlay extends StatelessWidget {
+  const _DropOverlay({required this.targetName});
+
+  final String targetName;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    // IgnorePointer: the overlay is purely visual — the underlying DropTarget
+    // must keep receiving the native drag/drop events.
+    return IgnorePointer(
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.45),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(32),
+        child: DottedBorderBox(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.cloud_upload_outlined,
+                    size: 48, color: Colors.white),
+                const SizedBox(height: 16),
+                Text(
+                  safeText(l.chatDropOverlayTitle(targetName)),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l.chatDropOverlayHint,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A rounded rectangle drawn with a dashed white border — the dashed look the
+/// web `DnDTip` uses. Implemented with a custom painter to avoid pulling in a
+/// dotted-border dependency for one widget.
+class DottedBorderBox extends StatelessWidget {
+  const DottedBorderBox({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DashedRectPainter(),
+      child: child,
+    );
+  }
+}
+
+class _DashedRectPainter extends CustomPainter {
+  static const double _radius = 16;
+  static const double _dash = 8;
+  static const double _gap = 6;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      const Radius.circular(_radius),
+    );
+    final path = Path()..addRRect(rrect);
+
+    for (final metric in path.computeMetrics()) {
+      double distance = 0;
+      while (distance < metric.length) {
+        final next = distance + _dash;
+        canvas.drawPath(
+          metric.extractPath(distance, next.clamp(0, metric.length)),
+          paint,
+        );
+        distance = next + _gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRectPainter oldDelegate) => false;
 }
 
 // ---------------------------------------------------------------------------

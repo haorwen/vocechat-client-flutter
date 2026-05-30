@@ -196,6 +196,8 @@
   "chatUnsupported": "[不支持的消息]",
   "chatMarkdown": "Markdown",
   "chatAttach": "附件",
+  "chatDropOverlayTitle": "发送到 {name}",
+  "chatDropOverlayHint": "拖放文件到此处以发送",
   "chatEmoji": "表情",
   "chatUserFallback": "用户 {uid}",
   "chatGroupFallback": "群组 {gid}",

@@ -1129,6 +1129,18 @@ abstract class AppL10n {
   /// **'Attach'**
   String get chatAttach;
 
+  /// No description provided for @chatDropOverlayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to {name}'**
+  String chatDropOverlayTitle(String name);
+
+  /// No description provided for @chatDropOverlayHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop files here to send them'**
+  String get chatDropOverlayHint;
+
   /// No description provided for @chatEmoji.
   ///
   /// In en, this message translates to:
