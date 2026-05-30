@@ -571,6 +571,30 @@ abstract class AppL10n {
   /// **'Clear cache'**
   String get storageClearCache;
 
+  /// No description provided for @storageClearCacheConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear cache?'**
+  String get storageClearCacheConfirmTitle;
+
+  /// No description provided for @storageClearCacheConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes locally cached messages and images. They will be re-downloaded as needed.'**
+  String get storageClearCacheConfirmBody;
+
+  /// No description provided for @storageClearCacheConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get storageClearCacheConfirm;
+
+  /// No description provided for @storageCacheCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache cleared'**
+  String get storageCacheCleared;
+
   /// No description provided for @aboutAppVersion.
   ///
   /// In en, this message translates to:

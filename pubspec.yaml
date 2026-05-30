@@ -43,6 +43,9 @@ dependencies:
 
   # Image
   cached_network_image: ^3.4.1
+  # Disk cache backing cached_network_image — declared explicitly so the
+  # clear-cache action can call DefaultCacheManager().emptyCache().
+  flutter_cache_manager: ^3.4.1
   image_picker: ^1.1.2
   file_picker: ^8.1.4
   photo_view: ^0.15.0

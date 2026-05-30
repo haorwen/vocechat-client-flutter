@@ -254,6 +254,18 @@ class AppL10nZh extends AppL10n {
   String get storageClearCache => '清除缓存';
 
   @override
+  String get storageClearCacheConfirmTitle => '清除缓存？';
+
+  @override
+  String get storageClearCacheConfirmBody => '将删除本地缓存的消息和图片，需要时会重新下载。';
+
+  @override
+  String get storageClearCacheConfirm => '清除';
+
+  @override
+  String get storageCacheCleared => '缓存已清除';
+
+  @override
   String get aboutAppVersion => '应用版本';
 
   @override

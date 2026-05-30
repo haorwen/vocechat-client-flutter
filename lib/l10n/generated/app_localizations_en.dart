@@ -256,6 +256,19 @@ class AppL10nEn extends AppL10n {
   String get storageClearCache => 'Clear cache';
 
   @override
+  String get storageClearCacheConfirmTitle => 'Clear cache?';
+
+  @override
+  String get storageClearCacheConfirmBody =>
+      'This removes locally cached messages and images. They will be re-downloaded as needed.';
+
+  @override
+  String get storageClearCacheConfirm => 'Clear';
+
+  @override
+  String get storageCacheCleared => 'Cache cleared';
+
+  @override
   String get aboutAppVersion => 'App version';
 
   @override

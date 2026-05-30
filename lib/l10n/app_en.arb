@@ -102,6 +102,10 @@
   "storageAutoDownload": "Auto-download media",
   "storageWifiOnly": "Wi-Fi only",
   "storageClearCache": "Clear cache",
+  "storageClearCacheConfirmTitle": "Clear cache?",
+  "storageClearCacheConfirmBody": "This removes locally cached messages and images. They will be re-downloaded as needed.",
+  "storageClearCacheConfirm": "Clear",
+  "storageCacheCleared": "Cache cleared",
 
   "aboutAppVersion": "App version",
   "aboutWebsite": "Website",

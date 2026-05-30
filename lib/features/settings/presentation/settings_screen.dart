@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +10,8 @@ import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../channels/application/conversation_providers.dart';
+import '../../messages/data/message_cache.dart';
 import '../application/app_info_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -889,8 +892,59 @@ class _OptionTile extends StatelessWidget {
 // _StoragePane — storage usage / auto-download / clear cache.
 // ---------------------------------------------------------------------------
 
-class _StoragePane extends StatelessWidget {
+class _StoragePane extends ConsumerStatefulWidget {
   const _StoragePane();
+
+  @override
+  ConsumerState<_StoragePane> createState() => _StoragePaneState();
+}
+
+class _StoragePaneState extends ConsumerState<_StoragePane> {
+  bool _clearing = false;
+
+  Future<void> _clearCache() async {
+    if (_clearing) return;
+    final l = AppL10n.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.storageClearCacheConfirmTitle),
+        content: Text(l.storageClearCacheConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l.actionCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(l.storageClearCacheConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _clearing = true);
+    try {
+      // SQLite message + directory snapshot cache.
+      final cache = await ref.read(messageCacheProvider.future);
+      await cache.clearAll();
+      // Network image cache: in-memory decoded images + on-disk file cache.
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+      await DefaultCacheManager().emptyCache();
+      // Rebuild the conversation list from the now-empty cache; it falls back
+      // to a network refresh (see Conversations.build no-cache path).
+      ref.invalidate(conversationsProvider);
+    } finally {
+      if (mounted) {
+        setState(() => _clearing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppL10n.of(context).storageCacheCleared)),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -913,7 +967,7 @@ class _StoragePane extends StatelessWidget {
             child: _SecondaryButton(
               label: l.storageClearCache,
               icon: Icons.delete_sweep_outlined,
-              onTap: () {},
+              onTap: _clearing ? () {} : _clearCache,
             ),
           ),
         ],

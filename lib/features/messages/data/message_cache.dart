@@ -369,6 +369,25 @@ class MessageCache {
     }
     return null;
   }
+
+  /// Wipe all cached messages and directory/meta snapshots, leaving the table
+  /// structure intact. Used by the "clear cache" action in settings. Pending
+  /// in-memory writes are dropped first so a debounced flush can't repopulate
+  /// the tables right after we empty them.
+  Future<void> clearAll() async {
+    for (final t in _flushTimers.values) {
+      t.cancel();
+    }
+    _flushTimers.clear();
+    _pendingWrites.clear();
+    _appendSinceTrim.clear();
+    try {
+      await _db.delete('messages');
+      await _db.delete('meta');
+    } catch (e) {
+      AppLog.w(LogTag.chat, () => '⚠️ cache.clearAll failed: $e');
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

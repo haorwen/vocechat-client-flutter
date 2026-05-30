@@ -89,6 +89,10 @@
   "storageAutoDownload": "自动下载媒体",
   "storageWifiOnly": "仅 Wi-Fi",
   "storageClearCache": "清除缓存",
+  "storageClearCacheConfirmTitle": "清除缓存？",
+  "storageClearCacheConfirmBody": "将删除本地缓存的消息和图片，需要时会重新下载。",
+  "storageClearCacheConfirm": "清除",
+  "storageCacheCleared": "缓存已清除",
 
   "aboutAppVersion": "应用版本",
   "aboutWebsite": "官网",
