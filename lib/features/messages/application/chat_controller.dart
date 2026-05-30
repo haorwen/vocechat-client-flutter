@@ -192,9 +192,10 @@ class ChatController extends _$ChatController {
 
     if (fresh.isEmpty && identical(updated, current)) return;
 
-    // Newest message at index 0 (matches reverse:true ListView contract).
-    fresh.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    final next = <ChatMessage>[...fresh, ...updated];
+    // Re-sort the whole list newest-first. `fresh` alone being ordered isn't
+    // enough: an SSE batch can carry mids that interleave with rows already in
+    // `updated`, so we order the merged result rather than just prepending.
+    final next = _sortedNewestFirst([...fresh, ...updated]);
 
     state = AsyncData(next);
     _persist(next);
@@ -343,8 +344,10 @@ class ChatController extends _$ChatController {
       }
       if (additions.isEmpty) return;
 
-      // Merge: new items go to the front (server returned newest first).
-      final next = <ChatMessage>[...additions, ...current];
+      // Merge new items with current, then re-sort so any interleaving with
+      // existing rows lands in the right place (server "newest first" is not a
+      // safe assumption once cache/history/SSE batches mix).
+      final next = _sortedNewestFirst([...additions, ...current]);
       state = AsyncData(next);
       cache.scheduleWrite(target, next);
       final maxMid = additions
@@ -488,7 +491,7 @@ class ChatController extends _$ChatController {
   }
 
   List<ChatMessage> _drainPending(List<ChatMessage> base) {
-    if (_pendingIncoming.isEmpty) return base;
+    if (_pendingIncoming.isEmpty) return _sortedNewestFirst(base);
     final extras = <ChatMessage>[];
     for (final m in _pendingIncoming.reversed) {
       if (m.mid > 0 && _seenMids.contains(m.mid)) continue;
@@ -496,7 +499,41 @@ class ChatController extends _$ChatController {
       if (m.mid > 0) _seenMids.add(m.mid);
     }
     _pendingIncoming.clear();
-    return extras.isEmpty ? base : [...extras, ...base];
+    return _sortedNewestFirst(extras.isEmpty ? base : [...extras, ...base]);
+  }
+
+  /// Single source of truth for chat-list ordering. The whole app (the
+  /// `reverse:true` ListView, the date-separator logic, pagination cursors)
+  /// assumes index 0 is the newest message. Every merge point — cache seed,
+  /// background refresh, SSE flush, pagination — funnels its result through
+  /// here so the list is *globally* ordered regardless of which source the
+  /// rows came from. Without this, interleaving cache/history/SSE batches can
+  /// land an older day's message below a newer one (e.g. a 5/28 row beneath
+  /// 5/29).
+  ///
+  /// Ordering key, newest-first:
+  ///   - Confirmed rows (positive, server-assigned `mid`) sort by `mid`
+  ///     descending. `mid` is the server's monotonic sequence and the
+  ///     authoritative order — it matches the cache layer's `ORDER BY mid DESC`
+  ///     and is immune to clock skew between `created_at` values.
+  ///   - Optimistic rows (negative temp `mid`, not yet acked) always sit at the
+  ///     very top (they're the just-sent messages) and tie-break among
+  ///     themselves by `createdAt` descending.
+  /// The sort is stable, so equal keys keep their relative input order.
+  List<ChatMessage> _sortedNewestFirst(List<ChatMessage> input) {
+    final out = List<ChatMessage>.from(input);
+    out.sort((a, b) {
+      final aOptimistic = a.mid < 0;
+      final bOptimistic = b.mid < 0;
+      if (aOptimistic && bOptimistic) {
+        return b.createdAt.compareTo(a.createdAt);
+      }
+      // Optimistic (unsent) rows always rank above confirmed ones.
+      if (aOptimistic) return -1;
+      if (bOptimistic) return 1;
+      return b.mid.compareTo(a.mid);
+    });
+    return out;
   }
 
   void _persist(List<ChatMessage> snapshot) {
@@ -817,7 +854,9 @@ class ChatController extends _$ChatController {
           if (m.mid > 0) _seenMids.add(m.mid);
         }
         if (fresh.isNotEmpty) {
-          final next = [...current, ...fresh];
+          // Older rows append at the tail, but re-sort the whole list so the
+          // pagination boundary can't leave an out-of-order seam.
+          final next = _sortedNewestFirst([...current, ...fresh]);
           state = AsyncData(next);
           _persist(next);
         }
