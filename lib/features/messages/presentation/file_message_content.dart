@@ -33,10 +33,26 @@ class FileMessageContent extends ConsumerWidget {
     super.key,
     required this.content,
     required this.properties,
+    this.localBytes,
+    this.sending = false,
+    this.progress,
   });
 
   final String content;
   final Map<String, dynamic>? properties;
+
+  /// Local image bytes for an optimistic (not-yet-uploaded) row. When set and
+  /// the message is an image, the bubble previews from memory instead of the
+  /// server URL.
+  final Uint8List? localBytes;
+
+  /// Whether this row is still uploading (shows a sending overlay on the
+  /// local preview).
+  final bool sending;
+
+  /// Upload progress in [0, 1] for an in-flight row. Null when unknown — the
+  /// overlay then shows an indeterminate spinner.
+  final double? progress;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -49,6 +65,16 @@ class FileMessageContent extends ConsumerWidget {
           color: AppTokens.gray700,
           height: 20 / 14,
         ),
+      );
+    }
+
+    // Optimistic local image: render directly from memory (no server URL yet).
+    if (localBytes != null && _isImage(parsed.contentType, parsed.size)) {
+      return _LocalImageBubble(
+        bytes: localBytes!,
+        meta: parsed,
+        sending: sending,
+        progress: progress,
       );
     }
 
@@ -211,6 +237,93 @@ Future<void> _launchExternal(String url) async {
 // Image bubble + preview
 // ---------------------------------------------------------------------------
 
+/// Computes a clamped bubble size from natural image dimensions.
+/// Matches _ImageBubble's sizing so optimistic → confirmed has no layout jump.
+(double, double) _imageBubbleSize(double? natW, double? natH) {
+  const minSize = 80.0;
+  const maxSize = 240.0;
+  double bubbleW = maxSize;
+  double bubbleH = maxSize;
+  if (natW != null && natH != null && natW > 0 && natH > 0) {
+    final ratio = natW / natH;
+    if (ratio >= 1) {
+      bubbleH = (maxSize / ratio).clamp(minSize, maxSize);
+    } else {
+      bubbleW = (maxSize * ratio).clamp(minSize, maxSize);
+    }
+  }
+  return (bubbleW, bubbleH);
+}
+
+/// Optimistic image preview rendered from in-memory bytes while the upload is
+/// in flight. Shows a translucent overlay + spinner when [sending].
+class _LocalImageBubble extends StatelessWidget {
+  const _LocalImageBubble({
+    required this.bytes,
+    required this.meta,
+    required this.sending,
+    this.progress,
+  });
+
+  final Uint8List bytes;
+  final _FileMeta meta;
+  final bool sending;
+  final double? progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final (bubbleW, bubbleH) = _imageBubbleSize(meta.width, meta.height);
+    final pct = progress == null ? null : (progress!.clamp(0.0, 1.0) * 100).round();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: bubbleW,
+        height: bubbleH,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.memory(bytes, fit: BoxFit.cover),
+            if (sending)
+              Container(
+                color: Colors.white.withValues(alpha: 0.5),
+                alignment: Alignment.center,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        // Indeterminate until the first byte-progress callback.
+                        value: progress?.clamp(0.0, 1.0),
+                        backgroundColor: Colors.black.withValues(alpha: 0.12),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppTokens.primary500,
+                        ),
+                      ),
+                    ),
+                    if (pct != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        '$pct%',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppTokens.gray700,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ImageBubble extends ConsumerStatefulWidget {
   const _ImageBubble({required this.meta, required this.urls});
 
@@ -241,18 +354,7 @@ class _ImageBubbleState extends ConsumerState<_ImageBubble> {
 
     final natW = widget.meta.width;
     final natH = widget.meta.height;
-    const minSize = 80.0;
-    const maxSize = 240.0;
-    double bubbleW = maxSize;
-    double bubbleH = maxSize;
-    if (natW != null && natH != null && natW > 0 && natH > 0) {
-      final ratio = natW / natH;
-      if (ratio >= 1) {
-        bubbleH = (maxSize / ratio).clamp(minSize, maxSize);
-      } else {
-        bubbleW = (maxSize * ratio).clamp(minSize, maxSize);
-      }
-    }
+    final (bubbleW, bubbleH) = _imageBubbleSize(natW, natH);
 
     final headers = _resolvedHeaders ?? _refererOnlyHeaders(widget.urls.baseUrl);
 

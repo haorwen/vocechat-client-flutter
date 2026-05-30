@@ -1,11 +1,16 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import 'package:super_clipboard/super_clipboard.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/storage/server_store.dart';
@@ -19,6 +24,7 @@ import '../../../shared/widgets/loading_capsule.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../application/chat_controller.dart';
 import '../application/chat_tools_provider.dart';
+import '../data/message_api.dart';
 import '../domain/message_models.dart';
 import '../domain/message_status.dart';
 import 'chat_tool_panels.dart';
@@ -47,17 +53,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   int? _replyToMid;
   ChatMessage? _replyTarget;
 
+  /// Images staged for sending — shown as preview chips above the input. Pick
+  /// and paste add here; the actual upload+send fires only on send (web parity
+  /// with the `UploadFileList` staging area).
+  final List<_StagedImage> _staged = [];
+
   late MessageTarget _target;
+
+  /// Send is enabled when there's text OR at least one staged image.
+  void _recomputeCanSend() {
+    final hasText = _textCtrl.text.trim().isNotEmpty;
+    final next = hasText || _staged.isNotEmpty;
+    if (next != _canSend) setState(() => _canSend = next);
+  }
 
   @override
   void initState() {
     super.initState();
     _target = _parseTarget(widget.id);
 
-    _textCtrl.addListener(() {
-      final hasText = _textCtrl.text.trim().isNotEmpty;
-      if (hasText != _canSend) setState(() => _canSend = hasText);
-    });
+    _textCtrl.addListener(_recomputeCanSend);
 
     _itemPositionsListener.itemPositions.addListener(_onPositionsChanged);
   }
@@ -115,18 +130,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final text = _textCtrl.text.trim();
     final l = AppL10n.of(context);
     final replyMid = _replyToMid;
+    // Snapshot + clear the staging area; uploads fire below (web parity:
+    // staged files only upload on send, then the stage resets).
+    final staged = List<_StagedImage>.from(_staged);
     _textCtrl.clear();
     setState(() {
       _canSend = false;
       _replyToMid = null;
       _replyTarget = null;
+      _staged.clear();
     });
     try {
       final notifier = ref.read(chatControllerProvider(_target).notifier);
-      if (replyMid != null) {
-        await notifier.sendReply(replyMid, text);
-      } else {
-        await notifier.sendText(text);
+      // 1) Text first (only when non-empty — images can be sent caption-less).
+      if (text.isNotEmpty) {
+        if (replyMid != null) {
+          await notifier.sendReply(replyMid, text);
+        } else {
+          await notifier.sendText(text);
+        }
+      }
+      // 2) Then each staged image (each becomes its own optimistic row).
+      for (final img in staged) {
+        await notifier.sendImage(
+          bytes: img.bytes,
+          filename: img.filename,
+          contentType: img.contentType,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -137,6 +167,116 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             SnackBar(content: Text(safeText(msg))));
       }
     }
+  }
+
+  /// Add an image to the staging area (preview above input). Upload is
+  /// deferred until the user taps send — matches the web `addStageFile` flow.
+  void _stageImage(Uint8List bytes, String filename) {
+    final contentType = MessageApi.inferContentType(filename, bytes: bytes);
+    setState(() {
+      _staged.add(_StagedImage(
+        bytes: bytes,
+        filename: filename,
+        contentType: contentType,
+      ));
+    });
+    _recomputeCanSend();
+  }
+
+  void _removeStaged(int index) {
+    if (index < 0 || index >= _staged.length) return;
+    setState(() => _staged.removeAt(index));
+    _recomputeCanSend();
+  }
+
+  /// Pick an image (desktop/web → file_picker, mobile → image_picker gallery)
+  /// and STAGE it for preview. Reads bytes in-memory so the clipboard + picker
+  /// paths share one staging entry point.
+  Future<void> _pickAndSendImage() async {
+    final l = AppL10n.of(context);
+    try {
+      Uint8List? bytes;
+      String filename = 'image.png';
+      final isDesktop = !kIsWeb &&
+          (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+      if (isDesktop || kIsWeb) {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.image,
+          withData: true,
+        );
+        final picked = result?.files.firstOrNull;
+        if (picked == null) return;
+        bytes = picked.bytes ??
+            (picked.path != null
+                ? await File(picked.path!).readAsBytes()
+                : null);
+        filename = picked.name;
+      } else {
+        final picker = ImagePicker();
+        final xfile = await picker.pickImage(source: ImageSource.gallery);
+        if (xfile == null) return;
+        bytes = await xfile.readAsBytes();
+        filename = xfile.name;
+      }
+      if (bytes == null || bytes.isEmpty) return;
+      _stageImage(bytes, filename);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(safeText(l.chatSendFailed(_friendlyError(e))))));
+      }
+    }
+  }
+
+  /// Try to read an image from the clipboard and STAGE it. Returns true when an
+  /// image was found+staged so the caller can suppress the default text paste.
+  Future<bool> _pasteImageFromClipboard() async {
+    try {
+      final clipboard = SystemClipboard.instance;
+      if (clipboard == null) return false;
+      final reader = await clipboard.read();
+
+      Uint8List? bytes;
+      String filename = 'pasted.png';
+      if (reader.canProvide(Formats.png)) {
+        bytes = await _readClipboardFormat(reader, Formats.png);
+        filename = 'pasted.png';
+      } else if (reader.canProvide(Formats.jpeg)) {
+        bytes = await _readClipboardFormat(reader, Formats.jpeg);
+        filename = 'pasted.jpg';
+      } else if (reader.canProvide(Formats.gif)) {
+        bytes = await _readClipboardFormat(reader, Formats.gif);
+        filename = 'pasted.gif';
+      } else if (reader.canProvide(Formats.webp)) {
+        bytes = await _readClipboardFormat(reader, Formats.webp);
+        filename = 'pasted.webp';
+      }
+      if (bytes == null || bytes.isEmpty) return false;
+
+      _stageImage(bytes, filename);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Read a single binary image format from the clipboard into bytes.
+  Future<Uint8List?> _readClipboardFormat(
+    ClipboardReader reader,
+    SimpleFileFormat format,
+  ) async {
+    final completer = Completer<Uint8List?>();
+    reader.getFile(format, (file) async {
+      try {
+        final data = await file.readAll();
+        if (!completer.isCompleted) completer.complete(data);
+      } catch (_) {
+        if (!completer.isCompleted) completer.complete(null);
+      }
+    }, onError: (_) {
+      if (!completer.isCompleted) completer.complete(null);
+    });
+    return completer.future;
   }
 
   void _startReply(ChatMessage msg) {
@@ -495,6 +635,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       controller: _textCtrl,
                       canSend: _canSend,
                       onSend: _sendMessage,
+                      onAttach: _pickAndSendImage,
+                      onPasteImage: _pasteImageFromClipboard,
+                      staged: _staged,
+                      onRemoveStaged: _removeStaged,
                       placeholder: isChannel
                           ? l.chatMessagePlaceholderChannel(title)
                           : l.chatMessagePlaceholderUser(title),
@@ -946,9 +1090,19 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
     } else if (detail is NormalMessageDetail || msg.isEdited) {
       if (displayContentType == 'vocechat/file') {
         final props = detail is NormalMessageDetail ? detail.properties : null;
+        final notifier =
+            ref.read(chatControllerProvider(widget.target).notifier);
+        final isSending = widget.status == MessageSendStatus.sending;
+        // Only preview from local memory while the upload is in flight. Once
+        // confirmed/failed the row falls back to the network-backed bubble so
+        // a sent image looks and behaves exactly like a received one.
+        final localBytes = isSending ? notifier.localBytesFor(msg.mid) : null;
         content = FileMessageContent(
           content: displayContent,
           properties: props,
+          localBytes: localBytes,
+          sending: isSending,
+          progress: isSending ? notifier.progressFor(msg.mid) : null,
         );
       } else if (displayContentType == 'text/markdown') {
         content = MarkdownBody(
@@ -1466,6 +1620,10 @@ class _SendBox extends StatelessWidget {
     required this.canSend,
     required this.onSend,
     required this.placeholder,
+    this.onAttach,
+    this.onPasteImage,
+    this.staged = const [],
+    this.onRemoveStaged,
     this.replyTarget,
     this.replyTargetName,
     this.onCancelReply,
@@ -1475,16 +1633,61 @@ class _SendBox extends StatelessWidget {
   final bool canSend;
   final VoidCallback onSend;
   final String placeholder;
+
+  /// Open the image/file picker.
+  final VoidCallback? onAttach;
+
+  /// Attempt to paste an image from the clipboard. Returns true if an image
+  /// was found and staged (so the default text paste should be suppressed).
+  final Future<bool> Function()? onPasteImage;
+
+  /// Images staged for sending, previewed above the input.
+  final List<_StagedImage> staged;
+
+  /// Remove a staged image by index.
+  final void Function(int index)? onRemoveStaged;
+
   final ChatMessage? replyTarget;
   final String? replyTargetName;
   final VoidCallback? onCancelReply;
 
+  /// Ctrl/Cmd+V handler: send a clipboard image if present, otherwise fall
+  /// back to inserting clipboard text at the caret (the default paste, which
+  /// CallbackShortcuts would otherwise swallow).
+  void _handlePaste() {
+    final paste = onPasteImage;
+    if (paste == null) {
+      _fallbackTextPaste();
+      return;
+    }
+    paste().then((handled) {
+      if (!handled) _fallbackTextPaste();
+    });
+  }
+
+  Future<void> _fallbackTextPaste() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text;
+    if (text == null || text.isEmpty) return;
+    final value = controller.value;
+    final sel = value.selection;
+    if (!sel.isValid) {
+      controller.text = value.text + text;
+      controller.selection =
+          TextSelection.collapsed(offset: controller.text.length);
+      return;
+    }
+    final newText = value.text.replaceRange(sel.start, sel.end, text);
+    controller.value = value.copyWith(
+      text: newText,
+      selection: TextSelection.collapsed(offset: sel.start + text.length),
+      composing: TextRange.empty,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
-    // Web: outer wrapper is `px-2 py-0 md:p-4` (16px desktop padding all
-    // sides), Send itself is `w-full bg-gray-200 rounded-lg` with no extra
-    // margin. Inner: `px-4 py-3.5` = 16px / 14px. We match that here.
     return Container(
       color: AppTokens.surface,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -1497,6 +1700,11 @@ class _SendBox extends StatelessWidget {
               target: replyTarget!,
               targetName: replyTargetName ?? '',
               onCancel: onCancelReply ?? () {},
+            ),
+          if (staged.isNotEmpty)
+            _StagedPreviewRow(
+              staged: staged,
+              onRemove: onRemoveStaged ?? (_) {},
             ),
           Container(
             decoration: BoxDecoration(
@@ -1525,6 +1733,13 @@ class _SendBox extends StatelessWidget {
                             () {
                           if (canSend) onSend();
                         },
+                        // Ctrl/Cmd+V: intercept to check for a clipboard image.
+                        // If none, fall back to the default text paste so plain
+                        // text still pastes normally.
+                        const SingleActivator(LogicalKeyboardKey.keyV,
+                            control: true): _handlePaste,
+                        const SingleActivator(LogicalKeyboardKey.keyV,
+                            meta: true): _handlePaste,
                       },
                       child: TextField(
                         controller: controller,
@@ -1569,7 +1784,7 @@ class _SendBox extends StatelessWidget {
                 _SendIcon(
                   icon: Icons.add_circle,
                   tooltip: l.chatAttach,
-                  onTap: () {},
+                  onTap: onAttach,
                 ),
                 ClipRect(
                   child: AnimatedAlign(
@@ -1600,6 +1815,86 @@ class _SendBox extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// One staged-but-not-yet-sent image awaiting send.
+class _StagedImage {
+  const _StagedImage({
+    required this.bytes,
+    required this.filename,
+    required this.contentType,
+  });
+
+  final Uint8List bytes;
+  final String filename;
+  final String contentType;
+}
+
+/// Horizontal row of staged image thumbnails shown above the input — mirrors
+/// the web `UploadFileList`. Each chip shows the image with an ✕ remove button.
+class _StagedPreviewRow extends StatelessWidget {
+  const _StagedPreviewRow({required this.staged, required this.onRemove});
+
+  final List<_StagedImage> staged;
+  final void Function(int index) onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTokens.borderSubtle,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: SizedBox(
+        height: 72,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: staged.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (context, i) {
+            final img = staged[i];
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.memory(
+                    img.bytes,
+                    width: 72,
+                    height: 72,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                Positioned(
+                  top: -6,
+                  right: -6,
+                  child: GestureDetector(
+                    onTap: () => onRemove(i),
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1),
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        size: 13,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

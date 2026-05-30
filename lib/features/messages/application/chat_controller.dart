@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -23,6 +27,20 @@ class ChatController extends _$ChatController {
   /// UI-only send status keyed by mid (negative for optimistic, then real mid).
   final Map<int, MessageSendStatus> _statuses = {};
 
+  /// Local image/file bytes for optimistic `vocechat/file` rows, keyed by the
+  /// row's current mid. Lets the UI render a preview from memory before the
+  /// upload finishes. Migrated tempMid → realMid on confirm, dropped once the
+  /// server row (with a real resource URL) lands so we stop holding the bytes.
+  final Map<int, Uint8List> _localAttachments = {};
+
+  /// Pending file uploads kept for retry, keyed by tempMid. Holds the raw bytes
+  /// + metadata so [retrySend] can re-run the upload without re-picking.
+  final Map<int, _PendingFile> _pendingFiles = {};
+
+  /// Upload progress (0.0–1.0) for in-flight file rows, keyed by the row's
+  /// current mid. Present only while uploading; cleared on confirm/failure.
+  final Map<int, double> _progress = {};
+
   /// Set of mids currently in [state] for O(1) dedup. Kept in sync with state.
   final Set<int> _seenMids = <int>{};
 
@@ -44,6 +62,14 @@ class ChatController extends _$ChatController {
 
   /// Return the send status for a given mid (null if unknown / from others).
   MessageSendStatus? statusFor(int mid) => _statuses[mid];
+
+  /// Local bytes for an optimistic file row (null once uploaded/confirmed or
+  /// for messages from the server). Used by the UI to preview before upload.
+  Uint8List? localBytesFor(int mid) => _localAttachments[mid];
+
+  /// Upload progress (0.0–1.0) for an in-flight file row, or null when not
+  /// uploading. Drives the percent overlay on the optimistic image bubble.
+  double? progressFor(int mid) => _progress[mid];
 
   /// Public entry point so external listeners (e.g. the global SSE
   /// dispatcher) can feed an incoming message directly.
@@ -146,6 +172,11 @@ class ChatController extends _$ChatController {
           if (placeholderMid < 0) {
             _statuses.remove(placeholderMid);
             _statuses[m.mid] = MessageSendStatus.sent;
+            // The server row carries a real resource path now; drop the local
+            // preview bytes + pending-retry entry + progress for the placeholder.
+            _localAttachments.remove(placeholderMid);
+            _pendingFiles.remove(placeholderMid);
+            _progress.remove(placeholderMid);
           }
           mergedInPlace = true;
         }
@@ -189,10 +220,23 @@ class ChatController extends _$ChatController {
       ReplyMessageDetail(mid: final m) => m,
       _ => null,
     };
+    // For file messages the optimistic content is a local temp path while the
+    // echo's content is the server `{"path": <serverPath>}` — they never match
+    // by surface content. Instead match on the `local_id` we wrote into
+    // X-Properties (which the server echoes back) so the placeholder upgrades
+    // in place instead of duplicating.
+    final echoLocalId =
+        echoContentType == 'vocechat/file' ? _localIdOf(echo) : null;
+
     for (int i = 0; i < rows.length; i++) {
       final r = rows[i];
       if (r.mid >= 0) continue;
       if (r.fromUid != currentUid) continue;
+      if (echoLocalId != null) {
+        if (r.displayContentType != 'vocechat/file') continue;
+        if (_localIdOf(r) != echoLocalId) continue;
+        return i;
+      }
       if (r.displayContent != echoContent) continue;
       if (r.displayContentType != echoContentType) continue;
       final rReplyMid = switch (r.detail) {
@@ -203,6 +247,17 @@ class ChatController extends _$ChatController {
       return i;
     }
     return -1;
+  }
+
+  /// Extract the `local_id` property (sender-generated dedup key) from a file
+  /// message, if present.
+  static int? _localIdOf(ChatMessage m) {
+    final props = switch (m.detail) {
+      NormalMessageDetail(properties: final p) => p,
+      ReplyMessageDetail(properties: final p) => p,
+      _ => null,
+    };
+    return (props?['local_id'] as num?)?.toInt();
   }
 
   @override
@@ -523,8 +578,177 @@ class ChatController extends _$ChatController {
     }
   }
 
+  /// Optimistically insert an image/file message backed by local [bytes];
+  /// upload + send in the background, then upgrade the placeholder to the
+  /// server-confirmed mid + path. Mirrors [sendText]'s optimistic pattern but
+  /// for `vocechat/file` content.
+  Future<void> sendImage({
+    required Uint8List bytes,
+    required String filename,
+    String? contentType,
+  }) async {
+    final currentUid = _currentUid() ?? -1;
+    final tempMid = -DateTime.now().microsecondsSinceEpoch;
+    // local_id doubles as the dedup key the server echoes back via X-Properties
+    // (see _findOptimisticMatch). Use a stable positive int.
+    final localId = DateTime.now().millisecondsSinceEpoch;
+
+    // Always resolve a concrete content_type: the optimistic row renders by
+    // properties['content_type'], and a missing/empty value makes _isImage()
+    // false → the image would wrongly render as a generic file card until the
+    // server echo arrives. Infer from filename + magic bytes when not given.
+    final resolvedType =
+        contentType ?? MessageApi.inferContentType(filename, bytes: bytes);
+
+    final dims = await _decodeImageSize(bytes);
+
+    final properties = <String, dynamic>{
+      'name': filename,
+      'content_type': resolvedType,
+      'size': bytes.length,
+      if (dims != null) 'width': dims.$1,
+      if (dims != null) 'height': dims.$2,
+      'local_id': localId,
+    };
+
+    final optimistic = ChatMessage(
+      mid: tempMid,
+      fromUid: currentUid,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      target: target,
+      detail: MessageDetail.normal(
+        contentType: 'vocechat/file',
+        // Placeholder content; the real {"path": ...} arrives via the echo.
+        content: jsonEncode({'path': 'local:$localId'}),
+        properties: properties,
+      ),
+    );
+
+    _localAttachments[tempMid] = bytes;
+    _pendingFiles[tempMid] = _PendingFile(
+      bytes: bytes,
+      filename: filename,
+      contentType: resolvedType,
+      localId: localId,
+      width: dims?.$1,
+      height: dims?.$2,
+    );
+
+    final current = state.valueOrNull ?? [];
+    _statuses[tempMid] = MessageSendStatus.sending;
+    _progress[tempMid] = 0.0;
+    state = AsyncData([optimistic, ...current]);
+
+    await _runFileUpload(tempMid, _pendingFiles[tempMid]!);
+  }
+
+  /// Shared upload+confirm path used by [sendImage] and [retrySend] for files.
+  Future<void> _runFileUpload(int tempMid, _PendingFile pending) async {
+    // Throttle progress emissions: byte-level callbacks fire very often and a
+    // full state rebuild per byte would hitch the list. Only emit when the
+    // rounded percentage advances.
+    int lastPct = -1;
+    void onProgress(int sent, int total) {
+      if (total <= 0) return;
+      final ratio = sent / total;
+      final pct = (ratio * 100).floor();
+      if (pct == lastPct) return;
+      lastPct = pct;
+      // Cap optimistic progress at 0.99 — the row only flips to "sent" once the
+      // follow-up send request returns, so never show a full 100% mid-flight.
+      _progress[tempMid] = ratio.clamp(0.0, 0.99);
+      final snap = state.valueOrNull;
+      if (snap != null) state = AsyncData(List.from(snap));
+    }
+
+    try {
+      final result = await ref.read(messageApiProvider).uploadBytesAndSend(
+            target,
+            bytes: pending.bytes,
+            filename: pending.filename,
+            contentType: pending.contentType,
+            width: pending.width,
+            height: pending.height,
+            localId: pending.localId,
+            onSendProgress: onProgress,
+          );
+
+      // Upgrade placeholder → confirmed. Swap content to the real server path
+      // and DROP the local preview bytes + progress so the row now renders via
+      // the network-backed _ImageBubble — identical to a received image
+      // (tap-to-fullscreen, thumbnail, etc.). The brief thumbnail load is
+      // covered by _ImageBubble's own spinner placeholder.
+      final after = state.valueOrNull ?? [];
+      final idx = after.indexWhere((m) => m.mid == tempMid);
+      if (idx >= 0) {
+        final placeholder = after[idx];
+        final confirmed = placeholder.copyWith(
+          mid: result.mid,
+          detail: MessageDetail.normal(
+            contentType: 'vocechat/file',
+            content: jsonEncode({'path': result.path}),
+            properties: _propertiesOf(placeholder),
+          ),
+        );
+        final updated = List<ChatMessage>.from(after);
+        updated[idx] = confirmed;
+        state = AsyncData(updated);
+        _seenMids.add(result.mid);
+        _localAttachments.remove(tempMid);
+        _pendingFiles.remove(tempMid);
+        _progress.remove(tempMid);
+        _persist(updated);
+        _cache?.setCursor(result.mid);
+      }
+      _statuses.remove(tempMid);
+      _progress.remove(tempMid);
+      _statuses[result.mid] = MessageSendStatus.sent;
+    } catch (_) {
+      _statuses[tempMid] = MessageSendStatus.failed;
+      _progress.remove(tempMid);
+      final snapshot = state.valueOrNull;
+      if (snapshot != null) state = AsyncData(List.from(snapshot));
+    }
+  }
+
+  static Map<String, dynamic>? _propertiesOf(ChatMessage m) {
+    return switch (m.detail) {
+      NormalMessageDetail(properties: final p) => p,
+      ReplyMessageDetail(properties: final p) => p,
+      _ => null,
+    };
+  }
+
+  /// Decode image pixel dimensions from raw bytes via dart:ui (no extra dep).
+  /// Returns null for non-images / undecodable bytes.
+  Future<(int, int)?> _decodeImageSize(Uint8List bytes) async {
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final w = frame.image.width;
+      final h = frame.image.height;
+      frame.image.dispose();
+      codec.dispose();
+      if (w <= 0 || h <= 0) return null;
+      return (w, h);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Retry a previously failed send identified by [tempMid].
   Future<void> retrySend(int tempMid) async {
+    // File retry: re-run the upload from the cached bytes.
+    final pendingFile = _pendingFiles[tempMid];
+    if (pendingFile != null) {
+      _statuses[tempMid] = MessageSendStatus.sending;
+      _progress[tempMid] = 0.0;
+      final snap = state.valueOrNull;
+      if (snap != null) state = AsyncData(List.from(snap));
+      await _runFileUpload(tempMid, pendingFile);
+      return;
+    }
+
     final current = state.valueOrNull ?? [];
     final msg = current.firstWhere(
       (m) => m.mid == tempMid,
@@ -602,4 +826,23 @@ class ChatController extends _$ChatController {
       // awaits live server; falls back gracefully
     }
   }
+}
+
+/// Cached pending file upload for optimistic send + retry.
+class _PendingFile {
+  const _PendingFile({
+    required this.bytes,
+    required this.filename,
+    required this.contentType,
+    required this.localId,
+    this.width,
+    this.height,
+  });
+
+  final Uint8List bytes;
+  final String filename;
+  final String? contentType;
+  final int localId;
+  final int? width;
+  final int? height;
 }
