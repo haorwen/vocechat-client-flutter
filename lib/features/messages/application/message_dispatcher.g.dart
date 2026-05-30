@@ -6,7 +6,7 @@ part of 'message_dispatcher.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$messageDispatcherHash() => r'e92468e1434ccce11a5c7d345e3f796461d57dec';
+String _$messageDispatcherHash() => r'30fea420c8c1517fc91f1037361cc260f749d3d1';
 
 /// Long-lived listener that routes every incoming SSE chat event to:
 ///   1. the conversations list (so previews update on the left),

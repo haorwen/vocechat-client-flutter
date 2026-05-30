@@ -9,6 +9,7 @@ import '../../../core/utils/app_log.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../messages/data/message_api.dart';
 import '../../messages/data/message_cache.dart';
+import '../../messages/application/read_index_provider.dart';
 import '../../messages/domain/message_models.dart';
 
 part 'conversation_providers.g.dart';
@@ -660,10 +661,65 @@ class Conversations extends _$Conversations {
 }
 
 // ---------------------------------------------------------------------------
-// unreadCountProvider — placeholder returning 0; will be replaced by SSE-derived state later
+// unreadInfo — derive a conversation's unread count + @-mention flag from the
+// locally cached messages and the read-index markers. Mirrors the web client's
+// `getUnreadCount`: count messages newer than the read marker that we didn't
+// send ourselves, and flag whether any of them mention us.
+//
+// Keyed by ConversationKey (family). Re-evaluates when:
+//   - the read marker for this conversation changes (ref.watch readIndex), or
+//   - this conversation's lastMid advances (a new message arrived) — sliced
+//     via conversationsProvider.select so unrelated list churn doesn't refire.
 // ---------------------------------------------------------------------------
 
+typedef UnreadInfo = ({int count, bool mention});
+
 @riverpod
-int unreadCount(Ref ref, ConversationKey key) {
-  return 0;
+Future<UnreadInfo> unreadInfo(Ref ref, ConversationKey key) async {
+  // Resolve our own uid so we can exclude self-sent messages and detect
+  // mentions of ourselves.
+  final authState = ref.watch(authControllerProvider).valueOrNull;
+  final currentUid =
+      authState is AuthStateAuthenticated ? authState.user.uid : 0;
+
+  // Re-run when this conversation's latest mid advances. Watching the whole
+  // list would refire on every unrelated preview update.
+  final lastMid = ref.watch(
+    conversationsProvider.select(
+      (async) => async.valueOrNull
+          ?.firstWhere(
+            (c) => c.key == key,
+            orElse: () => const ConversationItem(
+                key: GroupConversationKey(-1), name: '', isChannel: true),
+          )
+          .lastMid,
+    ),
+  );
+  // Nothing in the conversation yet → nothing unread.
+  if (lastMid == null || lastMid <= 0) return (count: 0, mention: false);
+
+  final readState = await ref.watch(readIndexProvider.future);
+
+  final (MessageTarget target, int readMid) = switch (key) {
+    GroupConversationKey(gid: final gid) => (
+        MessageTarget.group(gid: gid),
+        readState.readGroup(gid),
+      ),
+    UserConversationKey(uid: final uid) => (
+        MessageTarget.user(uid: uid),
+        readState.readUser(uid),
+      ),
+  };
+
+  // Already read up to the head → no badge (cheap short-circuit, avoids a DB
+  // hit for the common all-read case).
+  if (readMid >= lastMid) return (count: 0, mention: false);
+
+  final cache = await ref.watch(messageCacheProvider.future);
+  return cache.unreadSince(
+    target,
+    sinceMid: readMid,
+    excludeFromUid: currentUid,
+    mentionUid: currentUid,
+  );
 }

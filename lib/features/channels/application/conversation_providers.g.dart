@@ -6,7 +6,7 @@ part of 'conversation_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$unreadCountHash() => r'79f92c6f54c9684a9127d1d502ed77eff00eb622';
+String _$unreadInfoHash() => r'3a4177059ef5a4092711c8fd5f4fa46bc49bedf6';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -29,27 +29,27 @@ class _SystemHash {
   }
 }
 
-/// See also [unreadCount].
-@ProviderFor(unreadCount)
-const unreadCountProvider = UnreadCountFamily();
+/// See also [unreadInfo].
+@ProviderFor(unreadInfo)
+const unreadInfoProvider = UnreadInfoFamily();
 
-/// See also [unreadCount].
-class UnreadCountFamily extends Family<int> {
-  /// See also [unreadCount].
-  const UnreadCountFamily();
+/// See also [unreadInfo].
+class UnreadInfoFamily extends Family<AsyncValue<UnreadInfo>> {
+  /// See also [unreadInfo].
+  const UnreadInfoFamily();
 
-  /// See also [unreadCount].
-  UnreadCountProvider call(
+  /// See also [unreadInfo].
+  UnreadInfoProvider call(
     ConversationKey key,
   ) {
-    return UnreadCountProvider(
+    return UnreadInfoProvider(
       key,
     );
   }
 
   @override
-  UnreadCountProvider getProviderOverride(
-    covariant UnreadCountProvider provider,
+  UnreadInfoProvider getProviderOverride(
+    covariant UnreadInfoProvider provider,
   ) {
     return call(
       provider.key,
@@ -68,32 +68,32 @@ class UnreadCountFamily extends Family<int> {
       _allTransitiveDependencies;
 
   @override
-  String? get name => r'unreadCountProvider';
+  String? get name => r'unreadInfoProvider';
 }
 
-/// See also [unreadCount].
-class UnreadCountProvider extends AutoDisposeProvider<int> {
-  /// See also [unreadCount].
-  UnreadCountProvider(
+/// See also [unreadInfo].
+class UnreadInfoProvider extends AutoDisposeFutureProvider<UnreadInfo> {
+  /// See also [unreadInfo].
+  UnreadInfoProvider(
     ConversationKey key,
   ) : this._internal(
-          (ref) => unreadCount(
-            ref as UnreadCountRef,
+          (ref) => unreadInfo(
+            ref as UnreadInfoRef,
             key,
           ),
-          from: unreadCountProvider,
-          name: r'unreadCountProvider',
+          from: unreadInfoProvider,
+          name: r'unreadInfoProvider',
           debugGetCreateSourceHash:
               const bool.fromEnvironment('dart.vm.product')
                   ? null
-                  : _$unreadCountHash,
-          dependencies: UnreadCountFamily._dependencies,
+                  : _$unreadInfoHash,
+          dependencies: UnreadInfoFamily._dependencies,
           allTransitiveDependencies:
-              UnreadCountFamily._allTransitiveDependencies,
+              UnreadInfoFamily._allTransitiveDependencies,
           key: key,
         );
 
-  UnreadCountProvider._internal(
+  UnreadInfoProvider._internal(
     super._createNotifier, {
     required super.name,
     required super.dependencies,
@@ -107,12 +107,12 @@ class UnreadCountProvider extends AutoDisposeProvider<int> {
 
   @override
   Override overrideWith(
-    int Function(UnreadCountRef provider) create,
+    FutureOr<UnreadInfo> Function(UnreadInfoRef provider) create,
   ) {
     return ProviderOverride(
       origin: this,
-      override: UnreadCountProvider._internal(
-        (ref) => create(ref as UnreadCountRef),
+      override: UnreadInfoProvider._internal(
+        (ref) => create(ref as UnreadInfoRef),
         from: from,
         name: null,
         dependencies: null,
@@ -124,13 +124,13 @@ class UnreadCountProvider extends AutoDisposeProvider<int> {
   }
 
   @override
-  AutoDisposeProviderElement<int> createElement() {
-    return _UnreadCountProviderElement(this);
+  AutoDisposeFutureProviderElement<UnreadInfo> createElement() {
+    return _UnreadInfoProviderElement(this);
   }
 
   @override
   bool operator ==(Object other) {
-    return other is UnreadCountProvider && other.key == key;
+    return other is UnreadInfoProvider && other.key == key;
   }
 
   @override
@@ -144,17 +144,17 @@ class UnreadCountProvider extends AutoDisposeProvider<int> {
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-mixin UnreadCountRef on AutoDisposeProviderRef<int> {
+mixin UnreadInfoRef on AutoDisposeFutureProviderRef<UnreadInfo> {
   /// The parameter `key` of this provider.
   ConversationKey get key;
 }
 
-class _UnreadCountProviderElement extends AutoDisposeProviderElement<int>
-    with UnreadCountRef {
-  _UnreadCountProviderElement(super.provider);
+class _UnreadInfoProviderElement
+    extends AutoDisposeFutureProviderElement<UnreadInfo> with UnreadInfoRef {
+  _UnreadInfoProviderElement(super.provider);
 
   @override
-  ConversationKey get key => (origin as UnreadCountProvider).key;
+  ConversationKey get key => (origin as UnreadInfoProvider).key;
 }
 
 String _$conversationsRefreshingHash() =>

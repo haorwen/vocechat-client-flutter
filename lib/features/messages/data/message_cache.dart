@@ -36,6 +36,8 @@ class MessageCache {
   static const String _kUserDirectoryKey = 'user_directory';
   static const String _kGroupDirectoryKey = 'group_directory';
   static const String _kPinnedChatsKey = 'pinned_chats';
+  static const String _kReadIndexUsersKey = 'read_index_users';
+  static const String _kReadIndexGroupsKey = 'read_index_groups';
 
   /// In-memory write coalescing per target.
   final Map<String, Timer> _flushTimers = {};
@@ -221,6 +223,93 @@ class MessageCache {
       // ignore
     }
   }
+
+  // -------------------------------------------------------------------------
+  // Read-index persistence — `{id: mid}` maps for users + groups, so the
+  // unread badge survives a relaunch (a read conversation doesn't re-redden
+  // before the SSE `user_settings` snapshot lands).
+  // -------------------------------------------------------------------------
+
+  Future<Map<int, int>> readReadIndexUsers() =>
+      _readIntMap(_kReadIndexUsersKey);
+
+  Future<Map<int, int>> readReadIndexGroups() =>
+      _readIntMap(_kReadIndexGroupsKey);
+
+  Future<void> writeReadIndexUsers(Map<int, int> map) =>
+      _writeIntMap(_kReadIndexUsersKey, map);
+
+  Future<void> writeReadIndexGroups(Map<int, int> map) =>
+      _writeIntMap(_kReadIndexGroupsKey, map);
+
+  Future<Map<int, int>> _readIntMap(String key) async {
+    final raw = await _readMeta(key);
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      return decoded.map(
+        (k, v) => MapEntry(int.parse(k), (v as num).toInt()),
+      );
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> _writeIntMap(String key, Map<int, int> map) async {
+    try {
+      await _writeMeta(
+        key,
+        jsonEncode(map.map((k, v) => MapEntry(k.toString(), v))),
+      );
+    } catch (_) {
+      // best-effort
+    }
+  }
+
+  /// Count of cached messages for [target] with `mid > sinceMid` that were NOT
+  /// sent by [excludeFromUid], plus whether any of them @-mention [mentionUid].
+  /// Used to derive the conversation-list unread badge from locally cached
+  /// messages (mirrors the web client's `getUnreadCount`).
+  Future<({int count, bool mention})> unreadSince(
+    MessageTarget target, {
+    required int sinceMid,
+    required int excludeFromUid,
+    required int mentionUid,
+  }) async {
+    final key = _keyFor(target);
+    final rows = await _db.query(
+      'messages',
+      columns: ['from_uid', 'payload'],
+      where: 'target_key = ? AND mid > ?',
+      whereArgs: [key, sinceMid],
+      orderBy: 'mid DESC',
+      limit: _maxPerConversation,
+    );
+    int count = 0;
+    bool mention = false;
+    for (final row in rows) {
+      final fromUid = (row['from_uid'] as num?)?.toInt() ?? 0;
+      if (fromUid == excludeFromUid) continue;
+      count++;
+      if (!mention) {
+        try {
+          final map =
+              jsonDecode(row['payload'] as String) as Map<String, dynamic>;
+          final detail = map['detail'];
+          final props = detail is Map ? detail['properties'] : null;
+          final mentions = props is Map ? props['mentions'] : null;
+          if (mentions is List &&
+              mentions.any((e) => e is num && e.toInt() == mentionUid)) {
+            mention = true;
+          }
+        } catch (_) {
+          // ignore malformed payloads
+        }
+      }
+    }
+    return (count: count, mention: mention);
+  }
+
 
   /// Schedule a coalesced write of the given snapshot for [target].
   /// We only persist the head [_maxPerConversation] (newest first).

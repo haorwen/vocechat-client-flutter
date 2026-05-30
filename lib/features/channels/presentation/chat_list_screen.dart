@@ -244,7 +244,10 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     required String baseUrl,
     required bool showStatus,
   }) {
-    final unread = ref.watch(unreadCountProvider(item.key));
+    final unreadInfo = ref
+            .watch(unreadInfoProvider(item.key))
+            .valueOrNull ??
+        (count: 0, mention: false);
 
     String routeId;
     switch (item.key) {
@@ -279,7 +282,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     return RepaintBoundary(
       child: _ConversationTile(
         item: item,
-        unread: unread,
+        unread: unreadInfo.count,
+        mention: unreadInfo.mention,
         isSelected: isSelected,
         avatarUrl: avatarUrl,
         showStatus: showStatus,
@@ -488,6 +492,7 @@ class _ConversationTile extends ConsumerWidget {
   const _ConversationTile({
     required this.item,
     required this.unread,
+    required this.mention,
     required this.isSelected,
     required this.onTap,
     required this.showStatus,
@@ -498,6 +503,7 @@ class _ConversationTile extends ConsumerWidget {
 
   final ConversationItem item;
   final int unread;
+  final bool mention;
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
@@ -629,27 +635,59 @@ class _ConversationTile extends ConsumerWidget {
                           ),
                         ),
                         if (unread > 0)
-                          Container(
-                            margin: const EdgeInsets.only(left: 4),
-                            constraints:
-                                const BoxConstraints(minWidth: 16),
-                            height: 16,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: AppTokens.error,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              unread > 99 ? '99' : unread.toString(),
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                fontFamily: 'monospace',
-                                height: 1,
-                              ),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (mention)
+                                  Container(
+                                    margin:
+                                        const EdgeInsets.only(right: 3),
+                                    constraints: const BoxConstraints(
+                                        minWidth: 16),
+                                    height: 16,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: AppTokens.primary500,
+                                      borderRadius:
+                                          BorderRadius.circular(10),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: const Text(
+                                      '@',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.white,
+                                        height: 1,
+                                      ),
+                                    ),
+                                  ),
+                                Container(
+                                  constraints:
+                                      const BoxConstraints(minWidth: 16),
+                                  height: 16,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: AppTokens.primary500,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    unread > 99 ? '99' : unread.toString(),
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                      fontFamily: 'monospace',
+                                      height: 1,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                       ],

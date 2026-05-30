@@ -25,6 +25,7 @@ import '../../../shared/widgets/loading_capsule.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../application/chat_controller.dart';
 import '../application/chat_tools_provider.dart';
+import '../application/read_index_provider.dart';
 import '../data/message_api.dart';
 import '../domain/message_models.dart';
 import '../domain/message_status.dart';
@@ -51,6 +52,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _canSend = false;
   int? _highlightMid;
   Timer? _highlightTimer;
+
+  /// Debounce for read-index reporting: scrolling fires position changes
+  /// continuously, so we coalesce and only POST the newest seen mid ~500ms
+  /// after the user settles (web parity).
+  Timer? _readDebounce;
+  int _lastReportedReadMid = 0;
   int? _editingMid;
   int? _replyToMid;
   ChatMessage? _replyTarget;
@@ -90,6 +97,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       setState(() {
         _target = _parseTarget(widget.id);
       });
+      // New conversation: reset the read-report guard so its first visible
+      // message gets marked read.
+      _readDebounce?.cancel();
+      _lastReportedReadMid = 0;
     }
   }
 
@@ -98,6 +109,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _textCtrl.dispose();
     _editCtrl.dispose();
     _highlightTimer?.cancel();
+    _readDebounce?.cancel();
     _itemPositionsListener.itemPositions.removeListener(_onPositionsChanged);
     super.dispose();
   }
@@ -117,6 +129,44 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (maxIndex >= messages.length - 5) {
       ref.read(chatControllerProvider(_target).notifier).loadMore();
     }
+
+    // Mark-read: the newest visible message is at the minimum visible index
+    // (reverse list, index 0 == newest). Report it up to the server, debounced.
+    final minIndex = positions
+        .map((p) => p.index)
+        .reduce((a, b) => a < b ? a : b);
+    if (minIndex >= 0 && minIndex < messages.length) {
+      final newestVisibleMid = messages[minIndex].mid;
+      if (newestVisibleMid > _lastReportedReadMid) {
+        _scheduleReadReport(newestVisibleMid);
+      }
+    }
+  }
+
+  /// Debounced read-index report. Updates the local marker optimistically and
+  /// POSTs to the server. Only ever advances; placeholder/negative mids are
+  /// ignored.
+  void _scheduleReadReport(int mid) {
+    if (mid <= 0) return;
+    _readDebounce?.cancel();
+    _readDebounce = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted || mid <= _lastReportedReadMid) return;
+      _lastReportedReadMid = mid;
+
+      final notifier = ref.read(readIndexProvider.notifier);
+      final api = ref.read(messageApiProvider);
+      _target.map(
+        user: (t) {
+          notifier.setUser(t.uid, mid);
+          // Fire-and-forget; the server only moves markers forward.
+          api.readMessage(users: [(uid: t.uid, mid: mid)]).catchError((_) {});
+        },
+        group: (t) {
+          notifier.setGroup(t.gid, mid);
+          api.readMessage(groups: [(gid: t.gid, mid: mid)]).catchError((_) {});
+        },
+      );
+    });
   }
 
   static MessageTarget _parseTarget(String id) {

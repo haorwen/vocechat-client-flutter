@@ -260,6 +260,30 @@ class MessageApi {
     return (resp.data as num).toInt();
   }
 
+  // ---- read index ----------------------------------------------------
+
+  /// Report how far the user has read in one or more conversations.
+  /// Server contract: POST /api/user/read-index with
+  /// `{"users":[{"uid","mid"}], "groups":[{"gid","mid"}]}`. The server only
+  /// moves a marker forward, so re-sending a stale mid is harmless.
+  Future<void> readMessage({
+    List<({int uid, int mid})>? users,
+    List<({int gid, int mid})>? groups,
+  }) async {
+    final body = <String, dynamic>{
+      if (users != null && users.isNotEmpty)
+        'users': [
+          for (final u in users) {'uid': u.uid, 'mid': u.mid},
+        ],
+      if (groups != null && groups.isNotEmpty)
+        'groups': [
+          for (final g in groups) {'gid': g.gid, 'mid': g.mid},
+        ],
+    };
+    if (body.isEmpty) return;
+    await _dio.post('/api/user/read-index', data: body);
+  }
+
   // ---- util ----------------------------------------------------------
 
   /// Public wrapper so callers (controller / UI staging) can resolve a MIME

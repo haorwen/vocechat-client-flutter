@@ -13,6 +13,7 @@ import '../data/message_cache.dart';
 import '../domain/message_models.dart';
 import 'chat_controller.dart';
 import 'reactions_provider.dart';
+import 'read_index_provider.dart';
 
 part 'message_dispatcher.g.dart';
 
@@ -96,10 +97,12 @@ class MessageDispatcher extends _$MessageDispatcher {
         }
         if (event is ChatEventUserSettings) {
           _applyPinnedChatsSnapshot(event.data);
+          _applyReadIndexSnapshot(event.data);
           return;
         }
         if (event is ChatEventUserSettingsChanged) {
           _applyPinnedChatsDelta(event.data);
+          _applyReadIndexDelta(event.data);
           return;
         }
         if (event is ChatEventKick) {
@@ -173,6 +176,36 @@ class MessageDispatcher extends _$MessageDispatcher {
         ref.read(pinnedChatsProvider.notifier).removeAll(targets);
       }
     }
+  }
+
+  /// Read-index snapshot from `user_settings`: replace the markers wholesale.
+  void _applyReadIndexSnapshot(Map<String, dynamic> data) {
+    final users = _parseReadIndex(data['read_index_users'], 'uid');
+    final groups = _parseReadIndex(data['read_index_groups'], 'gid');
+    ref.read(readIndexProvider.notifier).applySnapshot(users, groups);
+  }
+
+  /// Read-index delta from `user_settings_changed` (e.g. another device marked
+  /// a chat read): max-merge the markers forward.
+  void _applyReadIndexDelta(Map<String, dynamic> data) {
+    final users = _parseReadIndex(data['read_index_users'], 'uid');
+    final groups = _parseReadIndex(data['read_index_groups'], 'gid');
+    if (users.isEmpty && groups.isEmpty) return;
+    ref.read(readIndexProvider.notifier).applyDelta(users, groups);
+  }
+
+  /// Parse a `[{<idKey>, mid}]` list into an `{id: mid}` map. Tolerates a
+  /// missing/malformed list (returns empty).
+  Map<int, int> _parseReadIndex(dynamic raw, String idKey) {
+    if (raw is! List) return {};
+    final out = <int, int>{};
+    for (final e in raw) {
+      if (e is! Map) continue;
+      final id = (e[idKey] as num?)?.toInt();
+      final mid = (e['mid'] as num?)?.toInt();
+      if (id != null && mid != null) out[id] = mid;
+    }
+    return out;
   }
 
   Map<String, dynamic>? _decode(String raw) {
