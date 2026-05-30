@@ -10,7 +10,7 @@ import '../../messages/application/message_dispatcher.dart';
 /// Width threshold above which the desktop left rail layout is used.
 const double _kWideBreakpoint = 900;
 
-class HomeShellScreen extends ConsumerWidget {
+class HomeShellScreen extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
 
   const HomeShellScreen({
@@ -18,15 +18,52 @@ class HomeShellScreen extends ConsumerWidget {
     required this.navigationShell,
   });
 
+  @override
+  ConsumerState<HomeShellScreen> createState() => _HomeShellScreenState();
+}
+
+class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
+  // The GoRouter's route-information notifier. Subscribing to it is what makes
+  // this shell rebuild on *intra-branch* navigation (e.g. pushing/popping
+  // /home/chat/:id). StatefulNavigationShell only rebuilds on branch switches,
+  // and GoRouterState.of(context) inside the shell does not re-fire when a
+  // nested page is popped via Navigator.maybePop — so reading the location
+  // without this listener leaves `isChatting` stale and the bottom nav
+  // permanently hidden after returning from a chat. (The original bug.)
+  Listenable? _routerListenable;
+
+  void _onRouterChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final router = GoRouter.of(context);
+    final next = router.routeInformationProvider;
+    if (identical(next, _routerListenable)) return;
+    _routerListenable?.removeListener(_onRouterChanged);
+    _routerListenable = next;
+    _routerListenable?.addListener(_onRouterChanged);
+  }
+
+  @override
+  void dispose() {
+    _routerListenable?.removeListener(_onRouterChanged);
+    super.dispose();
+  }
+
   void _onDestinationSelected(int index) {
-    navigationShell.goBranch(
+    widget.navigationShell.goBranch(
       index,
-      initialLocation: index == navigationShell.currentIndex,
+      initialLocation: index == widget.navigationShell.currentIndex,
     );
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final navigationShell = widget.navigationShell;
+
     // Activate the global SSE → ChatController/Conversations dispatcher.
     ref.watch(messageDispatcherProvider);
     // Activate SSE lifecycle watchers: token rotation, network up/down,
@@ -48,7 +85,11 @@ class HomeShellScreen extends ConsumerWidget {
     // and renders the conversation in a right pane via internal state, so the
     // /home/chat/* URL only appears when the user is actually on the detail
     // view (true mobile / narrow desktop).
-    final location = GoRouterState.of(context).matchedLocation;
+    //
+    // Read the live location from the router (kept fresh by the listener wired
+    // in didChangeDependencies) rather than GoRouterState.of(context), whose
+    // dependency does not re-fire on a nested Navigator pop.
+    final location = GoRouterState.of(context).uri.path;
     final isChatting =
         !isWide && RegExp(r'^/home/chat/').hasMatch(location);
 
