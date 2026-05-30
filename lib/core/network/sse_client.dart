@@ -39,12 +39,23 @@ const Duration _kSseWatchdog = Duration(seconds: 20);
 class VoceSseClient {
   VoceSseClient({
     required this.baseUrl,
-    required this.apiKey,
+    required String apiKey,
     int? initialAfterMid,
-  }) : _highWaterMid = initialAfterMid;
+    this.refreshToken,
+  })  : _apiKey = apiKey,
+        _highWaterMid = initialAfterMid;
 
   final String baseUrl;
-  final String apiKey;
+
+  /// Called at the start of every (re)connect attempt. If it returns a
+  /// non-null, non-empty string the returned value replaces [_apiKey] before
+  /// the WebSocket URL is built. Returning null means "no change / renew
+  /// failed; continue with current key".
+  final Future<String?> Function()? refreshToken;
+
+  /// The access token used in the WebSocket query string and header. Mutated
+  /// by [refreshToken] on every connect so reconnects always use a fresh key.
+  String _apiKey;
 
   static const Duration _maxBackoff = Duration(seconds: 30);
 
@@ -88,7 +99,16 @@ class VoceSseClient {
       StreamController<ChatEvent> controller, Duration currentDelay) async {
     if (_disposed || controller.isClosed) return;
 
-    final encodedKey = Uri.encodeComponent(apiKey);
+    // Renew the access token before every (re)connect so reconnects after
+    // expiry don't loop with a stale key. A null return means "keep current".
+    if (refreshToken != null) {
+      final fresh = await refreshToken!();
+      if (fresh != null && fresh.isNotEmpty) {
+        _apiKey = fresh;
+      }
+    }
+
+    final encodedKey = Uri.encodeComponent(_apiKey);
     final query = StringBuffer('api-key=$encodedKey');
     if (_highWaterMid != null) {
       query.write('&after_mid=${_highWaterMid!}');
@@ -103,7 +123,7 @@ class VoceSseClient {
     try {
       socket = await WebSocket.connect(
         url,
-        headers: {'X-API-Key': apiKey},
+        headers: {'X-API-Key': _apiKey},
       );
     } catch (e) {
       AppLog.w(LogTag.sse, () => '⚠️ SSE connect failed: $e');
@@ -254,34 +274,41 @@ Stream<ChatEvent> sseEvents(Ref ref) async* {
   // expose a stream; instead we manually invalidate this provider when a
   // refresh happens (see SseTokenWatcher below).
   final tokenStore = ref.read(secureTokenStoreProvider(serverId));
-  var tokens = await tokenStore.readTokens();
+  final tokens = await tokenStore.readTokens();
   if (tokens == null) return;
-
-  // Proactive renew: if the token is within 30s of expiring, refresh first.
-  // Mirrors web `useStreaming.ts`'s 20s pre-expire renew (we give a bit more
-  // headroom because mobile clients can have higher RTT).
-  final aboutToExpire =
-      tokens.expiresAt.isBefore(DateTime.now().add(const Duration(seconds: 30)));
-  if (aboutToExpire) {
-    AppLog.w(LogTag.sse, () => '🔑 SSE: token within 30s of expiry, renewing first');
-    final renewed = await ref
-        .read(authControllerProvider.notifier)
-        .renewIfPossible();
-    if (!renewed) {
-      AppLog.w(LogTag.sse, () => '🔑 SSE: token renew failed, aborting connect');
-      return;
-    }
-    tokens = await tokenStore.readTokens();
-    if (tokens == null) return;
-  }
 
   final cache = await ref.read(messageCacheProvider.future);
   final cursor = await cache.getCursor();
+
+  // Callback invoked at the start of every (re)connect. Re-reads the current
+  // token and proactively renews it if it is within 30s of expiry — mirroring
+  // web `useStreaming.ts`'s per-connect renew. Returning null tells the client
+  // to keep its existing key and proceed (preserves backoff/retry behaviour).
+  Future<String?> tokenRefreshCallback() async {
+    final store = ref.read(secureTokenStoreProvider(serverId));
+    final current = await store.readTokens();
+    if (current == null) return null;
+    final aboutToExpire =
+        current.expiresAt.isBefore(DateTime.now().add(const Duration(seconds: 30)));
+    if (aboutToExpire) {
+      AppLog.w(LogTag.sse, () => '🔑 SSE: token within 30s of expiry, renewing before connect');
+      final renewed =
+          await ref.read(authControllerProvider.notifier).renewIfPossible();
+      if (!renewed) {
+        AppLog.w(LogTag.sse, () => '🔑 SSE: token renew failed, proceeding with current key');
+        return null;
+      }
+      final fresh = await store.readTokens();
+      return fresh?.accessToken;
+    }
+    return current.accessToken;
+  }
 
   final client = VoceSseClient(
     baseUrl: currentServer.baseUrl,
     apiKey: tokens.accessToken,
     initialAfterMid: cursor,
+    refreshToken: tokenRefreshCallback,
   );
 
   // Forward connection-status transitions to the UI provider.
