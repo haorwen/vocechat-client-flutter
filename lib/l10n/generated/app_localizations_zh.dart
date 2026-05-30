@@ -74,6 +74,12 @@ class AppL10nZh extends AppL10n {
   String get chatEditSave => '保存';
 
   @override
+  String get chatFileDetailsTitle => '文件详情';
+
+  @override
+  String get chatFileNameLabel => '文件名';
+
+  @override
   String chatEditFailed(String error) {
     return '编辑失败：$error';
   }

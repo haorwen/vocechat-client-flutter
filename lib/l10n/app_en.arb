@@ -28,6 +28,8 @@
   "chatDeleteConfirmBody": "This cannot be undone.",
   "chatEditCancel": "Cancel",
   "chatEditSave": "Save",
+  "chatFileDetailsTitle": "File details",
+  "chatFileNameLabel": "Name",
   "chatEditFailed": "Edit failed: {error}",
   "@chatEditFailed": {
     "placeholders": {"error": {"type": "String"}}

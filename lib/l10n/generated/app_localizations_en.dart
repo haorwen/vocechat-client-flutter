@@ -74,6 +74,12 @@ class AppL10nEn extends AppL10n {
   String get chatEditSave => 'Save';
 
   @override
+  String get chatFileDetailsTitle => 'File details';
+
+  @override
+  String get chatFileNameLabel => 'Name';
+
+  @override
   String chatEditFailed(String error) {
     return 'Edit failed: $error';
   }

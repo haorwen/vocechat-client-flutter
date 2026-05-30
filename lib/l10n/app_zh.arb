@@ -24,6 +24,8 @@
   "chatDeleteConfirmBody": "此操作无法撤销。",
   "chatEditCancel": "取消",
   "chatEditSave": "保存",
+  "chatFileDetailsTitle": "文件详情",
+  "chatFileNameLabel": "文件名",
   "chatEditFailed": "编辑失败：{error}",
   "chatDeleteFailed": "删除失败：{error}",
   "chatReplyFailed": "回复失败：{error}",

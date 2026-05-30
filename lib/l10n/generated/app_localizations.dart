@@ -223,6 +223,18 @@ abstract class AppL10n {
   /// **'Save'**
   String get chatEditSave;
 
+  /// No description provided for @chatFileDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'File details'**
+  String get chatFileDetailsTitle;
+
+  /// No description provided for @chatFileNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get chatFileNameLabel;
+
   /// No description provided for @chatEditFailed.
   ///
   /// In en, this message translates to:

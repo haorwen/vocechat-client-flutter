@@ -15,6 +15,7 @@ import '../../../core/storage/secure_token_store.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/safe_text.dart';
+import 'file_display_utils.dart';
 
 /// Renders a `vocechat/file` message — image, video, audio, or generic file.
 ///
@@ -208,16 +209,6 @@ bool _isImage(String contentType, int size) {
   const fileImageSize = 10 * 1024 * 1024;
   if (size > fileImageSize) return false;
   return true;
-}
-
-String _formatBytes(int bytes) {
-  if (bytes <= 0) return '';
-  if (bytes < 1024) return '$bytes B';
-  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-  if (bytes < 1024 * 1024 * 1024) {
-    return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
-  }
-  return '${(bytes / 1024 / 1024 / 1024).toStringAsFixed(1)} GB';
 }
 
 String _formatDuration(Duration d) {
@@ -645,7 +636,7 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
     final label = widget.meta.name.isEmpty
         ? widget.meta.path.split('/').last
         : widget.meta.name;
-    final sizeLabel = _formatBytes(widget.meta.size);
+    final sizeLabel = formatBytes(widget.meta.size);
     return GestureDetector(
       onTap: _headers == null ? null : () => _openPlayer(context, _headers!),
       child: Container(
@@ -916,7 +907,7 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> {
         : widget.meta.name;
     final total = _duration ?? Duration.zero;
     final pos = _position > total ? total : _position;
-    final sizeLabel = _formatBytes(widget.meta.size);
+    final sizeLabel = formatBytes(widget.meta.size);
 
     return Container(
       constraints: const BoxConstraints(maxWidth: 320),
@@ -1031,9 +1022,9 @@ class _FileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icon = _iconForContentType(meta.contentType);
+    final icon = iconForContentType(meta.contentType);
     final label = meta.name.isEmpty ? meta.path.split('/').last : meta.name;
-    final sizeLabel = _formatBytes(meta.size);
+    final sizeLabel = formatBytes(meta.size);
     final canDownload = urls != null;
     return Container(
       constraints: const BoxConstraints(maxWidth: 320),
@@ -1088,16 +1079,6 @@ class _FileCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  static IconData _iconForContentType(String type) {
-    if (type.startsWith('video')) return Icons.movie_outlined;
-    if (type.startsWith('audio')) return Icons.audiotrack_outlined;
-    if (type.contains('pdf')) return Icons.picture_as_pdf_outlined;
-    if (type.contains('zip') || type.contains('compressed')) {
-      return Icons.folder_zip_outlined;
-    }
-    return Icons.insert_drive_file_outlined;
   }
 }
 

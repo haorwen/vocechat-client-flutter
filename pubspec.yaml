@@ -47,7 +47,7 @@ dependencies:
   file_picker: ^8.1.4
   photo_view: ^0.15.0
 
-  # Clipboard (cross-platform image paste — text-only Clipboard from
+  # Clipboard (cross-platform image/file paste — text-only Clipboard from
   # flutter/services cannot read image bytes)
   super_clipboard: ^0.8.24
 

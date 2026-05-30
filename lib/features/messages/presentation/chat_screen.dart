@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 
@@ -28,6 +27,7 @@ import '../data/message_api.dart';
 import '../domain/message_models.dart';
 import '../domain/message_status.dart';
 import 'chat_tool_panels.dart';
+import 'file_display_utils.dart';
 import 'file_message_content.dart';
 import 'reaction_widgets.dart';
 
@@ -53,10 +53,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   int? _replyToMid;
   ChatMessage? _replyTarget;
 
-  /// Images staged for sending — shown as preview chips above the input. Pick
+  /// Files staged for sending — shown as preview cards above the input. Pick
   /// and paste add here; the actual upload+send fires only on send (web parity
-  /// with the `UploadFileList` staging area).
-  final List<_StagedImage> _staged = [];
+  /// with the `UploadFileList` staging area). Supports any file type.
+  final List<_StagedFile> _staged = [];
 
   late MessageTarget _target;
 
@@ -132,7 +132,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final replyMid = _replyToMid;
     // Snapshot + clear the staging area; uploads fire below (web parity:
     // staged files only upload on send, then the stage resets).
-    final staged = List<_StagedImage>.from(_staged);
+    final staged = List<_StagedFile>.from(_staged);
     _textCtrl.clear();
     setState(() {
       _canSend = false;
@@ -169,12 +169,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  /// Add an image to the staging area (preview above input). Upload is
+  /// Add a file to the staging area (preview above input). Upload is
   /// deferred until the user taps send — matches the web `addStageFile` flow.
-  void _stageImage(Uint8List bytes, String filename) {
+  void _stageFile(Uint8List bytes, String filename) {
     final contentType = MessageApi.inferContentType(filename, bytes: bytes);
     setState(() {
-      _staged.add(_StagedImage(
+      _staged.add(_StagedFile(
         bytes: bytes,
         filename: filename,
         contentType: contentType,
@@ -189,37 +189,68 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _recomputeCanSend();
   }
 
-  /// Pick an image (desktop/web → file_picker, mobile → image_picker gallery)
-  /// and STAGE it for preview. Reads bytes in-memory so the clipboard + picker
+  /// Rename a staged file in place (web parity with the edit-name dialog).
+  void _renameStaged(int index, String newName) {
+    if (index < 0 || index >= _staged.length) return;
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) return;
+    setState(() => _staged[index].filename = trimmed);
+  }
+
+  /// Show the rename dialog for a staged file (web parity with
+  /// `EditFileDetailsModal`). Pre-fills the current name; on save, applies it.
+  Future<void> _showRenameDialog(int index) async {
+    if (index < 0 || index >= _staged.length) return;
+    final l = AppL10n.of(context);
+    final ctrl = TextEditingController(text: _staged[index].filename);
+    ctrl.selection =
+        TextSelection(baseOffset: 0, extentOffset: ctrl.text.length);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.chatFileDetailsTitle),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: InputDecoration(labelText: l.chatFileNameLabel),
+          onSubmitted: (v) => Navigator.of(ctx).pop(v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(l.actionCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(ctrl.text),
+            child: Text(l.chatEditSave),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (result != null) _renameStaged(index, result);
+  }
+
+  /// Pick one or more files (any type) via file_picker on every platform and
+  /// STAGE them for preview. Reads bytes in-memory so the clipboard + picker
   /// paths share one staging entry point.
-  Future<void> _pickAndSendImage() async {
+  Future<void> _pickAndStageFile() async {
     final l = AppL10n.of(context);
     try {
-      Uint8List? bytes;
-      String filename = 'image.png';
-      final isDesktop = !kIsWeb &&
-          (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
-      if (isDesktop || kIsWeb) {
-        final result = await FilePicker.platform.pickFiles(
-          type: FileType.image,
-          withData: true,
-        );
-        final picked = result?.files.firstOrNull;
-        if (picked == null) return;
-        bytes = picked.bytes ??
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        withData: true,
+        allowMultiple: true,
+      );
+      if (result == null) return;
+      for (final picked in result.files) {
+        final bytes = picked.bytes ??
             (picked.path != null
                 ? await File(picked.path!).readAsBytes()
                 : null);
-        filename = picked.name;
-      } else {
-        final picker = ImagePicker();
-        final xfile = await picker.pickImage(source: ImageSource.gallery);
-        if (xfile == null) return;
-        bytes = await xfile.readAsBytes();
-        filename = xfile.name;
+        if (bytes == null || bytes.isEmpty) continue;
+        _stageFile(bytes, picked.name);
       }
-      if (bytes == null || bytes.isEmpty) return;
-      _stageImage(bytes, filename);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -228,14 +259,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  /// Try to read an image from the clipboard and STAGE it. Returns true when an
-  /// image was found+staged so the caller can suppress the default text paste.
-  Future<bool> _pasteImageFromClipboard() async {
+  /// Try to read from the clipboard and STAGE whatever it holds. Handles both
+  /// raw image bytes (screenshots etc.) and real files copied from the OS file
+  /// manager (PDF/doc/any type). Returns true when something was staged so the
+  /// caller can suppress the default text paste.
+  Future<bool> _pasteFromClipboard() async {
     try {
       final clipboard = SystemClipboard.instance;
       if (clipboard == null) return false;
       final reader = await clipboard.read();
 
+      // Fast path: raw image bytes on the clipboard (no filename available).
       Uint8List? bytes;
       String filename = 'pasted.png';
       if (reader.canProvide(Formats.png)) {
@@ -251,10 +285,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         bytes = await _readClipboardFormat(reader, Formats.webp);
         filename = 'pasted.webp';
       }
-      if (bytes == null || bytes.isEmpty) return false;
+      if (bytes != null && bytes.isNotEmpty) {
+        _stageFile(bytes, filename);
+        return true;
+      }
 
-      _stageImage(bytes, filename);
-      return true;
+      // General path: a real file (any type) was copied in the OS file
+      // manager. Each item is its own reader; getFile(null) synthesizes the
+      // file from its URI on desktop, giving us bytes + a suggested name.
+      var staged = false;
+      for (final item in reader.items) {
+        final result = await _readFileFromReader(item);
+        if (result != null && result.$1.isNotEmpty) {
+          _stageFile(result.$1, result.$2);
+          staged = true;
+        }
+      }
+      return staged;
     } catch (_) {
       return false;
     }
@@ -635,10 +682,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       controller: _textCtrl,
                       canSend: _canSend,
                       onSend: _sendMessage,
-                      onAttach: _pickAndSendImage,
-                      onPasteImage: _pasteImageFromClipboard,
+                      onAttach: _pickAndStageFile,
+                      onPasteImage: _pasteFromClipboard,
                       staged: _staged,
                       onRemoveStaged: _removeStaged,
+                      onRenameStaged: _showRenameDialog,
                       placeholder: isChannel
                           ? l.chatMessagePlaceholderChannel(title)
                           : l.chatMessagePlaceholderUser(title),
@@ -1624,6 +1672,7 @@ class _SendBox extends StatelessWidget {
     this.onPasteImage,
     this.staged = const [],
     this.onRemoveStaged,
+    this.onRenameStaged,
     this.replyTarget,
     this.replyTargetName,
     this.onCancelReply,
@@ -1642,10 +1691,13 @@ class _SendBox extends StatelessWidget {
   final Future<bool> Function()? onPasteImage;
 
   /// Images staged for sending, previewed above the input.
-  final List<_StagedImage> staged;
+  final List<_StagedFile> staged;
 
-  /// Remove a staged image by index.
+  /// Remove a staged file by index.
   final void Function(int index)? onRemoveStaged;
+
+  /// Open the rename dialog for a staged file by index.
+  final void Function(int index)? onRenameStaged;
 
   final ChatMessage? replyTarget;
   final String? replyTargetName;
@@ -1705,6 +1757,7 @@ class _SendBox extends StatelessWidget {
             _StagedPreviewRow(
               staged: staged,
               onRemove: onRemoveStaged ?? (_) {},
+              onRename: onRenameStaged ?? (_) {},
             ),
           Container(
             decoration: BoxDecoration(
@@ -1821,25 +1874,35 @@ class _SendBox extends StatelessWidget {
 }
 
 /// One staged-but-not-yet-sent image awaiting send.
-class _StagedImage {
-  const _StagedImage({
+class _StagedFile {
+  _StagedFile({
     required this.bytes,
     required this.filename,
     required this.contentType,
   });
 
   final Uint8List bytes;
-  final String filename;
+
+  /// Mutable so the rename dialog can update it in place.
+  String filename;
   final String contentType;
+
+  int get size => bytes.length;
+  bool get isImage => contentType.startsWith('image/');
 }
 
 /// Horizontal row of staged image thumbnails shown above the input — mirrors
 /// the web `UploadFileList`. Each chip shows the image with an ✕ remove button.
 class _StagedPreviewRow extends StatelessWidget {
-  const _StagedPreviewRow({required this.staged, required this.onRemove});
+  const _StagedPreviewRow({
+    required this.staged,
+    required this.onRemove,
+    required this.onRename,
+  });
 
-  final List<_StagedImage> staged;
+  final List<_StagedFile> staged;
   final void Function(int index) onRemove;
+  final void Function(int index) onRename;
 
   @override
   Widget build(BuildContext context) {
@@ -1851,50 +1914,133 @@ class _StagedPreviewRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: SizedBox(
-        height: 72,
+        height: 138,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: staged.length,
           separatorBuilder: (_, __) => const SizedBox(width: 8),
-          itemBuilder: (context, i) {
-            final img = staged[i];
-            return Stack(
-              clipBehavior: Clip.none,
+          itemBuilder: (context, i) => _StagedFileCard(
+            file: staged[i],
+            onRemove: () => onRemove(i),
+            onRename: () => onRename(i),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A single staged-file card — thumbnail (or type icon), name, size, plus
+/// edit (rename) and remove controls. Mirrors the web `UploadFileList` item.
+class _StagedFileCard extends StatelessWidget {
+  const _StagedFileCard({
+    required this.file,
+    required this.onRemove,
+    required this.onRename,
+  });
+
+  final _StagedFile file;
+  final VoidCallback onRemove;
+  final VoidCallback onRename;
+
+  @override
+  Widget build(BuildContext context) {
+    const thumbSize = 80.0;
+    return SizedBox(
+      width: thumbSize + 8,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppTokens.surface,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: Image.memory(
-                    img.bytes,
-                    width: 72,
-                    height: 72,
-                    fit: BoxFit.cover,
-                  ),
+                  borderRadius: BorderRadius.circular(4),
+                  child: file.isImage
+                      ? Image.memory(
+                          file.bytes,
+                          width: thumbSize,
+                          height: thumbSize,
+                          fit: BoxFit.cover,
+                        )
+                      : Container(
+                          width: thumbSize,
+                          height: thumbSize,
+                          color: AppTokens.borderSubtle,
+                          alignment: Alignment.center,
+                          child: Icon(
+                            iconForContentType(file.contentType),
+                            size: 34,
+                            color: AppTokens.textMuted,
+                          ),
+                        ),
                 ),
-                Positioned(
-                  top: -6,
-                  right: -6,
-                  child: GestureDetector(
-                    onTap: () => onRemove(i),
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1),
-                      ),
-                      child: const Icon(
-                        Icons.close,
-                        size: 13,
-                        color: Colors.white,
-                      ),
+                const SizedBox(height: 4),
+                SizedBox(
+                  width: thumbSize,
+                  child: Text(
+                    safeText(file.filename),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
+                Text(
+                  formatBytes(file.size),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppTokens.textMuted,
+                  ),
+                ),
               ],
-            );
-          },
+            ),
+          ),
+          Positioned(
+            top: -6,
+            right: -6,
+            child: Row(
+              children: [
+                _CardActionButton(icon: Icons.edit_outlined, onTap: onRename),
+                const SizedBox(width: 4),
+                _CardActionButton(icon: Icons.close, onTap: onRemove),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CardActionButton extends StatelessWidget {
+  const _CardActionButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 20,
+        height: 20,
+        decoration: BoxDecoration(
+          color: Colors.black54,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 1),
         ),
+        child: Icon(icon, size: 12, color: Colors.white),
       ),
     );
   }
@@ -2114,4 +2260,33 @@ class _EmptyConversation extends StatelessWidget {
       ),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// File reading shared by clipboard-paste and drag-drop. Both surfaces reduce
+// to: given a single-item DataReader, read its file bytes + a filename.
+// ---------------------------------------------------------------------------
+
+/// Read an arbitrary file (any type) from a single-item [DataReader] into
+/// `(bytes, filename)`. Passing `null` to `getFile` makes super_native
+/// synthesize the file from its URI on desktop, so this works for images,
+/// PDFs, docs — anything copied or dropped. Returns null when the item holds
+/// no readable file.
+Future<(Uint8List, String)?> _readFileFromReader(DataReader item) async {
+  final suggested = await item.getSuggestedName();
+  final completer = Completer<(Uint8List, String)?>();
+  final progress = item.getFile(null, (file) async {
+    try {
+      final bytes = await file.readAll();
+      final name = file.fileName ?? suggested ?? 'file';
+      if (!completer.isCompleted) completer.complete((bytes, name));
+    } catch (_) {
+      if (!completer.isCompleted) completer.complete(null);
+    }
+  }, onError: (_) {
+    if (!completer.isCompleted) completer.complete(null);
+  });
+  // getFile returns null synchronously when the item has no file to provide.
+  if (progress == null && !completer.isCompleted) completer.complete(null);
+  return completer.future;
 }
