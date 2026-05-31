@@ -1,0 +1,33 @@
+name: Build macOS Desktop App
+
+on:
+  push:
+    branches: [ main ]  # 触发分支
+
+jobs:
+  build:
+    runs-on: macos-latest  # 使用 GitHub 托管的 macOS 最新系统
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        channel: 'stable'
+
+    - name: Install dependencies
+      run: |
+        flutter pub get
+        # 如果你使用了 Mac 原生插件，需要执行下行
+        cd macos && pod install
+
+    - name: Build macOS App
+      run: flutter build macos --release
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: macOS-App
+        path: build/macos/Build/Products/Release/*.app  # 收集打包产物
