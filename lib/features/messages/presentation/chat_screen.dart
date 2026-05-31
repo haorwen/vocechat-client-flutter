@@ -751,6 +751,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                           onReply: () => _startReply(msg),
                                           onEdit: () => _startEdit(msg),
                                           onDelete: () => _confirmDelete(msg),
+                                          onJumpToMid: _scrollToMid,
                                           onRetry: msg.mid < 0 &&
                                                   statuses[msg.mid] ==
                                                       MessageSendStatus.failed
@@ -1282,6 +1283,7 @@ class _MessageRow extends ConsumerStatefulWidget {
     this.onReply,
     this.onEdit,
     this.onDelete,
+    this.onJumpToMid,
   });
 
   final ChatMessage message;
@@ -1299,6 +1301,7 @@ class _MessageRow extends ConsumerStatefulWidget {
   final VoidCallback? onReply;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final void Function(int mid)? onJumpToMid;
 
   @override
   ConsumerState<_MessageRow> createState() => _MessageRowState();
@@ -1419,51 +1422,54 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                     ),
                   ),
                 )
-              : Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTokens.gray100,
-                      borderRadius: BorderRadius.circular(8),
-                      border: AppTokens.brightness == Brightness.dark
-                          ? Border.all(
-                              color: AppTokens.borderSubtle, width: 1)
-                          : null,
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        VoceAvatar(
-                          name: originalAuthor.name,
-                          imageUrl: widget.avatarUrlBuilder(
-                            original.fromUid,
-                            originalAuthor.avatarUpdatedAt,
+              : GestureDetector(
+                  onTap: () => widget.onJumpToMid?.call(detail.mid),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTokens.gray100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: AppTokens.brightness == Brightness.dark
+                            ? Border.all(
+                                color: AppTokens.borderSubtle, width: 1)
+                            : null,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          VoceAvatar(
+                            name: originalAuthor.name,
+                            imageUrl: widget.avatarUrlBuilder(
+                              original.fromUid,
+                              originalAuthor.avatarUpdatedAt,
+                            ),
+                            size: 24,
                           ),
-                          size: 24,
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                safeText(originalAuthor.name),
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: AppTokens.primary500,
-                                  height: 18 / 13,
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  safeText(originalAuthor.name),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: AppTokens.primary500,
+                                    height: 18 / 13,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 2),
-                              _ReplyQuotePreview(original: original),
-                            ],
+                                const SizedBox(height: 2),
+                                _ReplyQuotePreview(original: original),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
