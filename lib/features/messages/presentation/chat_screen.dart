@@ -1406,6 +1406,9 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                   decoration: BoxDecoration(
                     color: AppTokens.gray100,
                     borderRadius: BorderRadius.circular(8),
+                    border: AppTokens.brightness == Brightness.dark
+                        ? Border.all(color: AppTokens.borderSubtle, width: 1)
+                        : null,
                   ),
                   child: Text(
                     l.chatReplyDeleted,
@@ -1423,6 +1426,10 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                     decoration: BoxDecoration(
                       color: AppTokens.gray100,
                       borderRadius: BorderRadius.circular(8),
+                      border: AppTokens.brightness == Brightness.dark
+                          ? Border.all(
+                              color: AppTokens.borderSubtle, width: 1)
+                          : null,
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2321,10 +2328,19 @@ class _ReplyChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: AppTokens.gray50,
+          color: AppTokens.gray100,
           borderRadius: BorderRadius.circular(6),
           border: Border(
             left: BorderSide(color: AppTokens.primary500, width: 3),
+            top: AppTokens.brightness == Brightness.dark
+                ? BorderSide(color: AppTokens.borderSubtle, width: 1)
+                : BorderSide.none,
+            right: AppTokens.brightness == Brightness.dark
+                ? BorderSide(color: AppTokens.borderSubtle, width: 1)
+                : BorderSide.none,
+            bottom: AppTokens.brightness == Brightness.dark
+                ? BorderSide(color: AppTokens.borderSubtle, width: 1)
+                : BorderSide.none,
           ),
         ),
         child: Row(

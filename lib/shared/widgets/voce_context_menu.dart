@@ -103,22 +103,34 @@ class _VoceContextMenu extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          // web: bg #fff / dark bg black
-          color: dark ? Colors.black : Colors.white,
+          // dark: elevated surface with border for contrast against dark bg
+          color: dark ? AppTokens.surface : Colors.white,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: const [
-            // web: 0 20px 25px 20px rgba(31,41,55,.1), 0 10px 10px rgba(31,41,55,.04)
-            BoxShadow(
-              color: Color(0x1A1F2937),
-              blurRadius: 25,
-              spreadRadius: 6,
-              offset: Offset(0, 16),
-            ),
-            BoxShadow(
-              color: Color(0x0A1F2937),
-              blurRadius: 10,
-              offset: Offset(0, 8),
-            ),
+          border: dark
+              ? Border.all(color: AppTokens.borderStrong, width: 1)
+              : null,
+          boxShadow: [
+            if (!dark) ...[
+              // web: 0 20px 25px 20px rgba(31,41,55,.1), 0 10px 10px rgba(31,41,55,.04)
+              const BoxShadow(
+                color: Color(0x1A1F2937),
+                blurRadius: 25,
+                spreadRadius: 6,
+                offset: Offset(0, 16),
+              ),
+              const BoxShadow(
+                color: Color(0x0A1F2937),
+                blurRadius: 10,
+                offset: Offset(0, 8),
+              ),
+            ] else ...[
+              const BoxShadow(
+                color: Color(0x40000000),
+                blurRadius: 20,
+                spreadRadius: 2,
+                offset: Offset(0, 8),
+              ),
+            ],
           ],
         ),
         child: Column(
