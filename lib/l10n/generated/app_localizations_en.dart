@@ -629,4 +629,47 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get authSessionEnded => 'Your session ended. Please sign in again.';
+
+  @override
+  String get chatListMarkRead => 'Mark as read';
+
+  @override
+  String get chatListMute => 'Mute';
+
+  @override
+  String get chatListUnmute => 'Unmute';
+
+  @override
+  String get chatListHide => 'Hide';
+
+  @override
+  String get chatListLeave => 'Leave channel';
+
+  @override
+  String get chatListMarkReadDone => 'Marked as read';
+
+  @override
+  String get chatListMuteDone => 'Muted';
+
+  @override
+  String get chatListUnmuteDone => 'Unmuted';
+
+  @override
+  String get chatListHideDone => 'Hidden';
+
+  @override
+  String get chatListLeaveDone => 'Left channel';
+
+  @override
+  String chatListLeaveFailed(String error) {
+    return 'Leave failed: $error';
+  }
+
+  @override
+  String chatListMuteFailed(String error) {
+    return 'Mute failed: $error';
+  }
+
+  @override
+  String get chatListMarkReadFailed => 'Mark read failed';
 }

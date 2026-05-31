@@ -8,13 +8,17 @@ import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/loading_capsule.dart';
 import '../../../shared/widgets/voce_avatar.dart';
+import '../../../shared/widgets/voce_context_menu.dart';
 import '../../../features/contacts/application/presence_provider.dart';
 import '../../../features/contacts/application/user_directory_provider.dart';
 import '../../../features/messages/presentation/chat_screen.dart';
+import '../../../features/messages/application/read_index_provider.dart';
 import '../application/conversation_providers.dart';
+import '../application/muted_chats_provider.dart';
 import '../application/pending_chat_selection.dart';
 import '../application/pinned_chats_provider.dart';
 import '../data/pin_chat_api.dart';
+import '../data/session_actions_api.dart';
 import '../domain/pin_chat_models.dart';
 
 class ChatListScreen extends ConsumerStatefulWidget {
@@ -294,60 +298,174 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
             context.go('/home/chat/$routeId');
           }
         },
-        onLongPress: () => _showPinMenu(context, item),
-        onSecondaryTap: () => _showPinMenu(context, item),
+        onLongPress: () => _showSessionMenu(context, item),
+        onSecondaryTapDown: (pos) =>
+            _showSessionMenu(context, item, globalPos: pos),
       ),
     );
   }
 
-  Future<void> _showPinMenu(
-      BuildContext context, ConversationItem item) async {
+  /// Full context menu matching the web reference's SessionList/ContextMenu.
+  ///
+  /// DM items:  Pin/Unpin, Mark Read, Mute/Unmute, Hide (danger)
+  /// Channel:   Pin/Unpin, Mark Read, Mute/Unmute, Leave (danger)
+  Future<void> _showSessionMenu(
+    BuildContext context,
+    ConversationItem item, {
+    Offset? globalPos,
+  }) async {
     final l = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final pinned = ref.read(pinnedChatsProvider.notifier);
-    final target = switch (item.key) {
+    final pinTarget = switch (item.key) {
       UserConversationKey(uid: final uid) => PinChatTargetUser(uid),
       GroupConversationKey(gid: final gid) => PinChatTargetGroup(gid),
     };
-    final isPinned = pinned.isPinned(target);
+    final isPinned = pinned.isPinned(pinTarget);
 
-    final picked = await showModalBottomSheet<bool>(
-      context: context,
-      builder: (ctx) {
-        return SafeArea(
-          child: ListTile(
-            leading: Icon(
-              isPinned ? Icons.push_pin_outlined : Icons.push_pin,
-              color: AppTokens.gray700,
+    // Check mute state to toggle the label/action.
+    final muteNotifier = ref.read(mutedChatsProvider.notifier);
+    final isMuted = switch (item.key) {
+      UserConversationKey(uid: final uid) => muteNotifier.isUserMuted(uid),
+      GroupConversationKey(gid: final gid) => muteNotifier.isGroupMuted(gid),
+    };
+
+    // Build menu items matching the web reference order.
+    final items = <VoceContextMenuItem>[
+      VoceContextMenuItem(
+          'pin', isPinned ? l.chatListUnpin : l.chatListPin),
+      VoceContextMenuItem('markRead', l.chatListMarkRead),
+      VoceContextMenuItem('mute', isMuted ? l.chatListUnmute : l.chatListMute),
+      if (item.isChannel)
+        VoceContextMenuItem('leave', l.chatListLeave, danger: true)
+      else
+        VoceContextMenuItem('hide', l.chatListHide, danger: true),
+    ];
+
+    // Wide screen + right-click → positioned popover; otherwise → bottom sheet.
+    final isWide = MediaQuery.sizeOf(context).width >= 700;
+    String? selection;
+    if (globalPos != null && isWide) {
+      selection = await showVoceContextMenu(
+        context: context,
+        globalPos: globalPos,
+        items: items,
+      );
+    } else {
+      selection = await showModalBottomSheet<String>(
+        context: context,
+        builder: (ctx) {
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final mi in items)
+                  ListTile(
+                    title: Text(
+                      mi.label,
+                      style: mi.danger
+                          ? TextStyle(color: AppTokens.error)
+                          : null,
+                    ),
+                    onTap: () => Navigator.of(ctx).pop(mi.value),
+                  ),
+              ],
             ),
-            title: Text(isPinned ? l.chatListUnpin : l.chatListPin),
-            onTap: () => Navigator.of(ctx).pop(true),
-          ),
-        );
-      },
-    );
-    if (picked != true || !mounted) return;
+          );
+        },
+      );
+    }
+    if (!mounted || selection == null) return;
 
-    final api = ref.read(pinChatApiProvider);
     try {
-      if (isPinned) {
-        await api.unpin(target);
-      } else {
-        await api.pin(target);
+      switch (selection) {
+        case 'pin':
+          final api = ref.read(pinChatApiProvider);
+          if (isPinned) {
+            await api.unpin(pinTarget);
+          } else {
+            await api.pin(pinTarget);
+          }
+        case 'markRead':
+          final api = ref.read(sessionActionsApiProvider);
+          final mid = item.lastMid;
+          if (mid == null || mid <= 0) {
+            // Nothing to mark — surface a clear message instead of silently
+            // doing nothing (which reads as "failed" to the user).
+            if (mounted) {
+              messenger.showSnackBar(
+                  SnackBar(content: Text(l.chatListMarkReadDone)));
+            }
+            break;
+          }
+          final readNotifier = ref.read(readIndexProvider.notifier);
+          switch (item.key) {
+            case UserConversationKey(uid: final uid):
+              await api.markReadUser(uid, mid);
+              readNotifier.setUser(uid, mid);
+            case GroupConversationKey(gid: final gid):
+              await api.markReadGroup(gid, mid);
+              readNotifier.setGroup(gid, mid);
+          }
+          if (mounted) {
+            messenger.showSnackBar(
+                SnackBar(content: Text(l.chatListMarkReadDone)));
+          }
+        case 'mute':
+          final api = ref.read(sessionActionsApiProvider);
+          switch (item.key) {
+            case UserConversationKey(uid: final uid):
+              if (isMuted) {
+                await api.unmuteUser(uid);
+                muteNotifier.unmuteUser(uid);
+              } else {
+                await api.muteUser(uid);
+                muteNotifier.muteUser(uid);
+              }
+            case GroupConversationKey(gid: final gid):
+              if (isMuted) {
+                await api.unmuteGroup(gid);
+                muteNotifier.unmuteGroup(gid);
+              } else {
+                await api.muteGroup(gid);
+                muteNotifier.muteGroup(gid);
+              }
+          }
+          if (mounted) {
+            messenger.showSnackBar(SnackBar(
+                content: Text(
+                    isMuted ? l.chatListUnmuteDone : l.chatListMuteDone)));
+          }
+        case 'hide':
+          // Local-only: remove the DM from the conversation list state.
+          ref.read(conversationsProvider.notifier).hideConversation(item.key);
+          if (mounted) {
+            messenger
+                .showSnackBar(SnackBar(content: Text(l.chatListHideDone)));
+          }
+        case 'leave':
+          final gid = (item.key as GroupConversationKey).gid;
+          final api = ref.read(sessionActionsApiProvider);
+          await api.leaveGroup(gid);
+          // Remove from local list; SSE echo will also clean up.
+          ref.read(conversationsProvider.notifier).hideConversation(item.key);
+          if (mounted) {
+            messenger
+                .showSnackBar(SnackBar(content: Text(l.chatListLeaveDone)));
+          }
       }
-      // The SSE `user_settings_changed` echo updates `pinnedChatsProvider`;
-      // no local mutation needed here.
     } catch (e) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(safeText(
-            isPinned
-                ? l.chatListUnpinFailed(e.toString())
-                : l.chatListPinFailed(e.toString()),
-          )),
-        ),
-      );
+      final msg = switch (selection) {
+        'pin' => isPinned
+            ? l.chatListUnpinFailed(e.toString())
+            : l.chatListPinFailed(e.toString()),
+        'mute' => l.chatListMuteFailed(e.toString()),
+        'leave' => l.chatListLeaveFailed(e.toString()),
+        'markRead' => l.chatListMarkReadFailed,
+        _ => e.toString(),
+      };
+      messenger.showSnackBar(SnackBar(content: Text(safeText(msg))));
     }
   }
 }
@@ -498,7 +616,7 @@ class _ConversationTile extends ConsumerWidget {
     required this.showStatus,
     this.avatarUrl,
     this.onLongPress,
-    this.onSecondaryTap,
+    this.onSecondaryTapDown,
   });
 
   final ConversationItem item;
@@ -507,7 +625,7 @@ class _ConversationTile extends ConsumerWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
-  final VoidCallback? onSecondaryTap;
+  final ValueChanged<Offset>? onSecondaryTapDown;
   final String? avatarUrl;
   final bool showStatus;
 
@@ -526,13 +644,33 @@ class _ConversationTile extends ConsumerWidget {
         ? ref.watch(presenceProvider.select((m) => m[dmUid!] ?? false))
         : false;
 
+    // Muted state drives the de-emphasized badge / bell-off indicator, matching
+    // the web reference's SessionList row.
+    final muted = ref.watch(mutedChatsProvider.select((s) {
+      final key = item.key;
+      return switch (key) {
+        UserConversationKey(uid: final uid) => s.isUserMuted(uid),
+        GroupConversationKey(gid: final gid) => s.isGroupMuted(gid),
+      };
+    }));
+    // web: muted badges/icon are black/10 (light) or gray-500 (dark).
+    final mutedTint = AppTokens.brightness == Brightness.dark
+        ? AppTokens.gray500
+        : const Color(0x1A000000);
+
     return Material(
       color: bg,
       borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        onSecondaryTap: onSecondaryTap,
+      // Right-click is captured via GestureDetector (not InkWell, which only
+      // exposes the position-less onSecondaryTap) so the wide-screen popover
+      // can anchor at the cursor like the web client.
+      child: GestureDetector(
+        onSecondaryTapDown: onSecondaryTapDown == null
+            ? null
+            : (d) => onSecondaryTapDown!(d.globalPosition),
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(8),
         hoverColor: AppTokens.hover,
         child: Padding(
@@ -650,7 +788,10 @@ class _ConversationTile extends ConsumerWidget {
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 5, vertical: 1),
                                     decoration: BoxDecoration(
-                                      color: AppTokens.primary500,
+                                      // web: muted → faded gray badge.
+                                      color: muted
+                                          ? mutedTint
+                                          : AppTokens.primary500,
                                       borderRadius:
                                           BorderRadius.circular(10),
                                     ),
@@ -672,7 +813,9 @@ class _ConversationTile extends ConsumerWidget {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 6, vertical: 1),
                                   decoration: BoxDecoration(
-                                    color: AppTokens.primary500,
+                                    color: muted
+                                        ? mutedTint
+                                        : AppTokens.primary500,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   alignment: Alignment.center,
@@ -689,6 +832,17 @@ class _ConversationTile extends ConsumerWidget {
                                 ),
                               ],
                             ),
+                          )
+                        // web: no unreads but muted → show a bell-off icon
+                        // in place of the badge.
+                        else if (muted)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: Icon(
+                              Icons.notifications_off,
+                              size: 12,
+                              color: mutedTint,
+                            ),
                           ),
                       ],
                     ),
@@ -697,6 +851,7 @@ class _ConversationTile extends ConsumerWidget {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

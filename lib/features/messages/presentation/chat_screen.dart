@@ -23,6 +23,7 @@ import '../../../features/contacts/application/user_directory_provider.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/loading_capsule.dart';
 import '../../../shared/widgets/voce_avatar.dart';
+import '../../../shared/widgets/voce_context_menu.dart';
 import '../application/chat_controller.dart';
 import '../application/chat_tools_provider.dart';
 import '../application/read_index_provider.dart';
@@ -1612,6 +1613,14 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                 onEmojiTap: widget.message.mid > 0
                     ? () => _openReactionPicker()
                     : null,
+                onReplyTap: widget.message.mid > 0
+                    ? () => widget.onReply?.call()
+                    : null,
+                onFavoriteTap:
+                    widget.message.mid > 0 ? () => _favorite() : null,
+                onMoreTap: widget.message.mid > 0
+                    ? () => _openContextMenuAtToolbar()
+                    : null,
               ),
             ),
         ],
@@ -1690,6 +1699,26 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
     );
   }
 
+  /// Opens the context menu anchored to the floating toolbar (the "more"
+  /// button), mirroring the web reference where the More dropdown hangs off
+  /// the toolbar rather than at the cursor.
+  Future<void> _openContextMenuAtToolbar() async {
+    final box = _toolbarKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final topRight = box.localToGlobal(Offset(box.size.width, box.size.height));
+    await _openContextMenu(topRight);
+  }
+
+  Future<void> _favorite() async {
+    final l = AppL10n.of(context);
+    final ok =
+        await ref.read(favoritesProvider.notifier).add([widget.message.mid]);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(ok ? l.chatToolSavedAdded : l.chatToolSaveFail),
+    ));
+  }
+
   Future<void> _openContextMenu(Offset globalPos) async {
     final l = AppL10n.of(context);
     final isChannel = widget.target.map<bool>(
@@ -1703,74 +1732,27 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         (detail is NormalMessageDetail || detail is ReplyMessageDetail) &&
         (msg.displayContentType == 'text/plain' ||
             msg.displayContentType == 'text/markdown');
-    final overlay =
-        Overlay.of(context).context.findRenderObject() as RenderBox;
-    final selection = await showMenu<String>(
+
+    final items = <VoceContextMenuItem>[
+      VoceContextMenuItem('react', l.chatActionReact,
+          icon: Icons.emoji_emotions_outlined),
+      VoceContextMenuItem('reply', l.chatActionReply,
+          icon: Icons.reply_outlined),
+      if (canEdit)
+        VoceContextMenuItem('edit', l.chatActionEdit, icon: Icons.edit_outlined),
+      if (isChannel)
+        VoceContextMenuItem('pin', l.chatToolPin,
+            icon: Icons.push_pin_outlined),
+      VoceContextMenuItem('fav', l.chatToolSaved, icon: Icons.bookmark_outline),
+      if (isMine)
+        VoceContextMenuItem('delete', l.chatActionDelete,
+            icon: Icons.delete_outline, danger: true),
+    ];
+
+    final selection = await showVoceContextMenu(
       context: context,
-      position: RelativeRect.fromRect(
-        Rect.fromPoints(globalPos, globalPos),
-        Offset.zero & overlay.size,
-      ),
-      items: [
-        PopupMenuItem(
-          value: 'react',
-          child: Row(children: [
-            Icon(Icons.emoji_emotions_outlined,
-                size: 18, color: AppTokens.gray500),
-            const SizedBox(width: 12),
-            Text(l.chatActionReact),
-          ]),
-        ),
-        PopupMenuItem(
-          value: 'reply',
-          child: Row(children: [
-            Icon(Icons.reply_outlined,
-                size: 18, color: AppTokens.gray500),
-            const SizedBox(width: 12),
-            Text(l.chatActionReply),
-          ]),
-        ),
-        if (canEdit)
-          PopupMenuItem(
-            value: 'edit',
-            child: Row(children: [
-              Icon(Icons.edit_outlined,
-                  size: 18, color: AppTokens.gray500),
-              const SizedBox(width: 12),
-              Text(l.chatActionEdit),
-            ]),
-          ),
-        if (isChannel)
-          PopupMenuItem(
-            value: 'pin',
-            child: Row(children: [
-              Icon(Icons.push_pin_outlined,
-                  size: 18, color: AppTokens.gray500),
-              const SizedBox(width: 12),
-              Text(l.chatToolPin),
-            ]),
-          ),
-        PopupMenuItem(
-          value: 'fav',
-          child: Row(children: [
-            Icon(Icons.bookmark_outline,
-                size: 18, color: AppTokens.gray500),
-            const SizedBox(width: 12),
-            Text(l.chatToolSaved),
-          ]),
-        ),
-        if (isMine)
-          PopupMenuItem(
-            value: 'delete',
-            child: Row(children: [
-              Icon(Icons.delete_outline,
-                  size: 18, color: AppTokens.error),
-              const SizedBox(width: 12),
-              Text(l.chatActionDelete,
-                  style: TextStyle(color: AppTokens.error)),
-            ]),
-          ),
-      ],
+      globalPos: globalPos,
+      items: items,
     );
     if (!mounted || selection == null) return;
     if (selection == 'react') {
@@ -1794,13 +1776,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         content: Text(ok ? l.chatToolPinAdded : l.chatToolPinFail),
       ));
     } else if (selection == 'fav') {
-      final ok = await ref
-          .read(favoritesProvider.notifier)
-          .add([widget.message.mid]);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(ok ? l.chatToolSavedAdded : l.chatToolSaveFail),
-      ));
+      await _favorite();
     }
   }
 }
@@ -1866,28 +1842,38 @@ class _ReplyQuotePreview extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _ReplyActionsBar extends StatelessWidget {
-  const _ReplyActionsBar({super.key, this.onEmojiTap});
+  const _ReplyActionsBar({
+    super.key,
+    this.onEmojiTap,
+    this.onReplyTap,
+    this.onFavoriteTap,
+    this.onMoreTap,
+  });
 
   final VoidCallback? onEmojiTap;
+  final VoidCallback? onReplyTap;
+  final VoidCallback? onFavoriteTap;
+  final VoidCallback? onMoreTap;
 
   @override
   Widget build(BuildContext context) {
+    // Mirrors the web reference Commands toolbar:
+    //   bg-white dark:bg-gray-900, border border-black/10, rounded-md (6px),
+    //   flat icon buttons (24px) with p-1 (4px) and a gray-100/gray-800 hover.
     return Container(
       decoration: BoxDecoration(
         color: AppTokens.surface,
-        border: Border.all(color: const Color(0x14000000)),
+        border: Border.all(color: const Color(0x1A000000)),
         borderRadius: BorderRadius.circular(6),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _ReplyIcon(
-            icon: Icons.emoji_emotions_outlined,
-            onTap: onEmojiTap,
-          ),
-          const _ReplyIcon(icon: Icons.reply_outlined),
-          const _ReplyIcon(icon: Icons.bookmark_add_outlined),
-          const _ReplyIcon(icon: Icons.more_horiz),
+          _ReplyIcon(icon: Icons.emoji_emotions_outlined, onTap: onEmojiTap),
+          _ReplyIcon(icon: Icons.reply_outlined, onTap: onReplyTap),
+          _ReplyIcon(icon: Icons.bookmark_add_outlined, onTap: onFavoriteTap),
+          _ReplyIcon(icon: Icons.more_horiz, onTap: onMoreTap),
         ],
       ),
     );
@@ -1901,8 +1887,11 @@ class _ReplyIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 24px hit target (p-1 around a 16px-ish glyph in web → 20px glyph here),
+    // flat with a hover fill matching the web's md:hover:bg-gray-100.
     return InkWell(
-      onTap: onTap ?? () {},
+      onTap: onTap,
+      hoverColor: AppTokens.gray100,
       child: Padding(
         padding: const EdgeInsets.all(4),
         child: Icon(icon, size: 20, color: AppTokens.gray500),
@@ -1910,6 +1899,11 @@ class _ReplyIcon extends StatelessWidget {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Message context menu styling lives in shared/widgets/voce_context_menu.dart
+// (showVoceContextMenu / VoceContextMenuItem), shared with the chat list.
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // _SendBox — matches the web client `Send` component:

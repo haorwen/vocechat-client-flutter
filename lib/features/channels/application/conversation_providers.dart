@@ -272,6 +272,15 @@ class Conversations extends _$Conversations {
     await _refreshFromNetwork(cache);
   }
 
+  /// Remove a conversation from the local list (hide session / leave channel).
+  /// Does NOT call any server API — the caller is responsible for that.
+  void hideConversation(ConversationKey key) {
+    final current = state.valueOrNull ?? [];
+    final filtered = current.where((c) => c.key != key).toList();
+    state = AsyncData(filtered);
+    if (_cache != null) _persist(_cache!, filtered);
+  }
+
   Future<void> _refreshFromNetwork(MessageCache cache) async {
     ref.read(conversationsRefreshingProvider.notifier).set(true);
     try {

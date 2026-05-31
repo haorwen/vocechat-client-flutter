@@ -6,6 +6,7 @@ import '../../../core/network/sse_client.dart';
 import '../../../core/utils/app_log.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../channels/application/conversation_providers.dart';
+import '../../channels/application/muted_chats_provider.dart';
 import '../../channels/application/pinned_chats_provider.dart';
 import '../../channels/domain/pin_chat_models.dart';
 import '../../contacts/application/presence_provider.dart';
@@ -98,11 +99,13 @@ class MessageDispatcher extends _$MessageDispatcher {
         if (event is ChatEventUserSettings) {
           _applyPinnedChatsSnapshot(event.data);
           _applyReadIndexSnapshot(event.data);
+          _applyMuteSnapshot(event.data);
           return;
         }
         if (event is ChatEventUserSettingsChanged) {
           _applyPinnedChatsDelta(event.data);
           _applyReadIndexDelta(event.data);
+          _applyMuteDelta(event.data);
           return;
         }
         if (event is ChatEventKick) {
@@ -206,6 +209,57 @@ class MessageDispatcher extends _$MessageDispatcher {
       if (id != null && mid != null) out[id] = mid;
     }
     return out;
+  }
+
+  /// Mute snapshot from `user_settings`: `mute_users` / `mute_groups` are lists
+  /// of `{uid|gid, expired_at?}`. Replace the local mute set wholesale.
+  void _applyMuteSnapshot(Map<String, dynamic> data) {
+    final users = _parseMuteIds(data['mute_users'], 'uid');
+    final groups = _parseMuteIds(data['mute_groups'], 'gid');
+    ref.read(mutedChatsProvider.notifier).applySnapshot(
+          users: users.toSet(),
+          groups: groups.toSet(),
+        );
+  }
+
+  /// Mute delta from `user_settings_changed`: `add_mute_users` /
+  /// `add_mute_groups` are `{uid|gid, expired_at?}` lists; `remove_mute_users`
+  /// / `remove_mute_groups` are plain id lists.
+  void _applyMuteDelta(Map<String, dynamic> data) {
+    final addUsers = _parseMuteIds(data['add_mute_users'], 'uid');
+    final addGroups = _parseMuteIds(data['add_mute_groups'], 'gid');
+    final removeUsers = _parsePlainIds(data['remove_mute_users']);
+    final removeGroups = _parsePlainIds(data['remove_mute_groups']);
+    if (addUsers.isEmpty &&
+        addGroups.isEmpty &&
+        removeUsers.isEmpty &&
+        removeGroups.isEmpty) {
+      return;
+    }
+    ref.read(mutedChatsProvider.notifier).applyDelta(
+          addUsers: addUsers,
+          addGroups: addGroups,
+          removeUsers: removeUsers,
+          removeGroups: removeGroups,
+        );
+  }
+
+  /// Parse a `[{<idKey>, expired_at?}]` list into a list of ids.
+  List<int> _parseMuteIds(dynamic raw, String idKey) {
+    if (raw is! List) return const [];
+    final out = <int>[];
+    for (final e in raw) {
+      if (e is! Map) continue;
+      final id = (e[idKey] as num?)?.toInt();
+      if (id != null) out.add(id);
+    }
+    return out;
+  }
+
+  /// Parse a plain `[<int>]` id list.
+  List<int> _parsePlainIds(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw.whereType<num>().map((n) => n.toInt()).toList();
   }
 
   Map<String, dynamic>? _decode(String raw) {

@@ -270,5 +270,25 @@
 
   "authKickedFromOtherDevice": "Signed out: your account just signed in on another device.",
   "authAccountDeleted": "Your account has been deleted.",
-  "authSessionEnded": "Your session ended. Please sign in again."
+  "authSessionEnded": "Your session ended. Please sign in again.",
+
+  "chatListMarkRead": "Mark as read",
+  "chatListMute": "Mute",
+  "chatListUnmute": "Unmute",
+  "chatListHide": "Hide",
+  "chatListLeave": "Leave channel",
+  "chatListMarkReadDone": "Marked as read",
+  "chatListMuteDone": "Muted",
+  "chatListUnmuteDone": "Unmuted",
+  "chatListHideDone": "Hidden",
+  "chatListLeaveDone": "Left channel",
+  "chatListLeaveFailed": "Leave failed: {error}",
+  "@chatListLeaveFailed": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "chatListMuteFailed": "Mute failed: {error}",
+  "@chatListMuteFailed": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "chatListMarkReadFailed": "Mark read failed"
 }

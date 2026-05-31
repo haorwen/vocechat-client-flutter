@@ -1248,6 +1248,84 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Your session ended. Please sign in again.'**
   String get authSessionEnded;
+
+  /// No description provided for @chatListMarkRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as read'**
+  String get chatListMarkRead;
+
+  /// No description provided for @chatListMute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get chatListMute;
+
+  /// No description provided for @chatListUnmute.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute'**
+  String get chatListUnmute;
+
+  /// No description provided for @chatListHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get chatListHide;
+
+  /// No description provided for @chatListLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave channel'**
+  String get chatListLeave;
+
+  /// No description provided for @chatListMarkReadDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Marked as read'**
+  String get chatListMarkReadDone;
+
+  /// No description provided for @chatListMuteDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Muted'**
+  String get chatListMuteDone;
+
+  /// No description provided for @chatListUnmuteDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmuted'**
+  String get chatListUnmuteDone;
+
+  /// No description provided for @chatListHideDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden'**
+  String get chatListHideDone;
+
+  /// No description provided for @chatListLeaveDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Left channel'**
+  String get chatListLeaveDone;
+
+  /// No description provided for @chatListLeaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave failed: {error}'**
+  String chatListLeaveFailed(String error);
+
+  /// No description provided for @chatListMuteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute failed: {error}'**
+  String chatListMuteFailed(String error);
+
+  /// No description provided for @chatListMarkReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark read failed'**
+  String get chatListMarkReadFailed;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

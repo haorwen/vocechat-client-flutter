@@ -218,5 +218,25 @@
 
   "authKickedFromOtherDevice": "已退出登录：你的账号刚在另一台设备上登录。",
   "authAccountDeleted": "你的账号已被删除。",
-  "authSessionEnded": "登录已失效，请重新登录。"
+  "authSessionEnded": "登录已失效，请重新登录。",
+
+  "chatListMarkRead": "标记为已读",
+  "chatListMute": "免打扰",
+  "chatListUnmute": "取消免打扰",
+  "chatListHide": "隐藏会话",
+  "chatListLeave": "退出频道",
+  "chatListMarkReadDone": "已标记为已读",
+  "chatListMuteDone": "已开启免打扰",
+  "chatListUnmuteDone": "已取消免打扰",
+  "chatListHideDone": "已隐藏",
+  "chatListLeaveDone": "已退出频道",
+  "chatListLeaveFailed": "退出失败：{error}",
+  "@chatListLeaveFailed": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "chatListMuteFailed": "操作失败：{error}",
+  "@chatListMuteFailed": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "chatListMarkReadFailed": "标记已读失败"
 }

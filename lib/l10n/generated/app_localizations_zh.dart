@@ -621,4 +621,47 @@ class AppL10nZh extends AppL10n {
 
   @override
   String get authSessionEnded => '登录已失效，请重新登录。';
+
+  @override
+  String get chatListMarkRead => '标记为已读';
+
+  @override
+  String get chatListMute => '免打扰';
+
+  @override
+  String get chatListUnmute => '取消免打扰';
+
+  @override
+  String get chatListHide => '隐藏会话';
+
+  @override
+  String get chatListLeave => '退出频道';
+
+  @override
+  String get chatListMarkReadDone => '已标记为已读';
+
+  @override
+  String get chatListMuteDone => '已开启免打扰';
+
+  @override
+  String get chatListUnmuteDone => '已取消免打扰';
+
+  @override
+  String get chatListHideDone => '已隐藏';
+
+  @override
+  String get chatListLeaveDone => '已退出频道';
+
+  @override
+  String chatListLeaveFailed(String error) {
+    return '退出失败：$error';
+  }
+
+  @override
+  String chatListMuteFailed(String error) {
+    return '操作失败：$error';
+  }
+
+  @override
+  String get chatListMarkReadFailed => '标记已读失败';
 }
