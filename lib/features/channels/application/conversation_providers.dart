@@ -709,16 +709,34 @@ Future<UnreadInfo> unreadInfo(Ref ref, ConversationKey key) async {
 
   final readState = await ref.watch(readIndexProvider.future);
 
-  final (MessageTarget target, int readMid) = switch (key) {
+  final (MessageTarget target, int? readMidOrNull) = switch (key) {
     GroupConversationKey(gid: final gid) => (
         MessageTarget.group(gid: gid),
-        readState.readGroup(gid),
+        readState.readGroupOrNull(gid),
       ),
     UserConversationKey(uid: final uid) => (
         MessageTarget.user(uid: uid),
-        readState.readUser(uid),
+        readState.readUserOrNull(uid),
       ),
   };
+
+  // No baseline yet — the server omits read_index for conversations the user
+  // has never read, so on first entry we'd otherwise count the whole cached
+  // history as unread. Adopt the current head as the baseline (local only;
+  // the server gets the real read-report when the user opens the chat) and
+  // show no badge.
+  if (readMidOrNull == null) {
+    final notifier = ref.read(readIndexProvider.notifier);
+    switch (key) {
+      case GroupConversationKey(gid: final gid):
+        notifier.baselineGroup(gid, lastMid);
+      case UserConversationKey(uid: final uid):
+        notifier.baselineUser(uid, lastMid);
+    }
+    return (count: 0, mention: false);
+  }
+
+  final int readMid = readMidOrNull;
 
   // Already read up to the head → no badge (cheap short-circuit, avoids a DB
   // hit for the common all-read case).

@@ -6,7 +6,7 @@ part of 'conversation_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$unreadInfoHash() => r'3a4177059ef5a4092711c8fd5f4fa46bc49bedf6';
+String _$unreadInfoHash() => r'dfce3785de7d7899695193f4cc242d7582e09473';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -174,7 +174,7 @@ final conversationsRefreshingProvider =
 );
 
 typedef _$ConversationsRefreshing = Notifier<bool>;
-String _$conversationsHash() => r'f4e6f68760816066188f75e07039aba3c369bda2';
+String _$conversationsHash() => r'e8beed9fdfd215c07fecd51faebd0bedc681573a';
 
 /// See also [Conversations].
 @ProviderFor(Conversations)

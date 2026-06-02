@@ -28,6 +28,11 @@ class ReadIndexState {
   int readUser(int uid) => users[uid] ?? 0;
   int readGroup(int gid) => groups[gid] ?? 0;
 
+  /// Highest read mid for a DM peer, or null if no baseline has been
+  /// established yet (distinct from "read up to mid 0").
+  int? readUserOrNull(int uid) => users[uid];
+  int? readGroupOrNull(int gid) => groups[gid];
+
   ReadIndexState copyWith({Map<int, int>? users, Map<int, int>? groups}) =>
       ReadIndexState(users: users ?? this.users, groups: groups ?? this.groups);
 }
@@ -88,6 +93,28 @@ class ReadIndex extends _$ReadIndex {
     if (mid <= cur.readGroup(gid)) return;
     final next =
         cur.copyWith(groups: {...cur.groups, gid: mid});
+    state = AsyncData(next);
+    _persist(next);
+  }
+
+  /// Establish a read baseline for a DM the user has never read, so first
+  /// entry to the server doesn't surface its whole history as unread. No-op
+  /// if a record already exists (a real marker from user_settings wins).
+  void baselineUser(int uid, int mid) {
+    if (mid <= 0) return;
+    final cur = _current;
+    if (cur.users.containsKey(uid)) return;
+    final next = cur.copyWith(users: {...cur.users, uid: mid});
+    state = AsyncData(next);
+    _persist(next);
+  }
+
+  /// Channel variant of [baselineUser].
+  void baselineGroup(int gid, int mid) {
+    if (mid <= 0) return;
+    final cur = _current;
+    if (cur.groups.containsKey(gid)) return;
+    final next = cur.copyWith(groups: {...cur.groups, gid: mid});
     state = AsyncData(next);
     _persist(next);
   }
