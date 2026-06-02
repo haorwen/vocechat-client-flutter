@@ -12,14 +12,28 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Flutter
+    - name: Set up Flutter with Cache
       uses: subosito/flutter-action@v2
       with:
         channel: 'stable'
+        # 🌟 开启官方 Flutter 缓存：如果缓存命中，将直接跳过下载和解压 SDK 的过程
+        cache: true
+        # 可以显式指定一个固定的缓存 Key，方便管理（可选）
+        cache-key: "flutter-:channel:-:version:-:arch:-:hash:"
+
+    - name: Cache Pub dependencies
+      # 🌟 顺便把 pub get 的依赖包也缓存起来，避免每次都去网络下载依赖
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.pub-cache
+          .dart_tool/pub
+        key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pub-
 
     - name: Install Tools
       run: |
-        # 安装用于制作 DMG 的工具
         brew install create-dmg
 
     - name: Install dependencies
@@ -33,8 +47,6 @@ jobs:
     - name: Create DMG Packages
       run: |
         cd build/macos/Build/Products/Release/
-        
-        # 使用你项目的真实名称 vocechat_client 制作 dmg 镜像
         create-dmg \
           --volname "VoceChat Installer" \
           --window-pos 200 120 \
@@ -49,5 +61,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: VoceChat-macOS-Installer
-        # 只上传 dmg 格式，完美锁死并保留 Mac 文件的执行权限
         path: build/macos/Build/Products/Release/VoceChat-Client-Installer.dmg
