@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/network/dio_client.dart';
+import '../../auth/application/auth_controller.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
@@ -33,7 +33,8 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
     setState(() => _switching = true);
     final notifier = ref.read(serverStoreProvider.notifier);
     await notifier.selectServer(config.id);
-    VoceDioClient.setBaseUrl(config.baseUrl);
+    // Wait for auth controller to re-bootstrap with new server
+    await ref.read(authControllerProvider.future);
     if (mounted) context.go('/login');
   }
 
@@ -50,7 +51,8 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
           final notifier = ref.read(serverStoreProvider.notifier);
           await notifier.addServer(config);
           await notifier.selectServer(config.id);
-          VoceDioClient.setBaseUrl(config.baseUrl);
+          // Wait for auth controller to re-bootstrap with new server
+          await ref.read(authControllerProvider.future);
           if (mounted) context.go('/login');
         },
       ),
