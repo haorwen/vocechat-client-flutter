@@ -11,7 +11,12 @@
 	<key>uploadSymbols</key>
 	<true/>
 	<key>signingStyle</key>
-	<string>automatic</string>
+	<string>manual</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>com.privoce.vocechatclient</key>
+		<string>VoceChat AppStore</string>
+	</dict>
 	<key>destination</key>
 	<string>export</string>
 </dict>
