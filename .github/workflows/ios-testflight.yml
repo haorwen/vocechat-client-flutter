@@ -38,10 +38,8 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
-      - name: Install CocoaPods
-        run: |
-          cd ios
-          pod install
+      - name: Precache iOS artifacts
+        run: flutter precache --ios
 
       # --- Code signing setup ---
       # Required secrets:
