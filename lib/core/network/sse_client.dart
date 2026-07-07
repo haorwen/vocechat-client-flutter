@@ -36,6 +36,15 @@ part 'sse_client.g.dart';
 /// plus jitter. Web uses 20s; mirror that.
 const Duration _kSseWatchdog = Duration(seconds: 20);
 
+/// Hard cap on a single `WebSocket.connect` handshake. On a silently-dropped
+/// idle link (NAT/firewall reaped the TCP flow without an RST) the SYN of a
+/// reconnect goes nowhere and the handshake hangs *forever* — there is no
+/// default timeout on `WebSocket.connect`. Without this, a watchdog-driven
+/// reconnect can deadlock the whole stream: the old socket never errored, the
+/// new one never completes, and no further reconnect is ever scheduled. This
+/// timeout converts that hang into a normal "connect failed → backoff retry".
+const Duration _kConnectTimeout = Duration(seconds: 15);
+
 class VoceSseClient {
   VoceSseClient({
     required this.baseUrl,
@@ -70,6 +79,15 @@ class VoceSseClient {
   /// assume the link is dead and force a reconnect.
   Timer? _watchdog;
 
+  /// Monotonic connection generation. Bumped on every [_cleanup]. Each
+  /// connect attempt captures the generation it was started under; any
+  /// callback (onDone/onError/listen/connect-completion) that fires for a
+  /// stale generation is ignored. This is what prevents a torn-down socket's
+  /// late `onDone` from racing the watchdog's fresh reconnect and spawning a
+  /// second, competing reconnect chain (two sockets, two watchdogs clobbering
+  /// each other's fields).
+  int _generation = 0;
+
   /// Set when the consumer (provider dispose) tears us down explicitly —
   /// suppresses any in-flight reconnect schedules.
   bool _disposed = false;
@@ -99,10 +117,18 @@ class VoceSseClient {
       StreamController<ChatEvent> controller, Duration currentDelay) async {
     if (_disposed || controller.isClosed) return;
 
+    // Capture the generation this attempt belongs to. _cleanup() bumps
+    // _generation, so any callback below that fires after a teardown sees a
+    // mismatch and bails — no stale reconnect chains.
+    final myGen = _generation;
+    bool isStale() =>
+        _disposed || controller.isClosed || myGen != _generation;
+
     // Renew the access token before every (re)connect so reconnects after
     // expiry don't loop with a stale key. A null return means "keep current".
     if (refreshToken != null) {
       final fresh = await refreshToken!();
+      if (isStale()) return;
       if (fresh != null && fresh.isNotEmpty) {
         _apiKey = fresh;
       }
@@ -121,15 +147,30 @@ class VoceSseClient {
 
     WebSocket socket;
     try {
+      // `.timeout` is the critical guard: a silently-dropped idle link makes
+      // the handshake hang indefinitely (no default connect timeout). Bound
+      // it so the hang becomes a normal "connect failed → backoff" instead of
+      // a permanent dead stream.
       socket = await WebSocket.connect(
         url,
         headers: {'X-API-Key': _apiKey},
-      );
+      ).timeout(_kConnectTimeout);
     } catch (e) {
       AppLog.w(LogTag.sse, () => '⚠️ SSE connect failed: $e');
+      if (isStale()) return;
       _scheduleReconnect(controller, currentDelay);
       return;
     }
+
+    // We may have been torn down (dispose / connectivity invalidate / a newer
+    // reconnect) while awaiting the handshake. If so, this socket is an
+    // orphan: close it and bail without wiring listeners or touching shared
+    // fields, otherwise it would clobber the live connection's _socket/_sub.
+    if (isStale()) {
+      socket.close().catchError((_) {});
+      return;
+    }
+
     // WebSocket-protocol-level ping. Lower-cost than the business-layer
     // watchdog but doesn't catch app-layer hangs — both work together.
     socket.pingInterval = const Duration(seconds: 30);
@@ -139,7 +180,7 @@ class VoceSseClient {
     _armWatchdog(controller);
     _sub = socket.listen(
       (frame) async {
-        if (_disposed || controller.isClosed) return;
+        if (isStale()) return;
         // Any frame at all means the link is alive. Reset the watchdog.
         _armWatchdog(controller);
         if (firstFrame) {
@@ -169,7 +210,7 @@ class VoceSseClient {
           } catch (_) {
             chatEvent = ChatEvent.unknown(type: eventType, raw: trimmed);
           }
-          if (controller.isClosed) return;
+          if (isStale()) return;
         }
 
         if (chatEvent is ChatEventChat) {
@@ -182,10 +223,12 @@ class VoceSseClient {
       },
       onError: (e) {
         AppLog.w(LogTag.sse, () => '⚠️ SSE socket error: $e');
+        if (isStale()) return;
         _scheduleReconnect(controller, currentDelay);
       },
       onDone: () {
         AppLog.w(LogTag.sse, () => '🔌 SSE socket closed');
+        if (isStale()) return;
         _scheduleReconnect(controller, currentDelay);
       },
       cancelOnError: false,
@@ -216,6 +259,10 @@ class VoceSseClient {
   }
 
   void _cleanup() {
+    // Invalidate the current generation so any in-flight connect attempt and
+    // any still-queued onDone/onError/listen callback from the socket we're
+    // tearing down become no-ops (see isStale() in _connect).
+    _generation++;
     _watchdog?.cancel();
     _watchdog = null;
     _sub?.cancel();

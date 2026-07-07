@@ -134,6 +134,11 @@ class VoceDioClient {
 // AuthInterceptor
 // ---------------------------------------------------------------------------
 
+/// Marker key set in `RequestOptions.extra` on the `/api/token/renew` call so
+/// the interceptor can recognise the renew request and NOT recurse into the
+/// refresh logic when the renew itself returns 401 (dead refresh token).
+const String _kRenewRequest = '__voce_renew_request__';
+
 class _AuthInterceptor extends Interceptor {
   _AuthInterceptor(this._dio, this._ref);
 
@@ -213,6 +218,19 @@ class _AuthInterceptor extends Interceptor {
     );
 
     if (statusCode == 401) {
+      // CRITICAL: the renew call below is itself a Dio request and goes
+      // through this same interceptor. When the refresh token is also dead,
+      // `/api/token/renew` returns 401 (server: RenewTokenApiResponse maps
+      // IllegalToken → 401). If we let that 401 re-enter the refresh logic it
+      // sees `_refreshing != null` (the outer renew still holds the lock) and
+      // does `await _refreshing!.future` — i.e. the renew awaits ITSELF and
+      // deadlocks forever, wedging the whole client. So a 401 ON the renew
+      // request must skip refresh handling entirely and fall through to the
+      // normal error mapping.
+      if (err.requestOptions.extra[_kRenewRequest] == true) {
+        AppLog.w(LogTag.token,
+            () => '🔑 renew request itself returned 401 — refresh token dead');
+      } else {
       final serverId =
           _ref.read(serverStoreProvider).valueOrNull?.currentServerId;
       if (serverId == null) {
@@ -221,10 +239,13 @@ class _AuthInterceptor extends Interceptor {
       }
       final store = _ref.read(secureTokenStoreProvider(serverId));
 
-      // If a refresh is already in progress, await it then retry
-      if (_refreshing != null) {
+      // If a refresh is already in progress, await it then retry. Capture the
+      // completer into a local first: the owning renew clears [_refreshing] in
+      // its finally, so reading the field again after the await could NPE.
+      final inFlight = _refreshing;
+      if (inFlight != null) {
         try {
-          await _refreshing!.future;
+          await inFlight.future;
           final tokens = await store.readTokens();
           if (tokens != null) {
             final retryOptions = err.requestOptions;
@@ -246,40 +267,83 @@ class _AuthInterceptor extends Interceptor {
         return;
       }
 
-      _refreshing = Completer<void>();
+      // Critical section: exactly one in-flight renew, guarded by
+      // [_refreshing]. The cardinal rule here is that the completer MUST be
+      // settled and cleared on EVERY exit path — otherwise a leaked pending
+      // completer wedges the whole client: every later 401 awaits a future
+      // that never completes, and all token-requiring requests hang forever
+      // (observed as "after idling a while, nothing can be sent"). The renew
+      // body does unguarded `as` casts on the response shape, which throw
+      // *non-DioException* TypeErrors on an unexpected body — a path the old
+      // `on DioException catch` missed, leaking the lock. We therefore catch
+      // *everything* and settle the completer in a finally.
+      final refreshing = _refreshing = Completer<void>();
+      bool renewed = false;
+      String? newAccess;
       try {
         final renewResp = await _dio.post(
           '/api/token/renew',
           data: {'refresh_token': tokens.refreshToken},
-          options: Options(headers: {'X-API-Key': null}),
+          options: Options(
+            headers: {'X-API-Key': null},
+            extra: {_kRenewRequest: true},
+          ),
         );
-        final newAccess = renewResp.data['token'] as String;
-        final newRefresh = renewResp.data['refresh_token'] as String;
-        final expiredIn = renewResp.data['expired_in'] as int;
-        await store.saveTokens(
-          access: newAccess,
-          refresh: newRefresh,
-          expiresAt: DateTime.now().add(Duration(seconds: expiredIn)),
-        );
-        _refreshing!.complete();
-        _refreshing = null;
+        final data = renewResp.data;
+        final access = data is Map ? data['token'] : null;
+        final refresh = data is Map ? data['refresh_token'] : null;
+        final expiredIn = data is Map ? data['expired_in'] : null;
+        if (access is String &&
+            access.isNotEmpty &&
+            refresh is String &&
+            expiredIn is int) {
+          await store.saveTokens(
+            access: access,
+            refresh: refresh,
+            expiresAt: DateTime.now().add(Duration(seconds: expiredIn)),
+          );
+          newAccess = access;
+          renewed = true;
+        } else {
+          AppLog.w(
+            LogTag.token,
+            () => '🔑 token renew returned unexpected body shape; treating as failure',
+          );
+        }
+      } on DioException catch (renewErr) {
+        AppLog.w(LogTag.token, () => '🔑 token renew failed: ${renewErr.type}');
+        // A 401 on the renew call itself means the refresh token is dead.
+        if (renewErr.response?.statusCode == 401) {
+          await store.clear();
+        }
+      } catch (e) {
+        // Cast/Type errors on an unexpected renew body, or anything else.
+        AppLog.w(LogTag.token, () => '🔑 token renew threw: $e');
+      } finally {
+        // ALWAYS settle + clear, no matter how we exited above.
+        if (!refreshing.isCompleted) refreshing.complete();
+        if (identical(_refreshing, refreshing)) _refreshing = null;
+      }
 
-        // Retry original request with new token
+      if (!renewed || newAccess == null) {
+        // Renew failed — reject the original request. Do NOT loop.
+        handler.next(err);
+        return;
+      }
+
+      // Renew succeeded. Retry the original request with the fresh token.
+      // This is OUTSIDE the lock: a failure here must not clear auth or be
+      // mistaken for a renew failure.
+      try {
         final retryOptions = err.requestOptions;
         retryOptions.headers['X-API-Key'] = newAccess;
         final retryResponse = await _dio.fetch(retryOptions);
         handler.resolve(retryResponse);
-        return;
       } on DioException catch (retryErr) {
-        _refreshing!.completeError(retryErr);
-        _refreshing = null;
-        if (retryErr.response?.statusCode == 401) {
-          // Second 401 – clear auth
-          await store.clear();
-        }
         handler.next(retryErr);
-        return;
       }
+      return;
+      } // end else (not the renew request's own 401)
     }
 
     // Convert non-2xx to ApiException
