@@ -478,6 +478,15 @@ class MessageCache {
     try {
       await _db.delete('messages');
       await _db.delete('meta');
+      // DELETE only marks pages as free — the .db file keeps its size, so the
+      // settings "storage usage" readout would show no change. Truncate the
+      // WAL sidecar and VACUUM to actually give the space back to the OS.
+      try {
+        await _db.execute('PRAGMA wal_checkpoint(TRUNCATE)');
+      } catch (_) {
+        // no-op when the DB isn't in WAL mode
+      }
+      await _db.execute('VACUUM');
     } catch (e) {
       AppLog.w(LogTag.chat, () => '⚠️ cache.clearAll failed: $e');
     }
