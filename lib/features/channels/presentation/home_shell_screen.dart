@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/sse_lifecycle.dart';
+import '../../../core/storage/server_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/widgets/voce_avatar.dart';
 import '../../messages/application/message_dispatcher.dart';
 import '../../messages/presentation/chat_tool_panels.dart';
 
@@ -163,7 +165,7 @@ class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
 // and a settings affordance pinned to the bottom.
 // ---------------------------------------------------------------------------
 
-class _DesktopLeftRail extends StatelessWidget {
+class _DesktopLeftRail extends ConsumerWidget {
   const _DesktopLeftRail({
     required this.currentIndex,
     required this.onDestinationSelected,
@@ -173,8 +175,19 @@ class _DesktopLeftRail extends StatelessWidget {
   final ValueChanged<int> onDestinationSelected;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l = AppL10n.of(context);
+
+    // Current server → organization logo served at
+    // GET /api/resource/organization/logo (see vocechat-server resource.rs;
+    // the server falls back to a default logo when none was uploaded).
+    final serverState = ref.watch(serverStoreProvider).valueOrNull;
+    final currentServer = serverState?.servers
+        .where((s) => s.id == serverState.currentServerId)
+        .firstOrNull;
+    final logoUrl = currentServer == null
+        ? null
+        : '${currentServer.baseUrl}/api/resource/organization/logo';
 
     return SizedBox(
       width: 72,
@@ -182,17 +195,13 @@ class _DesktopLeftRail extends StatelessWidget {
         children: [
           const SizedBox(height: 12),
           // Server header avatar (matches Figma 32px circular avatar at top).
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppTokens.primary50,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppTokens.gray200),
+          Tooltip(
+            message: currentServer?.name ?? '',
+            child: VoceAvatar(
+              name: currentServer?.name ?? '?',
+              imageUrl: logoUrl,
+              size: 40,
             ),
-            child: Icon(Icons.bolt_outlined,
-                size: 22, color: AppTokens.primary500),
           ),
           const SizedBox(height: 16),
           _RailItem(
