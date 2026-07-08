@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 /// A translucent pill-shaped loading indicator.
@@ -82,31 +84,82 @@ class LoadingCapsule extends StatelessWidget {
 /// Convenience overlay positioning the capsule discreetly at the bottom-right
 /// of its parent. The capsule renders in [LoadingCapsule.subtle] mode so a
 /// long background refresh doesn't hijack the user's attention.
-class LoadingCapsuleOverlay extends StatelessWidget {
+///
+/// Failsafe: if [visible] stays true past [maxVisibleDuration] the capsule
+/// fades out anyway. A background refresh that genuinely runs that long has
+/// stopped being useful signal, and a latched refreshing flag (provider torn
+/// down mid-refresh, unawaited error path) must not read as "stuck updating".
+class LoadingCapsuleOverlay extends StatefulWidget {
   const LoadingCapsuleOverlay({
     super.key,
     required this.visible,
     required this.label,
     this.bottomPadding = 10,
     this.rightPadding = 12,
+    this.maxVisibleDuration = const Duration(seconds: 25),
   });
 
   final bool visible;
   final String label;
   final double bottomPadding;
   final double rightPadding;
+  final Duration maxVisibleDuration;
+
+  @override
+  State<LoadingCapsuleOverlay> createState() => _LoadingCapsuleOverlayState();
+}
+
+class _LoadingCapsuleOverlayState extends State<LoadingCapsuleOverlay> {
+  Timer? _failsafe;
+  bool _expired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.visible) _armFailsafe();
+  }
+
+  @override
+  void didUpdateWidget(covariant LoadingCapsuleOverlay old) {
+    super.didUpdateWidget(old);
+    if (widget.visible != old.visible) {
+      if (widget.visible) {
+        // A new refresh cycle starts a fresh timeout window.
+        _expired = false;
+        _armFailsafe();
+      } else {
+        _failsafe?.cancel();
+        _failsafe = null;
+        _expired = false;
+      }
+    }
+  }
+
+  void _armFailsafe() {
+    _failsafe?.cancel();
+    _failsafe = Timer(widget.maxVisibleDuration, () {
+      if (mounted) setState(() => _expired = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _failsafe?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final show = widget.visible && !_expired;
     return Positioned(
-      right: rightPadding,
-      bottom: bottomPadding,
+      right: widget.rightPadding,
+      bottom: widget.bottomPadding,
       child: IgnorePointer(
         ignoring: true,
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 220),
-          opacity: visible ? 1 : 0,
-          child: LoadingCapsule(label: label, subtle: true),
+          opacity: show ? 1 : 0,
+          child: LoadingCapsule(label: widget.label, subtle: true),
         ),
       ),
     );

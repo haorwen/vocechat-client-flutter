@@ -210,8 +210,28 @@ class Conversations extends _$Conversations {
   final Map<ConversationKey, ChatMessage> _pendingPatches = {};
   bool _patchScheduled = false;
 
+  /// Single-flight guard: pull-to-refresh, SSE "unknown conversation"
+  /// triggers, and delete echoes can all request a refresh in the same
+  /// window. Running them concurrently multiplies the getHistory fan-out
+  /// and makes the refreshing flag flap; instead everyone shares one run.
+  Future<void>? _refreshInFlight;
+
+  /// Conversation keys that arrived via SSE but were NOT present in the
+  /// roster even after a refresh. Without this set, every further message
+  /// from such a conversation retriggers a full refresh — an endless
+  /// refresh loop that keeps the "updating" capsule on screen forever.
+  final Set<ConversationKey> _unresolvedRosterKeys = {};
+
   @override
   Future<List<ConversationItem>> build() async {
+    // This notifier can be rebuilt mid-refresh (server switch invalidates
+    // messageCacheProvider; "clear cache" invalidates us directly). The old
+    // instance's `finally` can no longer touch providers through its dead
+    // ref, which would leave the refreshing flag latched to `true` — the
+    // "stuck updating capsule" bug. Reset it as the new instance spins up.
+    // Deferred to a microtask because mutating another provider synchronously
+    // inside build() is not allowed.
+    Future.microtask(() => _setRefreshing(false));
     bootLog('20 Conversations.build: await messageCacheProvider');
     final cache = await ref.watch(messageCacheProvider.future);
     _cache = cache;
@@ -281,8 +301,33 @@ class Conversations extends _$Conversations {
     if (_cache != null) _persist(_cache!, filtered);
   }
 
-  Future<void> _refreshFromNetwork(MessageCache cache) async {
-    ref.read(conversationsRefreshingProvider.notifier).set(true);
+  Future<void> _refreshFromNetwork(MessageCache cache) {
+    // Single-flight: concurrent triggers (pull-to-refresh + SSE unknown-key
+    // + delete echo) await the same run instead of stacking fan-outs and
+    // flapping the refreshing capsule.
+    final inFlight = _refreshInFlight;
+    if (inFlight != null) return inFlight;
+    final run = _doRefreshFromNetwork(cache).whenComplete(() {
+      _refreshInFlight = null;
+    });
+    _refreshInFlight = run;
+    return run;
+  }
+
+  /// Set the shared "refresh in flight" flag, tolerating a disposed ref.
+  /// This notifier is keepAlive but still rebuilds on server switch / cache
+  /// clear; a refresh that spans that rebuild must not crash — and, more
+  /// importantly, must not strand the capsule in the visible state.
+  void _setRefreshing(bool value) {
+    try {
+      ref.read(conversationsRefreshingProvider.notifier).set(value);
+    } catch (_) {
+      // ref already disposed — the new notifier instance resets the flag.
+    }
+  }
+
+  Future<void> _doRefreshFromNetwork(MessageCache cache) async {
+    _setRefreshing(true);
     try {
       final base = await _fetchBaseRoster();
       if (base.isEmpty) return;
@@ -301,16 +346,27 @@ class Conversations extends _$Conversations {
           lastFromUid: existing.lastFromUid,
         );
       }).toList();
+      // Keys the roster now knows about are no longer "unresolved" — a
+      // future unknown-key SSE message for them may retrigger a refresh.
+      _unresolvedRosterKeys
+          .removeWhere((k) => merged.any((c) => c.key == k));
       final sorted = _sorted(merged);
       state = AsyncData(sorted);
       _persist(cache, sorted);
+
+      // The roster is on screen — drop the capsule NOW. The per-conversation
+      // preview fan-out below can take tens of seconds on a large workspace
+      // (N conversations / 3 concurrent, each up to the 30s receive timeout);
+      // keeping the capsule up for all of it reads as "stuck updating".
+      // Enriched previews drip into the list silently instead.
+      _setRefreshing(false);
 
       // Background enrichment — preview updates flow incrementally.
       await _enrichPreviews(cache, base);
     } catch (_) {
       // ignore — cached state stays valid
     } finally {
-      ref.read(conversationsRefreshingProvider.notifier).set(false);
+      _setRefreshing(false);
     }
   }
 
@@ -546,7 +602,14 @@ class Conversations extends _$Conversations {
       final msg = entry.value;
       final idx = next.indexWhere((c) => c.key == targetKey);
       if (idx < 0) {
-        needsRefresh = true;
+        // Unknown conversation. Only refresh for keys we haven't already
+        // tried to resolve — if a previous refresh came back WITHOUT this
+        // key (deactivated user, hidden bot, channel we can't list), every
+        // subsequent message from it would otherwise re-fire a full roster
+        // refresh, pinning the "updating" capsule on screen indefinitely.
+        if (_unresolvedRosterKeys.add(targetKey)) {
+          needsRefresh = true;
+        }
         continue;
       }
       final old = next[idx];
