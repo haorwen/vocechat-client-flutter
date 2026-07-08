@@ -14,6 +14,7 @@ import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/voce_avatar.dart';
+import '../../../shared/widgets/voce_dialog.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../channels/application/conversation_providers.dart';
 import '../../messages/data/message_cache.dart';
@@ -80,29 +81,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (mounted) context.go('/server-picker');
   }
 
-  void _confirmLogout() {
+  Future<void> _confirmLogout() async {
     final l = AppL10n.of(context);
-    showDialog<void>(
+    final ok = await showVoceConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.settingsLogoutConfirmTitle),
-        content: Text(l.settingsLogoutConfirmContent),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(l.actionCancel),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              _logout();
-            },
-            style: TextButton.styleFrom(foregroundColor: AppTokens.error),
-            child: Text(l.settingsLogout),
-          ),
-        ],
-      ),
+      title: l.settingsLogoutConfirmTitle,
+      body: l.settingsLogoutConfirmContent,
+      confirmLabel: l.settingsLogout,
+      cancelLabel: l.actionCancel,
+      danger: true,
     );
+    if (ok == true) await _logout();
   }
 
   @override
@@ -513,12 +502,12 @@ class _SecondaryButton extends StatelessWidget {
     final fg = AppTokens.gray700;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: AppTokens.surface,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppTokens.gray300, width: 1),
         ),
         child: Row(
@@ -1162,22 +1151,13 @@ class _StoragePaneState extends ConsumerState<_StoragePane> {
   Future<void> _clearCache() async {
     if (_clearing) return;
     final l = AppL10n.of(context);
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showVoceConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.storageClearCacheConfirmTitle),
-        content: Text(l.storageClearCacheConfirmBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l.actionCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l.storageClearCacheConfirm),
-          ),
-        ],
-      ),
+      title: l.storageClearCacheConfirmTitle,
+      body: l.storageClearCacheConfirmBody,
+      confirmLabel: l.storageClearCacheConfirm,
+      cancelLabel: l.actionCancel,
+      danger: true,
     );
     if (confirmed != true) return;
 

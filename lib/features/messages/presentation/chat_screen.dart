@@ -24,6 +24,7 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/loading_capsule.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../../../shared/widgets/voce_context_menu.dart';
+import '../../../shared/widgets/voce_dialog.dart';
 import '../application/chat_controller.dart';
 import '../application/chat_tools_provider.dart';
 import '../application/read_index_provider.dart';
@@ -568,23 +569,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _confirmDelete(ChatMessage msg) async {
     final l = AppL10n.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showVoceConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.chatDeleteConfirmTitle),
-        content: Text(l.chatDeleteConfirmBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l.actionCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l.chatActionDelete,
-                style: TextStyle(color: AppTokens.error)),
-          ),
-        ],
-      ),
+      title: l.chatDeleteConfirmTitle,
+      body: l.chatDeleteConfirmBody,
+      confirmLabel: l.chatActionDelete,
+      cancelLabel: l.actionCancel,
+      danger: true,
     );
     if (ok != true || !mounted) return;
     try {
@@ -2747,7 +2738,7 @@ class _EditForm extends StatelessWidget {
               child: Text(l.chatEditCancel),
             ),
             const SizedBox(width: 6),
-            ElevatedButton(
+            FilledButton(
               onPressed: onSave,
               child: Text(l.chatEditSave),
             ),

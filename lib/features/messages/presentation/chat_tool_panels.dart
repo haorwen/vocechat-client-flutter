@@ -501,13 +501,6 @@ class _AutoDeletePanelState extends ConsumerState<_AutoDeletePanel> {
             width: double.infinity,
             child: FilledButton(
               onPressed: _saving ? null : _save,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppTokens.primary500,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
               child: _saving
                   ? const SizedBox(
                       width: 18,

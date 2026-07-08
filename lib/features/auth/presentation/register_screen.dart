@@ -253,9 +253,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   label:
                       Text(l.registerMagicLink),
                   style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 52),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                    minimumSize: const Size(double.infinity, 44),
                   ),
                 ),
                 const SizedBox(height: 24),

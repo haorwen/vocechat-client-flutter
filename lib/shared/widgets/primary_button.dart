@@ -40,15 +40,10 @@ class PrimaryButton extends StatelessWidget {
             : Text(label));
 
     return SizedBox(
-      height: 52,
+      height: 44,
       width: double.infinity,
       child: FilledButton(
         onPressed: isLoading ? null : onPressed,
-        style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
         child: child,
       ),
     );

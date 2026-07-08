@@ -410,9 +410,7 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
                       : Icons.wifi),
               label: Text(safeText(_testing ? l.serverTesting : l.serverTestConnection)),
               style: OutlinedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                minimumSize: const Size(double.infinity, 44),
               ),
             ),
             const SizedBox(height: 12),

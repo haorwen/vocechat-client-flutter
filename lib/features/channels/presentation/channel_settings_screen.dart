@@ -13,6 +13,7 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../../shared/widgets/voce_avatar.dart';
+import '../../../shared/widgets/voce_dialog.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../contacts/application/user_directory_provider.dart';
 import '../application/muted_chats_provider.dart';
@@ -205,23 +206,13 @@ class _ChannelSettingsScreenState
 
   Future<void> _confirmLeave(int gid) async {
     final l = AppL10n.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showVoceConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.chatListLeave),
-        content: Text(l.channelLeaveConfirmBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l.actionCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child:
-                Text(l.actionLeave, style: TextStyle(color: AppTokens.error)),
-          ),
-        ],
-      ),
+      title: l.chatListLeave,
+      body: l.channelLeaveConfirmBody,
+      confirmLabel: l.actionLeave,
+      cancelLabel: l.actionCancel,
+      danger: true,
     );
     if (ok != true || !mounted) return;
     try {
@@ -238,23 +229,13 @@ class _ChannelSettingsScreenState
 
   Future<void> _confirmDelete(int gid) async {
     final l = AppL10n.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showVoceConfirm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l.channelDeleteTitle),
-        content: Text(l.channelDeleteConfirmBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l.actionCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l.chatActionDelete,
-                style: TextStyle(color: AppTokens.error)),
-          ),
-        ],
-      ),
+      title: l.channelDeleteTitle,
+      body: l.channelDeleteConfirmBody,
+      confirmLabel: l.chatActionDelete,
+      cancelLabel: l.actionCancel,
+      danger: true,
     );
     if (ok != true || !mounted) return;
     try {
