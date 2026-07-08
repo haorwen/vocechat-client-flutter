@@ -164,9 +164,6 @@ class AppL10nEn extends AppL10n {
   String get navSaved => 'Saved';
 
   @override
-  String get navFiles => 'Files';
-
-  @override
   String get comingSoon => 'Coming soon';
 
   @override

@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/voce_avatar.dart';
+import '../../auth/application/auth_controller.dart';
 import '../../contacts/application/user_directory_provider.dart';
 import '../application/burn_after_read_provider.dart';
 import '../application/chat_tools_provider.dart';
@@ -30,8 +31,6 @@ Future<void> showChatToolOverlay(
   required int targetId,
   required bool isChannel,
 }) {
-  final size = MediaQuery.sizeOf(context);
-  final isWide = size.width >= 700;
   final l = AppL10n.of(context);
   final String title = switch (tool) {
     ChatTool.pin => l.chatToolPin,
@@ -40,18 +39,25 @@ Future<void> showChatToolOverlay(
     ChatTool.autoDelete => l.chatAutoDeleteTitle,
   };
 
-  Widget body() {
-    switch (tool) {
-      case ChatTool.pin:
-        return _PinListPanel(gid: targetId);
-      case ChatTool.saved:
-        return _FavListPanel(targetId: targetId, isChannel: isChannel);
-      case ChatTool.members:
-        return _MembersListPanel(gid: targetId);
-      case ChatTool.autoDelete:
-        return _AutoDeletePanel(targetId: targetId, isChannel: isChannel);
-    }
-  }
+  final Widget body = switch (tool) {
+    ChatTool.pin => _PinListPanel(gid: targetId),
+    ChatTool.saved => _FavListPanel(targetId: targetId, isChannel: isChannel),
+    ChatTool.members => _MembersListPanel(gid: targetId),
+    ChatTool.autoDelete =>
+      _AutoDeletePanel(targetId: targetId, isChannel: isChannel),
+  };
+
+  return _showToolCardOverlay(context, title: title, body: body);
+}
+
+Future<void> _showToolCardOverlay(
+  BuildContext context, {
+  required String title,
+  required Widget body,
+}) {
+  final size = MediaQuery.sizeOf(context);
+  final isWide = size.width >= 700;
+  final l = AppL10n.of(context);
 
   if (isWide) {
     // Anchored right-side popover.
@@ -68,7 +74,7 @@ Future<void> showChatToolOverlay(
               padding: const EdgeInsets.only(right: 76, top: 16, bottom: 16),
               child: Material(
                 color: Colors.transparent,
-                child: _ToolCard(title: title, child: body()),
+                child: _ToolCard(title: title, child: body),
               ),
             ),
           ),
@@ -99,7 +105,7 @@ Future<void> showChatToolOverlay(
     builder: (ctx) {
       return FractionallySizedBox(
         heightFactor: 0.92,
-        child: _ToolCard(title: title, narrow: true, child: body()),
+        child: _ToolCard(title: title, narrow: true, child: body),
       );
     },
   );
@@ -250,19 +256,59 @@ class _PinListPanel extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Favorite list — reads favoritesProvider
+// Favorite list — reads favoritesProvider.
+//
+// Web reference: routes/chat/FavList.tsx + hooks/useFavMessage.ts (chat
+// scope) and routes/favs/index.tsx (global scope). When [targetId] is set,
+// an archive is shown only when every bundled message's `source` matches
+// this channel (gid) or DM peer (uid); when null all favorites are shown,
+// each with a source line ("# channel" / "From user"). Author name/avatar
+// come from the archive's own denormalized `users` list — the avatar is an
+// archive attachment served by
+// GET /api/favorite/attachment/:uid/:id/:attachment_id (uid = the favoriting
+// user, i.e. the current user).
 // ---------------------------------------------------------------------------
+
+/// Standalone favorites overlay (all favorites, ungated by conversation) —
+/// used by the desktop left rail's "Saved" destination.
+Future<void> showFavoritesOverlay(BuildContext context) {
+  return _showToolCardOverlay(
+    context,
+    title: AppL10n.of(context).chatToolSaved,
+    body: const _FavListPanel(targetId: null, isChannel: null),
+  );
+}
 
 class _FavListPanel extends ConsumerWidget {
   const _FavListPanel({required this.targetId, required this.isChannel});
-  final int targetId;
-  final bool isChannel;
+
+  /// Conversation filter — null shows every favorite (global view).
+  final int? targetId;
+  final bool? isChannel;
+
+  bool _matchesConversation(FavoriteArchive fav) {
+    final id = targetId;
+    if (id == null) return true;
+    final messages = fav.archive.messages;
+    if (messages.isEmpty) return false;
+    return messages.every((m) {
+      final source = m.source;
+      if (source == null) return false;
+      return source.map(
+        user: (s) => isChannel == false && s.uid == id,
+        group: (s) => isChannel == true && s.gid == id,
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppL10n.of(context);
     final favsAsync = ref.watch(favoritesProvider);
-    final userDir = ref.watch(userDirectoryProvider).valueOrNull ?? {};
+
+    final authState = ref.watch(authControllerProvider).valueOrNull;
+    final currentUid =
+        authState is AuthStateAuthenticated ? authState.user.uid : 0;
 
     return favsAsync.when(
       loading: () => const Center(
@@ -272,50 +318,262 @@ class _FavListPanel extends ConsumerWidget {
         ),
       ),
       error: (e, _) => _EmptyState(label: l.errorPrefix(e.toString())),
-      data: (favs) {
+      data: (all) {
+        final favs = all.where(_matchesConversation).toList(growable: false);
         if (favs.isEmpty) {
           return _EmptyState(label: l.chatToolSavedEmpty);
         }
         return ListView.separated(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.all(12),
           itemCount: favs.length,
-          separatorBuilder: (_, __) =>
-              Divider(height: 1, color: AppTokens.gray200),
-          itemBuilder: (ctx, i) {
-            final fav = favs[i];
-            final first =
-                fav.messages.isNotEmpty ? fav.messages.first : null;
-            final user = first != null ? userDir[first.fromUid] : null;
-            return _MessageListTile(
-              name: user?.name ??
-                  (first != null
-                      ? l.chatUserFallback(first.fromUid)
-                      : '—'),
-              avatarUrl:
-                  _userAvatarUrl(ref, first?.fromUid ?? 0, user?.avatarUpdatedAt),
-              createdAt: fav.createdAt,
-              content: first?.content ?? '',
-              contentType: first?.contentType ?? 'text/plain',
-              trailing: IconButton(
-                tooltip: l.chatToolRemoveFav,
-                icon: Icon(Icons.close,
-                    size: 16, color: AppTokens.gray500),
-                onPressed: () async {
-                  final ok = await ref
-                      .read(favoritesProvider.notifier)
-                      .remove(fav.id);
-                  if (!ctx.mounted) return;
-                  if (!ok) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                      content: Text(l.chatToolRemoveFavFail),
-                    ));
-                  }
-                },
-              ),
-            );
-          },
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (ctx, i) => _FavArchiveCard(
+            fav: favs[i],
+            currentUid: currentUid,
+            showSource: targetId == null,
+          ),
         );
       },
+    );
+  }
+}
+
+/// One favorite archive rendered as a card: bundled messages with the
+/// archive's own author info, save date, and a remove button.
+class _FavArchiveCard extends ConsumerWidget {
+  const _FavArchiveCard({
+    required this.fav,
+    required this.currentUid,
+    this.showSource = false,
+  });
+
+  final FavoriteArchive fav;
+  final int currentUid;
+  final bool showSource;
+
+  String? _attachmentUrl(WidgetRef ref, int? attachmentId) {
+    if (attachmentId == null || currentUid <= 0) return null;
+    final serverState = ref.read(serverStoreProvider).valueOrNull;
+    final server = serverState?.servers
+        .where((s) => s.id == serverState.currentServerId)
+        .firstOrNull;
+    final base = server?.baseUrl ?? '';
+    if (base.isEmpty) return null;
+    return '$base/api/favorite/attachment/$currentUid/${fav.id}/$attachmentId';
+  }
+
+  String _preview(AppL10n l, ArchiveMessageBody body) {
+    final ct = body.contentType;
+    if (ct == 'text/plain' || ct == 'text/markdown') {
+      return (body.content ?? '').trim();
+    }
+    if (ct == 'vocechat/file') {
+      final fileType =
+          (body.properties?['content_type'] as String?) ?? '';
+      final name = body.properties?['name'] as String?;
+      if (fileType.startsWith('image/')) {
+        return name == null ? l.previewImage : '${l.previewImage} $name';
+      }
+      return name ?? l.previewFile;
+    }
+    if (ct == 'vocechat/archive') return l.archiveForwardedLabel;
+    return '[${ct.split('/').last}]';
+  }
+
+  String _formatDate(int createdAt) {
+    if (createdAt == 0) return '';
+    final dt =
+        DateTime.fromMillisecondsSinceEpoch(createdAt, isUtc: true).toLocal();
+    final mo = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    return '${dt.year}-$mo-$d';
+  }
+
+  /// "# channel-name" / "From user-name" line for the global view, derived
+  /// from the first bundled message's source (mirrors web routes/favs).
+  Widget? _sourceLabel(BuildContext context, WidgetRef ref) {
+    final l = AppL10n.of(context);
+    final source = fav.archive.messages.firstOrNull?.source;
+    if (source == null) return null;
+    final userDir = ref.watch(userDirectoryProvider).valueOrNull ?? {};
+    final groupDir = ref.watch(groupDirectoryProvider).valueOrNull ?? {};
+    final (IconData icon, String label) = source.map(
+      user: (s) => (
+        Icons.person_outline,
+        userDir[s.uid]?.name ?? l.chatUserFallback(s.uid),
+      ),
+      group: (s) => (
+        Icons.tag,
+        groupDir[s.gid]?.name ?? l.chatGroupFallback(s.gid),
+      ),
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: AppTokens.gray400),
+        const SizedBox(width: 3),
+        Flexible(
+          child: Text(
+            safeText(label),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppTokens.gray500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppL10n.of(context);
+    final archive = fav.archive;
+    final sourceLabel = showSource ? _sourceLabel(context, ref) : null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTokens.canvasAlt,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTokens.borderSubtle),
+      ),
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (sourceLabel != null) ...[
+                Flexible(child: sourceLabel),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Text(
+                  _formatDate(fav.createdAt),
+                  style: TextStyle(fontSize: 12, color: AppTokens.gray400),
+                ),
+              ),
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  tooltip: l.chatToolRemoveFav,
+                  icon: Icon(Icons.close, size: 16, color: AppTokens.gray500),
+                  onPressed: () async {
+                    final ok = await ref
+                        .read(favoritesProvider.notifier)
+                        .remove(fav.id);
+                    if (!context.mounted) return;
+                    if (!ok) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(l.chatToolRemoveFavFail),
+                      ));
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          for (var i = 0; i < archive.messages.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            _favMessageRow(context, ref, archive, archive.messages[i]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _favMessageRow(
+    BuildContext context,
+    WidgetRef ref,
+    Archive archive,
+    ArchiveMessage message,
+  ) {
+    final l = AppL10n.of(context);
+    final user =
+        (message.fromUser >= 0 && message.fromUser < archive.users.length)
+            ? archive.users[message.fromUser]
+            : null;
+    final name = user?.name ?? '';
+    final avatarUrl = _attachmentUrl(ref, user?.avatar);
+
+    // Image favorites render the actual thumbnail (served straight from the
+    // archive attachment endpoint); everything else gets a text preview.
+    final body = message.content;
+    final fileType = (body.properties?['content_type'] as String?) ?? '';
+    final isImage = body.contentType == 'vocechat/file' &&
+        fileType.startsWith('image/') &&
+        body.fileId != null;
+    final imageUrl =
+        isImage ? _attachmentUrl(ref, body.thumbnailId ?? body.fileId) : null;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        VoceAvatar(name: name, imageUrl: avatarUrl, size: 32),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      safeText(name),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppTokens.textHeading,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    _formatDate(message.createdAt),
+                    style: TextStyle(fontSize: 11, color: AppTokens.gray400),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 3),
+              if (imageUrl != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: ConstrainedBox(
+                    constraints:
+                        const BoxConstraints(maxWidth: 220, maxHeight: 160),
+                    child: Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Text(
+                        l.previewImage,
+                        style: TextStyle(
+                            fontSize: 13, color: AppTokens.gray600),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Text(
+                  safeText(_preview(l, body)),
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppTokens.gray600,
+                    height: 1.4,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

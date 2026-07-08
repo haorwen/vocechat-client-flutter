@@ -398,6 +398,7 @@ class ArchiveMessage {
     required this.createdAt,
     required this.mid,
     required this.content,
+    this.source,
   });
 
   /// Index into [Archive.users] — NOT a uid.
@@ -406,6 +407,19 @@ class ArchiveMessage {
   final int mid;
   final ArchiveMessageBody content;
 
+  /// Where the original message lived: `{"uid":N}` for a DM (always the
+  /// peer's uid — the server rewrites own-sent DMs) or `{"gid":N}` for a
+  /// channel. Used by the favorites panel to filter by conversation.
+  final MessageTarget? source;
+
+  static MessageTarget? _sourceFromJson(Object? v) {
+    if (v is Map<String, dynamic> &&
+        (v.containsKey('uid') || v.containsKey('gid'))) {
+      return MessageTarget.fromJson(v);
+    }
+    return null;
+  }
+
   factory ArchiveMessage.fromJson(Map<String, dynamic> j) => ArchiveMessage(
         fromUser: (j['from_user'] as num?)?.toInt() ?? 0,
         createdAt: (j['created_at'] as num?)?.toInt() ?? 0,
@@ -413,6 +427,7 @@ class ArchiveMessage {
         // ArchiveMessageBody is #[oai(flatten)] server-side, so its fields
         // are siblings of from_user/created_at/mid/source at the top level.
         content: ArchiveMessageBody.fromJson(j),
+        source: _sourceFromJson(j['source']),
       );
 }
 

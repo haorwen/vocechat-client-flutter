@@ -22,12 +22,12 @@ final chatToolsProvider = Provider<ChatTools>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ChatToolsRef = ProviderRef<ChatTools>;
-String _$favoritesHash() => r'9bbc293681e5f9e21850536a41e0a89eca526acb';
+String _$favoritesHash() => r'54f5bca7bf39414b1ccd4ffa822837b462695b94';
 
 /// See also [Favorites].
 @ProviderFor(Favorites)
 final favoritesProvider =
-    AsyncNotifierProvider<Favorites, List<FavoriteSummary>>.internal(
+    AsyncNotifierProvider<Favorites, List<FavoriteArchive>>.internal(
   Favorites.new,
   name: r'favoritesProvider',
   debugGetCreateSourceHash:
@@ -36,6 +36,6 @@ final favoritesProvider =
   allTransitiveDependencies: null,
 );
 
-typedef _$Favorites = AsyncNotifier<List<FavoriteSummary>>;
+typedef _$Favorites = AsyncNotifier<List<FavoriteArchive>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

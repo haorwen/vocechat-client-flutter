@@ -164,9 +164,6 @@ class AppL10nZh extends AppL10n {
   String get navSaved => '收藏';
 
   @override
-  String get navFiles => '文件';
-
-  @override
   String get comingSoon => '敬请期待';
 
   @override

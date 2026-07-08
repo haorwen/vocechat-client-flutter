@@ -6,6 +6,7 @@ import '../../../core/network/sse_lifecycle.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../messages/application/message_dispatcher.dart';
+import '../../messages/presentation/chat_tool_panels.dart';
 
 /// Width threshold above which the desktop left rail layout is used.
 const double _kWideBreakpoint = 900;
@@ -174,15 +175,6 @@ class _DesktopLeftRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
-    void comingSoon() {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l.comingSoon),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
 
     return SizedBox(
       width: 72,
@@ -224,16 +216,8 @@ class _DesktopLeftRail extends StatelessWidget {
             icon: Icons.bookmark_outline_rounded,
             selectedIcon: Icons.bookmark_rounded,
             isSelected: false,
-            onTap: comingSoon,
+            onTap: () => showFavoritesOverlay(context),
             tooltip: l.navSaved,
-          ),
-          const SizedBox(height: 8),
-          _RailItem(
-            icon: Icons.folder_outlined,
-            selectedIcon: Icons.folder_rounded,
-            isSelected: false,
-            onTap: comingSoon,
-            tooltip: l.navFiles,
           ),
           const Spacer(),
           _RailItem(

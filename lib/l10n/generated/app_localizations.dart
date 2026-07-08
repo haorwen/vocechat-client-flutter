@@ -391,12 +391,6 @@ abstract class AppL10n {
   /// **'Saved'**
   String get navSaved;
 
-  /// No description provided for @navFiles.
-  ///
-  /// In en, this message translates to:
-  /// **'Files'**
-  String get navFiles;
-
   /// No description provided for @comingSoon.
   ///
   /// In en, this message translates to:
