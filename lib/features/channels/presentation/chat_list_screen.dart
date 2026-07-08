@@ -792,7 +792,7 @@ class _ConversationTile extends ConsumerWidget {
                                         minWidth: 16),
                                     height: 16,
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 5, vertical: 1),
+                                        horizontal: 5),
                                     decoration: BoxDecoration(
                                       // web: muted → faded gray badge.
                                       color: muted
@@ -809,6 +809,11 @@ class _ConversationTile extends ConsumerWidget {
                                         fontWeight: FontWeight.w900,
                                         color: Colors.white,
                                         height: 1,
+                                        // iOS SF font puts extra leading above
+                                        // the baseline; even distribution keeps
+                                        // the glyph vertically centered.
+                                        leadingDistribution:
+                                            TextLeadingDistribution.even,
                                       ),
                                     ),
                                   ),
@@ -817,7 +822,7 @@ class _ConversationTile extends ConsumerWidget {
                                       const BoxConstraints(minWidth: 16),
                                   height: 16,
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 1),
+                                      horizontal: 6),
                                   decoration: BoxDecoration(
                                     color: muted
                                         ? mutedTint
@@ -831,8 +836,18 @@ class _ConversationTile extends ConsumerWidget {
                                       fontSize: 10,
                                       fontWeight: FontWeight.w900,
                                       color: Colors.white,
-                                      fontFamily: 'monospace',
+                                      // Tabular figures give the monospace
+                                      // digit width without relying on a
+                                      // 'monospace' family iOS doesn't ship.
+                                      fontFeatures: [
+                                        FontFeature.tabularFigures(),
+                                      ],
                                       height: 1,
+                                      // iOS SF font puts extra leading above
+                                      // the baseline; even distribution keeps
+                                      // the digits vertically centered.
+                                      leadingDistribution:
+                                          TextLeadingDistribution.even,
                                     ),
                                   ),
                                 ),
