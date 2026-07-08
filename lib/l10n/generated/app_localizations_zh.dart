@@ -161,6 +161,85 @@ class AppL10nZh extends AppL10n {
   String get navSettings => '设置';
 
   @override
+  String get navSaved => '收藏';
+
+  @override
+  String get navFiles => '文件';
+
+  @override
+  String get comingSoon => '敬请期待';
+
+  @override
+  String get actionBack => '返回';
+
+  @override
+  String get actionClose => '关闭';
+
+  @override
+  String get memberRoleOwner => '群主';
+
+  @override
+  String get tooltipDownload => '下载';
+
+  @override
+  String get tooltipZoomIn => '放大';
+
+  @override
+  String get tooltipZoomOut => '缩小';
+
+  @override
+  String get tooltipFullscreen => '全屏';
+
+  @override
+  String get tooltipExitFullscreen => '退出全屏';
+
+  @override
+  String get tooltipShowPassword => '显示密码';
+
+  @override
+  String get tooltipHidePassword => '隐藏密码';
+
+  @override
+  String get reactionDeletedUser => '已注销用户';
+
+  @override
+  String reactionTooltipMany(String names, int count, String emoji) {
+    return '$names 和其他 $count 人回应了 $emoji';
+  }
+
+  @override
+  String reactionTooltipFew(String names, String emoji) {
+    return '$names 回应了 $emoji';
+  }
+
+  @override
+  String get expiredImageTitle => '图片不存在';
+
+  @override
+  String get expiredImageBody => '图片已过期或被删除';
+
+  @override
+  String get expiredVideoTitle => '视频不存在';
+
+  @override
+  String get expiredVideoBody => '视频已过期或被删除';
+
+  @override
+  String get expiredAudioTitle => '音频不存在';
+
+  @override
+  String get expiredAudioBody => '音频已过期或被删除';
+
+  @override
+  String get expiredFileTitle => '文件不存在';
+
+  @override
+  String get expiredFileBody => '文件已过期或被删除';
+
+  @override
+  String get featureUnavailable => '该功能暂未开放';
+
+  @override
   String get settingsTitle => '设置';
 
   @override
@@ -614,6 +693,9 @@ class AppL10nZh extends AppL10n {
   }
 
   @override
+  String get errorRequestFailed => '请求失败';
+
+  @override
   String get authKickedFromOtherDevice => '已退出登录：你的账号刚在另一台设备上登录。';
 
   @override
@@ -664,4 +746,166 @@ class AppL10nZh extends AppL10n {
 
   @override
   String get chatListMarkReadFailed => '标记已读失败';
+
+  @override
+  String get createChannelTitle => '新建频道';
+
+  @override
+  String get createChannelNameLabel => '频道名称';
+
+  @override
+  String get channelPublicLabel => '公开频道';
+
+  @override
+  String get createChannelPublicAdminOnly => '只有管理员可以创建公开频道';
+
+  @override
+  String get createChannelSubmit => '创建';
+
+  @override
+  String get createChannelNameRequired => '请输入频道名称';
+
+  @override
+  String get createChannelFailed => '创建频道失败';
+
+  @override
+  String get channelSettingsTitle => '频道设置';
+
+  @override
+  String get channelUpdated => '频道已更新';
+
+  @override
+  String get avatarUpdated => '头像已更新';
+
+  @override
+  String get channelVisibilityChanged => '可见性已更改';
+
+  @override
+  String get inviteLinkCopied => '链接已复制';
+
+  @override
+  String get channelOverview => '概览';
+
+  @override
+  String get channelNameLabel => '名称';
+
+  @override
+  String get channelDescriptionLabel => '描述';
+
+  @override
+  String get channelSaveChanges => '保存更改';
+
+  @override
+  String get channelAddMember => '添加成员';
+
+  @override
+  String get channelInviteLinkSection => '邀请链接';
+
+  @override
+  String get channelGenerateInviteLink => '生成邀请链接';
+
+  @override
+  String get channelMuteLabel => '静音频道';
+
+  @override
+  String get channelLeaveConfirmBody => '确定要退出该频道吗？';
+
+  @override
+  String get channelDeleteTitle => '删除频道';
+
+  @override
+  String get channelDeleteConfirmBody => '此操作将为所有成员永久删除该频道，且无法撤销。';
+
+  @override
+  String get actionLeave => '退出';
+
+  @override
+  String get accountEditNameTitle => '编辑姓名';
+
+  @override
+  String get accountNameLabel => '姓名';
+
+  @override
+  String get accountNameUpdated => '姓名已更新';
+
+  @override
+  String get accountChangePasswordTitle => '修改密码';
+
+  @override
+  String get accountCurrentPasswordLabel => '当前密码';
+
+  @override
+  String get accountNewPasswordLabel => '新密码';
+
+  @override
+  String get accountPasswordChanged => '密码已修改';
+
+  @override
+  String get chatActionCopy => '复制';
+
+  @override
+  String get chatActionForward => '转发';
+
+  @override
+  String get chatCopiedToClipboard => '已复制到剪贴板';
+
+  @override
+  String get chatForwardedMessagePreview => '[转发的消息]';
+
+  @override
+  String get chatAutoDeleteTitle => '阅后即焚';
+
+  @override
+  String chatExpiresTooltip(String duration) {
+    return '发送后 $duration 消失';
+  }
+
+  @override
+  String get chatAutoDeleteOff => '关闭';
+
+  @override
+  String get chatAutoDelete5Min => '5 分钟';
+
+  @override
+  String get chatAutoDelete10Min => '10 分钟';
+
+  @override
+  String get chatAutoDelete1Hour => '1 小时';
+
+  @override
+  String get chatAutoDelete1Day => '1 天';
+
+  @override
+  String get chatAutoDelete1Week => '1 周';
+
+  @override
+  String get chatAutoDeleteSaved => '已保存';
+
+  @override
+  String get chatAutoDeleteSaveFailed => '保存失败';
+
+  @override
+  String get forwardSheetTitle => '转发给...';
+
+  @override
+  String get forwardMessageSent => '消息已转发';
+
+  @override
+  String forwardFailed(String error) {
+    return '转发失败：$error';
+  }
+
+  @override
+  String get forwardNoConversations => '暂无会话';
+
+  @override
+  String forwardSelectedCount(int count) {
+    return '已选择 $count 个';
+  }
+
+  @override
+  String get archiveForwardedLabel => '转发的消息';
+
+  @override
+  String get archiveLoadFailed => '加载转发消息失败';
 }

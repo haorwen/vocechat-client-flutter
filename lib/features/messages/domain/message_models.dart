@@ -331,3 +331,113 @@ Map<String, dynamic>? _decodeMap(String s) {
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Archive (forwarded-message bundle)
+// ---------------------------------------------------------------------------
+//
+// Server contract (vocechat-server/src/api/archive.rs):
+//   Archive { users: Vec<ArchiveUser>, messages: Vec<ArchiveMessage>, num_attachments }
+//   ArchiveUser { name, avatar: Option<usize> }   // avatar is an attachment index, not a uid
+//   ArchiveMessage { from_user: usize, created_at, mid, source, #[flatten] content }
+//     // from_user is an INDEX into Archive.users, not a uid (archive is self-contained
+//     // so forwarded messages still resolve for recipients without the sender in their
+//     // directory).
+//   ArchiveMessageContent { properties, content_type, content, file_id, thumbnail_id }
+//
+// Plain Dart classes with manual JSON (matching UserSummary/GroupSummary style in
+// user_directory_provider.dart) rather than Freezed, since these are simple
+// read-only DTOs fetched once per forwarded-message card.
+
+class ArchiveUser {
+  const ArchiveUser({required this.name, this.avatar});
+
+  final String name;
+  final int? avatar;
+
+  factory ArchiveUser.fromJson(Map<String, dynamic> j) => ArchiveUser(
+        name: j['name'] as String? ?? '',
+        avatar: (j['avatar'] as num?)?.toInt(),
+      );
+}
+
+// Named `ArchiveMessageBody` (not `ArchiveMessageContent`) to avoid colliding
+// with the `ArchiveMessageContent` widget in
+// presentation/archive_message_content.dart.
+class ArchiveMessageBody {
+  const ArchiveMessageBody({
+    required this.contentType,
+    this.content,
+    this.properties,
+    this.fileId,
+    this.thumbnailId,
+  });
+
+  @JsonKey(name: 'content_type')
+  final String contentType;
+  final String? content;
+  final Map<String, dynamic>? properties;
+  @JsonKey(name: 'file_id')
+  final int? fileId;
+  @JsonKey(name: 'thumbnail_id')
+  final int? thumbnailId;
+
+  factory ArchiveMessageBody.fromJson(Map<String, dynamic> j) =>
+      ArchiveMessageBody(
+        contentType: j['content_type'] as String? ?? 'text/plain',
+        content: j['content'] as String?,
+        properties: j['properties'] as Map<String, dynamic>?,
+        fileId: (j['file_id'] as num?)?.toInt(),
+        thumbnailId: (j['thumbnail_id'] as num?)?.toInt(),
+      );
+}
+
+class ArchiveMessage {
+  const ArchiveMessage({
+    required this.fromUser,
+    required this.createdAt,
+    required this.mid,
+    required this.content,
+  });
+
+  /// Index into [Archive.users] — NOT a uid.
+  final int fromUser;
+  final int createdAt;
+  final int mid;
+  final ArchiveMessageBody content;
+
+  factory ArchiveMessage.fromJson(Map<String, dynamic> j) => ArchiveMessage(
+        fromUser: (j['from_user'] as num?)?.toInt() ?? 0,
+        createdAt: (j['created_at'] as num?)?.toInt() ?? 0,
+        mid: (j['mid'] as num?)?.toInt() ?? 0,
+        // ArchiveMessageBody is #[oai(flatten)] server-side, so its fields
+        // are siblings of from_user/created_at/mid/source at the top level.
+        content: ArchiveMessageBody.fromJson(j),
+      );
+}
+
+class Archive {
+  const Archive({
+    required this.users,
+    required this.messages,
+    required this.numAttachments,
+  });
+
+  final List<ArchiveUser> users;
+  final List<ArchiveMessage> messages;
+  final int numAttachments;
+
+  factory Archive.fromJson(Map<String, dynamic> j) => Archive(
+        users: (j['users'] as List<dynamic>?)
+                ?.cast<Map<String, dynamic>>()
+                .map(ArchiveUser.fromJson)
+                .toList() ??
+            const [],
+        messages: (j['messages'] as List<dynamic>?)
+                ?.cast<Map<String, dynamic>>()
+                .map(ArchiveMessage.fromJson)
+                .toList() ??
+            const [],
+        numAttachments: (j['num_attachments'] as num?)?.toInt() ?? 0,
+      );
+}

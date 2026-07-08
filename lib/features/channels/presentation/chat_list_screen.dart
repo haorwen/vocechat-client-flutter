@@ -20,6 +20,7 @@ import '../application/pinned_chats_provider.dart';
 import '../data/pin_chat_api.dart';
 import '../data/session_actions_api.dart';
 import '../domain/pin_chat_models.dart';
+import 'create_channel_dialog.dart';
 
 class ChatListScreen extends ConsumerStatefulWidget {
   const ChatListScreen({super.key});
@@ -337,6 +338,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
       VoceContextMenuItem('markRead', l.chatListMarkRead),
       VoceContextMenuItem('mute', isMuted ? l.chatListUnmute : l.chatListMute),
       if (item.isChannel)
+        VoceContextMenuItem('settings', l.channelSettingsTitle),
+      if (item.isChannel)
         VoceContextMenuItem('leave', l.chatListLeave, danger: true)
       else
         VoceContextMenuItem('hide', l.chatListHide, danger: true),
@@ -443,6 +446,9 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
             messenger
                 .showSnackBar(SnackBar(content: Text(l.chatListHideDone)));
           }
+        case 'settings':
+          final gid = (item.key as GroupConversationKey).gid;
+          if (mounted) context.go('/home/chat/g-$gid/settings');
         case 'leave':
           final gid = (item.key as GroupConversationKey).gid;
           final api = ref.read(sessionActionsApiProvider);
@@ -592,7 +598,7 @@ class _ChatListHeader extends StatelessWidget {
           const SizedBox(width: 4),
           IconButton(
             icon: Icon(Icons.add, size: 22, color: AppTokens.gray500),
-            onPressed: () {},
+            onPressed: () => showCreateChannelDialog(context),
             tooltip: l.chatListNewChat,
           ),
         ],
@@ -820,7 +826,7 @@ class _ConversationTile extends ConsumerWidget {
                                   ),
                                   alignment: Alignment.center,
                                   child: Text(
-                                    unread > 99 ? '99' : unread.toString(),
+                                    unread > 99 ? '99+' : unread.toString(),
                                     style: const TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w900,
@@ -867,13 +873,29 @@ class _EmptyState extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: AppTokens.gray500,
-            fontSize: 13,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppTokens.gray100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.forum_outlined,
+                  size: 26, color: AppTokens.gray400),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppTokens.gray500,
+                fontSize: 13,
+              ),
+            ),
+          ],
         ),
       ),
     );

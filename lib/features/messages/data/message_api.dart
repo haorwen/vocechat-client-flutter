@@ -43,24 +43,52 @@ class MessageApi {
 
   // ---- send ----------------------------------------------------------
 
-  Future<int> sendText(MessageTarget target, String text) async {
+  /// [mentions] (group chats only, per web's `enableMention` gating) is sent
+  /// as `properties.mentions` via the same `X-Properties` base64-JSON header
+  /// mechanism already used by `uploadBytesAndSend` — confirmed accepted on
+  /// this endpoint server-side (group.rs:1012 / user.rs:1401 both read
+  /// X-Properties on /send, not just file uploads).
+  Future<int> sendText(
+    MessageTarget target,
+    String text, {
+    List<int>? mentions,
+  }) async {
     final resp = await _dio.post(
       _sendPath(target),
       data: text,
-      options: Options(contentType: 'text/plain'),
+      options: Options(
+        contentType: 'text/plain',
+        headers: _propertiesHeader(mentions),
+      ),
     );
     // Server returns raw i64 as JSON body (e.g. 602475), not {"mid": 602475}.
     return (resp.data as num).toInt();
   }
 
-  Future<int> sendMarkdown(MessageTarget target, String md) async {
+  Future<int> sendMarkdown(
+    MessageTarget target,
+    String md, {
+    List<int>? mentions,
+  }) async {
     final resp = await _dio.post(
       _sendPath(target),
       data: md,
-      options: Options(contentType: 'text/markdown'),
+      options: Options(
+        contentType: 'text/markdown',
+        headers: _propertiesHeader(mentions),
+      ),
     );
     // Server returns raw i64 as JSON body.
     return (resp.data as num).toInt();
+  }
+
+  /// Builds the `X-Properties` header map carrying `{"mentions": [...]}` when
+  /// [mentions] is non-empty, or null (no header) otherwise.
+  static Map<String, dynamic>? _propertiesHeader(List<int>? mentions) {
+    if (mentions == null || mentions.isEmpty) return null;
+    return {
+      'X-Properties': base64Encode(utf8.encode(jsonEncode({'mentions': mentions}))),
+    };
   }
 
   /// Uploads [file] in a single chunk then sends a file message.
@@ -240,12 +268,14 @@ class MessageApi {
     int targetMid,
     String text, {
     bool markdown = false,
+    List<int>? mentions,
   }) async {
     final resp = await _dio.post(
       '/api/message/$targetMid/reply',
       data: text,
       options: Options(
         contentType: markdown ? 'text/markdown' : 'text/plain',
+        headers: _propertiesHeader(mentions),
       ),
     );
     return (resp.data as num).toInt();
@@ -258,6 +288,49 @@ class MessageApi {
     );
     // Server returns raw i64 (the new reaction mid).
     return (resp.data as num).toInt();
+  }
+
+  // ---- forward (archive) ----------------------------------------------
+
+  /// Bundles [mids] into a new server-side archive. Server contract:
+  /// POST /api/resource/archive, body {"mid_list": [...]}, response is a bare
+  /// JSON string path like "2026/7/8/<uuid>" (Json<String>, not wrapped).
+  /// Mirrors web's `createArchive` (src/app/services/message.ts).
+  Future<String> createArchive(List<int> mids) async {
+    final resp = await _dio.post(
+      '/api/resource/archive',
+      data: {'mid_list': mids},
+    );
+    final data = resp.data;
+    final path = data is String ? data : (data is Map ? data['id'] as String? : null);
+    if (path == null || path.isEmpty) {
+      throw StateError('createArchive returned no path: $data');
+    }
+    return path;
+  }
+
+  /// Sends a forwarded-message reference to [target]. Server contract: the
+  /// archive id is sent as the raw body string (not JSON-wrapped) with
+  /// content-type `vocechat/archive` — mirrors web's
+  /// `sendUserMsg({type:"archive", id, content: archive_id})` where `content`
+  /// is used directly as the request body.
+  Future<int> sendArchive(MessageTarget target, String archiveId) async {
+    final resp = await _dio.post(
+      _sendPath(target),
+      data: archiveId,
+      options: Options(contentType: 'vocechat/archive'),
+    );
+    return (resp.data as num).toInt();
+  }
+
+  /// Fetches the archive index for a forwarded-message card. Server contract:
+  /// GET /api/resource/archive?file_path=<path> -> Json<Archive>.
+  Future<Archive> getArchive(String filePath) async {
+    final resp = await _dio.get(
+      '/api/resource/archive',
+      queryParameters: {'file_path': filePath},
+    );
+    return Archive.fromJson(resp.data as Map<String, dynamic>);
   }
 
   // ---- read index ----------------------------------------------------
@@ -282,6 +355,33 @@ class MessageApi {
     };
     if (body.isEmpty) return;
     await _dio.post('/api/user/read-index', data: body);
+  }
+
+  // ---- burn-after-read (auto-delete) ---------------------------------
+
+  /// Update the auto-delete ("burn after reading") setting for one or more
+  /// DM peers / channels. Server contract: POST /api/user/burn-after-reading
+  /// with `{"users":[{"uid","expires_in"}], "groups":[{"gid","expires_in"}]}`.
+  /// `expiresIn` is seconds; `0` disables (server deletes the row), `>0`
+  /// enables/updates. Verified against vocechat-server's
+  /// `update_burn_after_reading` handler (api/user.rs) and web's
+  /// `useUpdateAutoDeleteMsgMutation` (app/services/user.ts).
+  Future<void> updateBurnAfterReading({
+    List<({int uid, int expiresIn})>? users,
+    List<({int gid, int expiresIn})>? groups,
+  }) async {
+    final body = <String, dynamic>{
+      if (users != null && users.isNotEmpty)
+        'users': [
+          for (final u in users) {'uid': u.uid, 'expires_in': u.expiresIn},
+        ],
+      if (groups != null && groups.isNotEmpty)
+        'groups': [
+          for (final g in groups) {'gid': g.gid, 'expires_in': g.expiresIn},
+        ],
+    };
+    if (body.isEmpty) return;
+    await _dio.post('/api/user/burn-after-reading', data: body);
   }
 
   // ---- util ----------------------------------------------------------

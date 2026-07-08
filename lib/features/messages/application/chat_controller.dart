@@ -409,10 +409,14 @@ class ChatController extends _$ChatController {
     int targetMid,
     String text, {
     bool markdown = false,
+    List<int>? mentions,
   }) async {
     if (targetMid <= 0) return;
     final currentUid = _currentUid() ?? -1;
     final tempMid = -DateTime.now().microsecondsSinceEpoch;
+    final properties = (mentions == null || mentions.isEmpty)
+        ? null
+        : <String, dynamic>{'mentions': mentions};
 
     final optimistic = ChatMessage(
       mid: tempMid,
@@ -423,6 +427,7 @@ class ChatController extends _$ChatController {
         mid: targetMid,
         contentType: markdown ? 'text/markdown' : 'text/plain',
         content: text,
+        properties: properties,
       ),
     );
 
@@ -433,7 +438,7 @@ class ChatController extends _$ChatController {
     try {
       final realMid = await ref
           .read(messageApiProvider)
-          .replyMessage(targetMid, text, markdown: markdown);
+          .replyMessage(targetMid, text, markdown: markdown, mentions: mentions);
 
       final after = state.valueOrNull ?? [];
       final idx = after.indexWhere((m) => m.mid == tempMid);
@@ -558,9 +563,15 @@ class ChatController extends _$ChatController {
   }
 
   /// Optimistically insert a sent message; flip status on server ack or failure.
-  Future<void> sendText(String text) async {
+  /// [mentions] (uids referenced via ` @{uid} ` tokens, group chats only) is
+  /// carried in `properties.mentions` for both the optimistic row and the
+  /// outgoing request.
+  Future<void> sendText(String text, {List<int>? mentions}) async {
     final currentUid = _currentUid() ?? -1;
     final tempMid = -DateTime.now().microsecondsSinceEpoch;
+    final properties = (mentions == null || mentions.isEmpty)
+        ? null
+        : <String, dynamic>{'mentions': mentions};
 
     final optimistic = ChatMessage(
       mid: tempMid,
@@ -570,6 +581,7 @@ class ChatController extends _$ChatController {
       detail: MessageDetail.normal(
         contentType: 'text/plain',
         content: text,
+        properties: properties,
       ),
     );
 
@@ -588,9 +600,13 @@ class ChatController extends _$ChatController {
           text.contains('```');
       final int realMid;
       if (isMarkdown) {
-        realMid = await ref.read(messageApiProvider).sendMarkdown(target, text);
+        realMid = await ref
+            .read(messageApiProvider)
+            .sendMarkdown(target, text, mentions: mentions);
       } else {
-        realMid = await ref.read(messageApiProvider).sendText(target, text);
+        realMid = await ref
+            .read(messageApiProvider)
+            .sendText(target, text, mentions: mentions);
       }
 
       // Replace placeholder with server-confirmed mid.

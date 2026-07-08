@@ -312,4 +312,21 @@ class AuthController extends _$AuthController {
     state = const AsyncLoading();
     state = AsyncData(await _bootstrap());
   }
+
+  /// Re-fetch `/api/user/me` and update [state] in place, without the token
+  /// re-validation `_bootstrap()` does. Used after a profile edit (name,
+  /// avatar) so the rest of the app picks up the fresh `VoceUser` (e.g. the
+  /// updated `avatarUpdatedAt` for cache-busting) without a jarring loading
+  /// flash or redundant refresh-token exchange. No-op if not authenticated.
+  Future<void> refreshUser() async {
+    final current = state.valueOrNull;
+    if (current is! AuthStateAuthenticated) return;
+    try {
+      final user = await ref.read(authApiProvider).me();
+      state = AsyncData(AuthState.authenticated(user: user));
+    } catch (e) {
+      AppLog.w(LogTag.auth, () => '🟦 refreshUser: me() failed: $e');
+      // Best-effort — keep the previous state on failure.
+    }
+  }
 }

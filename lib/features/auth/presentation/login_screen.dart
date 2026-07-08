@@ -32,7 +32,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   String get _serverName {
-    final state = ref.read(serverStoreProvider).valueOrNull;
+    final state = ref.watch(serverStoreProvider).valueOrNull;
     if (state == null) return '';
     final current = state.servers
         .where((s) => s.id == state.currentServerId)
@@ -42,27 +42,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _signIn() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    // Ignore Enter-key submits while a login is already in flight.
+    if (ref.read(authControllerProvider).isLoading) return;
 
+    // Navigation + error surfacing happen in the ref.listen below — doing it
+    // here as well produced duplicate snackbars / double context.go.
     await ref
         .read(authControllerProvider.notifier)
         .login(_emailCtrl.text.trim(), _passwordCtrl.text);
+  }
 
-    if (!mounted) return;
-
-    final authState = ref.read(authControllerProvider);
-    authState.whenOrNull(
-      data: (state) {
-        if (state is AuthStateAuthenticated) {
-          context.go('/home');
-        }
-      },
-      error: (e, _) {
-        final msg = e is DioException && e.error is ApiException
-            ? (e.error as ApiException).message
-            : e.toString();
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(safeText(msg))));
-      },
+  void _showUnavailable() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(AppL10n.of(context).featureUnavailable),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -120,7 +116,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
           child: Form(
             key: _formKey,
-            child: Column(
+            child: AutofillGroup(
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 16),
@@ -169,6 +166,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.email],
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
                       return l.loginEmailRequired;
@@ -192,6 +190,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           BorderRadius.all(Radius.circular(12)),
                     ),
                     suffixIcon: IconButton(
+                      tooltip: _obscurePassword
+                          ? l.tooltipShowPassword
+                          : l.tooltipHidePassword,
                       icon: Icon(_obscurePassword
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined),
@@ -201,6 +202,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   obscureText: _obscurePassword,
                   textInputAction: TextInputAction.done,
+                  autofillHints: const [AutofillHints.password],
                   onFieldSubmitted: (_) => _signIn(),
                   validator: (v) {
                     if (v == null || v.isEmpty) {
@@ -216,7 +218,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () {},
+                    onPressed: _showUnavailable,
                     child: Text(l.loginForgotPassword),
                   ),
                 ),
@@ -232,12 +234,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     _TertiaryAction(
                       icon: Icons.auto_awesome_outlined,
                       label: l.loginMagicLink,
-                      onTap: () {},
+                      onTap: _showUnavailable,
                     ),
                     _TertiaryAction(
                       icon: Icons.fingerprint,
                       label: l.loginPasskey,
-                      onTap: () {},
+                      onTap: _showUnavailable,
                     ),
                     _TertiaryAction(
                       icon: Icons.dns_outlined,
@@ -261,6 +263,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ],
                 ),
               ],
+              ),
             ),
           ),
         ),

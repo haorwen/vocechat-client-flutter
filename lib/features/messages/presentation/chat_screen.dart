@@ -30,9 +30,13 @@ import '../application/read_index_provider.dart';
 import '../data/message_api.dart';
 import '../domain/message_models.dart';
 import '../domain/message_status.dart';
+import 'archive_message_content.dart';
 import 'chat_tool_panels.dart';
 import 'file_display_utils.dart';
 import 'file_message_content.dart';
+import 'forward_sheet.dart';
+import 'mention_overlay.dart';
+import 'mention_text.dart';
 import 'reaction_widgets.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -47,6 +51,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _textCtrl = TextEditingController();
   final _editCtrl = TextEditingController();
   final _searchAnchorKey = GlobalKey();
+  final _sendBoxKey = GlobalKey();
+
+  /// Uids accumulated for the in-progress compose session via the "@" picker
+  /// (group chats only — mentions are disabled in DMs, matching web's
+  /// `enableMention: members.length > 0`). Sent as `properties.mentions` and
+  /// reset after each send.
+  final List<int> _pendingMentions = [];
+
+  /// Index into `_textCtrl.text` of the "@" that triggered the currently-open
+  /// mention overlay, or null when no overlay is showing.
+  int? _mentionTriggerIndex;
+  MentionOverlayHandle? _mentionOverlay;
   final ItemScrollController _itemScrollController = ItemScrollController();
   final ItemPositionsListener _itemPositionsListener =
       ItemPositionsListener.create();
@@ -111,8 +127,83 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _editCtrl.dispose();
     _highlightTimer?.cancel();
     _readDebounce?.cancel();
+    _mentionOverlay?.remove();
     _itemPositionsListener.itemPositions.removeListener(_onPositionsChanged);
     super.dispose();
+  }
+
+  /// Detects "@" typed in the composer (group chats only) and drives the
+  /// mention-overlay lifecycle: opens it when "@" is typed at a word
+  /// boundary, updates its filter as the user keeps typing, and closes it
+  /// once the query is interrupted by whitespace or the "@" is deleted.
+  void _onComposerChanged(String text) {
+    final gid = _target.maybeMap<int?>(group: (t) => t.gid, orElse: () => null);
+    if (gid == null) return;
+
+    final caret = _textCtrl.selection.baseOffset;
+    if (caret < 0) {
+      _closeMentionOverlay();
+      return;
+    }
+
+    final triggerIndex = _mentionTriggerIndex;
+    if (triggerIndex == null) {
+      // Look for a fresh "@" immediately before the caret, at a word
+      // boundary (start of string or preceded by whitespace).
+      if (caret == 0 || text[caret - 1] != '@') return;
+      final before = caret - 1;
+      if (before > 0 && text[before - 1] != ' ' && text[before - 1] != '\n') {
+        return;
+      }
+      _mentionTriggerIndex = before;
+      _mentionOverlay = showMentionOverlay(
+        context,
+        anchorKey: _sendBoxKey,
+        gid: gid,
+        onSelect: _insertMention,
+      );
+      return;
+    }
+
+    // Overlay already open: keep it in sync with the text typed after "@".
+    if (triggerIndex >= text.length || text[triggerIndex] != '@' ||
+        caret <= triggerIndex) {
+      _closeMentionOverlay();
+      return;
+    }
+    final query = text.substring(triggerIndex + 1, caret);
+    if (query.contains(' ') || query.contains('\n')) {
+      _closeMentionOverlay();
+      return;
+    }
+    _mentionOverlay?.updateQuery(query);
+  }
+
+  void _closeMentionOverlay() {
+    _mentionOverlay?.remove();
+    _mentionOverlay = null;
+    _mentionTriggerIndex = null;
+  }
+
+  /// Replaces the partial "@query" typed so far with the literal " @{uid} "
+  /// token (web wire format) and records [uid] for the outgoing
+  /// `properties.mentions` array.
+  void _insertMention(int uid, String name) {
+    final triggerIndex = _mentionTriggerIndex;
+    _mentionTriggerIndex = null;
+    _mentionOverlay = null;
+    if (triggerIndex == null) return;
+
+    final text = _textCtrl.text;
+    final caret = _textCtrl.selection.baseOffset;
+    final end = caret < 0 || caret < triggerIndex ? text.length : caret;
+    final token = ' @$uid ';
+    final newText = text.replaceRange(triggerIndex, end, token);
+    _textCtrl.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: triggerIndex + token.length),
+    );
+    _pendingMentions.add(uid);
   }
 
   void _onPositionsChanged() {
@@ -190,21 +281,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // Snapshot + clear the staging area; uploads fire below (web parity:
     // staged files only upload on send, then the stage resets).
     final staged = List<_StagedFile>.from(_staged);
+    final mentions = List<int>.from(_pendingMentions);
     _textCtrl.clear();
+    _closeMentionOverlay();
     setState(() {
       _canSend = false;
       _replyToMid = null;
       _replyTarget = null;
       _staged.clear();
+      _pendingMentions.clear();
     });
     try {
       final notifier = ref.read(chatControllerProvider(_target).notifier);
       // 1) Text first (only when non-empty — images can be sent caption-less).
       if (text.isNotEmpty) {
         if (replyMid != null) {
-          await notifier.sendReply(replyMid, text);
+          await notifier.sendReply(replyMid, text, mentions: mentions);
         } else {
-          await notifier.sendText(text);
+          await notifier.sendText(text, mentions: mentions);
         }
       }
       // 2) Then each staged image (each becomes its own optimistic row).
@@ -218,8 +312,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     } catch (e) {
       if (mounted) {
         final msg = replyMid != null
-            ? l.chatReplyFailed(_friendlyError(e))
-            : l.chatSendFailed(_friendlyError(e));
+            ? l.chatReplyFailed(_friendlyError(e, l))
+            : l.chatSendFailed(_friendlyError(e, l));
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(safeText(msg))));
       }
@@ -311,7 +405,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(safeText(l.chatSendFailed(_friendlyError(e))))));
+            content: Text(safeText(l.chatSendFailed(_friendlyError(e, l))))));
       }
     }
   }
@@ -333,7 +427,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(safeText(l.chatSendFailed(_friendlyError(e))))));
+            content: Text(safeText(l.chatSendFailed(_friendlyError(e, l))))));
       }
     }
   }
@@ -467,7 +561,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content:
-                Text(safeText(l.chatEditFailed(_friendlyError(e))))));
+                Text(safeText(l.chatEditFailed(_friendlyError(e, l))))));
       }
     }
   }
@@ -501,7 +595,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content:
-                Text(safeText(l.chatDeleteFailed(_friendlyError(e))))));
+                Text(safeText(l.chatDeleteFailed(_friendlyError(e, l))))));
       }
     }
   }
@@ -511,13 +605,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// `DioException` still contains the request URL, status line, and raw
   /// response body — too verbose for a snackbar, and a leak risk if
   /// screenshots get shared.
-  static String _friendlyError(Object e) {
+  static String _friendlyError(Object e, AppL10n l) {
     if (e is DioException) {
       final inner = e.error;
       if (inner is ApiException) return inner.message;
-      return e.message ?? 'Request failed';
+      return e.message ?? l.errorRequestFailed;
     }
-    return 'Request failed';
+    return l.errorRequestFailed;
   }
 
   bool _showDateSeparator(List<ChatMessage> msgs, int index) {
@@ -696,6 +790,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             onMembers: isChannel
                                 ? () => _showToolPanel(ChatTool.members)
                                 : null,
+                            onAutoDelete: () =>
+                                _showToolPanel(ChatTool.autoDelete),
                           ),
                           Expanded(
                             child: messagesAsync.when(
@@ -787,6 +883,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 : (userDir[_replyTarget!.fromUid]?.name ??
                                     l.chatUserFallback(_replyTarget!.fromUid)),
                             onCancelReply: _cancelReply,
+                            textFieldKey: _sendBoxKey,
+                            onChanged: isChannel ? _onComposerChanged : null,
                           ),
                         ],
                       ),
@@ -808,6 +906,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   onMembers: isChannel
                       ? () => _showToolPanel(ChatTool.members)
                       : null,
+                  onAutoDelete: () => _showToolPanel(ChatTool.autoDelete),
                 ),
             ],
           );
@@ -946,6 +1045,7 @@ class _ChatHeader extends StatelessWidget {
     this.onPin,
     this.onSaved,
     this.onMembers,
+    this.onAutoDelete,
   });
 
   final String title;
@@ -961,6 +1061,7 @@ class _ChatHeader extends StatelessWidget {
   final VoidCallback? onPin;
   final VoidCallback? onSaved;
   final VoidCallback? onMembers;
+  final VoidCallback? onAutoDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -978,6 +1079,7 @@ class _ChatHeader extends StatelessWidget {
         children: [
           if (canPop)
             IconButton(
+              tooltip: AppL10n.of(context).actionBack,
               icon: Icon(Icons.arrow_back,
                   size: 20, color: AppTokens.gray700),
               onPressed: () => Navigator.of(context).maybePop(),
@@ -1069,6 +1171,8 @@ class _ChatHeader extends StatelessWidget {
                     onSaved?.call();
                   case ChatTool.members:
                     onMembers?.call();
+                  case ChatTool.autoDelete:
+                    onAutoDelete?.call();
                 }
               },
               itemBuilder: (context) => [
@@ -1095,6 +1199,13 @@ class _ChatHeader extends StatelessWidget {
                       label: l.chatToolMembers,
                     ),
                   ),
+                PopupMenuItem(
+                  value: ChatTool.autoDelete,
+                  child: _ChatToolMenuRow(
+                    icon: Icons.timer_outlined,
+                    label: l.chatAutoDeleteTitle,
+                  ),
+                ),
               ],
             ),
         ],
@@ -1136,12 +1247,14 @@ class _ChatSideRail extends StatelessWidget {
     this.onPin,
     this.onSaved,
     this.onMembers,
+    this.onAutoDelete,
   });
 
   final bool isChannel;
   final VoidCallback? onPin;
   final VoidCallback? onSaved;
   final VoidCallback? onMembers;
+  final VoidCallback? onAutoDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1178,6 +1291,12 @@ class _ChatSideRail extends StatelessWidget {
               onPressed: onMembers ?? () {},
             ),
           ],
+          const SizedBox(height: 12),
+          _RailButton(
+            icon: Icons.timer_outlined,
+            tooltip: l.chatAutoDeleteTitle,
+            onPressed: onAutoDelete ?? () {},
+          ),
         ],
       ),
     );
@@ -1266,6 +1385,30 @@ class _DateSeparator extends StatelessWidget {
 // the right of the row (Emoji / Reply / Bookmark / More).
 // ---------------------------------------------------------------------------
 
+/// Friendly label for a burn-after-read `expiresIn` (seconds) value, for the
+/// message-row timer tooltip. Covers the real option set (0/300/600/3600/
+/// 86400/604800, matching web's AutoDeleteMessages.tsx) plus a generic
+/// fallback in case the server ever returns an arbitrary value.
+String _formatExpiresIn(int seconds) {
+  if (seconds >= 604800 && seconds % 604800 == 0) {
+    final weeks = seconds ~/ 604800;
+    return weeks == 1 ? '1 week' : '$weeks weeks';
+  }
+  if (seconds >= 86400 && seconds % 86400 == 0) {
+    final days = seconds ~/ 86400;
+    return days == 1 ? '1 day' : '$days days';
+  }
+  if (seconds >= 3600 && seconds % 3600 == 0) {
+    final hours = seconds ~/ 3600;
+    return hours == 1 ? '1 hour' : '$hours hours';
+  }
+  if (seconds >= 60 && seconds % 60 == 0) {
+    final minutes = seconds ~/ 60;
+    return minutes == 1 ? '1 minute' : '$minutes minutes';
+  }
+  return '$seconds seconds';
+}
+
 class _MessageRow extends ConsumerStatefulWidget {
   const _MessageRow({
     required this.message,
@@ -1323,7 +1466,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
     final l = AppL10n.of(context);
     final msg = widget.message;
     final sender = widget.userDir[msg.fromUid];
-    final senderName = sender?.name ?? 'uid:${msg.fromUid}';
+    final senderName = sender?.name ?? l.chatUserFallback(msg.fromUid);
     final senderAvatarUrl = sender != null
         ? widget.avatarUrlBuilder(msg.fromUid, sender.avatarUpdatedAt)
         : null;
@@ -1337,6 +1480,16 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
     final detail = msg.detail;
     final displayContent = msg.displayContent;
     final displayContentType = msg.displayContentType;
+    // Burn-after-read: server stamps `expires_in` (seconds) onto normal/reply
+    // messages based on the sender's own auto-delete setting for this
+    // target. Static icon + tooltip only — no countdown/auto-delete-on-expiry
+    // (that's out of scope; see web's ExpireTimer.tsx for the fuller
+    // behaviour this intentionally does not replicate).
+    final expiresIn = switch (detail) {
+      NormalMessageDetail() => detail.expiresIn,
+      ReplyMessageDetail() => detail.expiresIn,
+      _ => null,
+    };
     Widget content;
     if (widget.isEditing && widget.editController != null) {
       content = _EditForm(
@@ -1361,6 +1514,8 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
           sending: isSending,
           progress: isSending ? notifier.progressFor(msg.mid) : null,
         );
+      } else if (displayContentType == 'vocechat/archive') {
+        content = ArchiveMessageContent(filePath: displayContent);
       } else if (displayContentType == 'text/markdown') {
         content = MarkdownBody(
           data: safeText(displayContent),
@@ -1373,8 +1528,9 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
           ),
         );
       } else {
-        content = Text(
-          safeText(displayContent),
+        content = MentionText(
+          text: displayContent,
+          userDir: widget.userDir,
           style: TextStyle(
             fontSize: 14,
             color: AppTokens.gray700,
@@ -1479,9 +1635,12 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
               content: displayContent,
               properties: detail.properties,
             )
+          else if (displayContentType == 'vocechat/archive')
+            ArchiveMessageContent(filePath: displayContent)
           else
-            Text(
-              safeText(displayContent),
+            MentionText(
+              text: displayContent,
+              userDir: widget.userDir,
               style: TextStyle(
                 fontSize: 14,
                 color: AppTokens.gray700,
@@ -1550,13 +1709,17 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(
-                          safeText(senderName),
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: AppTokens.primary600,
-                            height: 20 / 14,
+                        Flexible(
+                          child: Text(
+                            safeText(senderName),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: AppTokens.primary600,
+                              height: 20 / 14,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -1579,6 +1742,15 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                               color: AppTokens.gray400,
                               height: 18 / 12,
                             ),
+                          ),
+                        ],
+                        if (expiresIn != null && expiresIn > 0) ...[
+                          const SizedBox(width: 6),
+                          Tooltip(
+                            message: l.chatExpiresTooltip(
+                                _formatExpiresIn(expiresIn)),
+                            child: Icon(Icons.timer_outlined,
+                                size: 12, color: AppTokens.gray400),
                           ),
                         ],
                         if (widget.status ==
@@ -1746,11 +1918,22 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         (msg.displayContentType == 'text/plain' ||
             msg.displayContentType == 'text/markdown');
 
+    // Copy is only meaningful for text-ish content (plain/markdown). Files,
+    // images, reactions, and archive (forwarded) messages have no clipboard
+    // text to copy — mirrors the web reference which hides the copy action
+    // for non-text message types.
+    final canCopy = msg.displayContentType == 'text/plain' ||
+        msg.displayContentType == 'text/markdown';
+
     final items = <VoceContextMenuItem>[
       VoceContextMenuItem('react', l.chatActionReact,
           icon: Icons.emoji_emotions_outlined),
       VoceContextMenuItem('reply', l.chatActionReply,
           icon: Icons.reply_outlined),
+      if (canCopy)
+        VoceContextMenuItem('copy', l.chatActionCopy, icon: Icons.copy_outlined),
+      VoceContextMenuItem('forward', l.chatActionForward,
+          icon: Icons.forward_outlined),
       if (canEdit)
         VoceContextMenuItem('edit', l.chatActionEdit, icon: Icons.edit_outlined),
       if (isChannel)
@@ -1772,6 +1955,10 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
       _openReactionPicker();
     } else if (selection == 'reply') {
       widget.onReply?.call();
+    } else if (selection == 'copy') {
+      await _copyToClipboard();
+    } else if (selection == 'forward') {
+      await _forward();
     } else if (selection == 'edit') {
       widget.onEdit?.call();
     } else if (selection == 'delete') {
@@ -1791,6 +1978,18 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
     } else if (selection == 'fav') {
       await _favorite();
     }
+  }
+
+  Future<void> _copyToClipboard() async {
+    await Clipboard.setData(ClipboardData(text: widget.message.displayContent));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(AppL10n.of(context).chatCopiedToClipboard),
+    ));
+  }
+
+  Future<void> _forward() async {
+    await showForwardSheet(context, mids: [widget.message.mid]);
   }
 }
 
@@ -1822,6 +2021,18 @@ class _ReplyQuotePreview extends StatelessWidget {
       return ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 220, maxHeight: 160),
         child: FileMessageContent(content: content, properties: props),
+      );
+    }
+
+    if (type == 'vocechat/archive') {
+      return Text(
+        l.chatForwardedMessagePreview,
+        style: TextStyle(
+          fontSize: 13,
+          color: AppTokens.gray500,
+          fontStyle: FontStyle.italic,
+          height: 18 / 13,
+        ),
       );
     }
 
@@ -1872,21 +2083,43 @@ class _ReplyActionsBar extends StatelessWidget {
   Widget build(BuildContext context) {
     // Mirrors the web reference Commands toolbar:
     //   bg-white dark:bg-gray-900, border border-black/10, rounded-md (6px),
-    //   flat icon buttons (24px) with p-1 (4px) and a gray-100/gray-800 hover.
+    //   flat icon buttons with a gray-100/gray-800 hover.
+    final l = AppL10n.of(context);
     return Container(
       decoration: BoxDecoration(
         color: AppTokens.surface,
-        border: Border.all(color: const Color(0x1A000000)),
+        border: Border.all(color: AppTokens.borderSubtle),
         borderRadius: BorderRadius.circular(6),
+        boxShadow: [
+          BoxShadow(
+            color: AppTokens.brightness == Brightness.dark
+                ? const Color(0x66000000)
+                : const Color(0x14000000),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _ReplyIcon(icon: Icons.emoji_emotions_outlined, onTap: onEmojiTap),
-          _ReplyIcon(icon: Icons.reply_outlined, onTap: onReplyTap),
-          _ReplyIcon(icon: Icons.bookmark_add_outlined, onTap: onFavoriteTap),
-          _ReplyIcon(icon: Icons.more_horiz, onTap: onMoreTap),
+          _ReplyIcon(
+              icon: Icons.emoji_emotions_outlined,
+              tooltip: l.chatActionReact,
+              onTap: onEmojiTap),
+          _ReplyIcon(
+              icon: Icons.reply_outlined,
+              tooltip: l.chatActionReply,
+              onTap: onReplyTap),
+          _ReplyIcon(
+              icon: Icons.bookmark_add_outlined,
+              tooltip: l.chatToolSaved,
+              onTap: onFavoriteTap),
+          _ReplyIcon(
+              icon: Icons.more_horiz,
+              tooltip: l.actionMore,
+              onTap: onMoreTap),
         ],
       ),
     );
@@ -1894,20 +2127,26 @@ class _ReplyActionsBar extends StatelessWidget {
 }
 
 class _ReplyIcon extends StatelessWidget {
-  const _ReplyIcon({required this.icon, this.onTap});
+  const _ReplyIcon({required this.icon, required this.tooltip, this.onTap});
   final IconData icon;
+  final String tooltip;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    // 24px hit target (p-1 around a 16px-ish glyph in web → 20px glyph here),
-    // flat with a hover fill matching the web's md:hover:bg-gray-100.
-    return InkWell(
-      onTap: onTap,
-      hoverColor: AppTokens.gray100,
-      child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: Icon(icon, size: 20, color: AppTokens.gray500),
+    // Flat with a hover fill matching the web's md:hover:bg-gray-100. The
+    // 32px box keeps the toolbar compact while staying tappable on touch.
+    return Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 500),
+      child: InkWell(
+        onTap: onTap,
+        hoverColor: AppTokens.gray100,
+        child: SizedBox(
+          width: 32,
+          height: 32,
+          child: Icon(icon, size: 20, color: AppTokens.gray500),
+        ),
       ),
     );
   }
@@ -1940,12 +2179,19 @@ class _SendBox extends StatelessWidget {
     this.replyTarget,
     this.replyTargetName,
     this.onCancelReply,
+    this.textFieldKey,
+    this.onChanged,
   });
 
   final TextEditingController controller;
   final bool canSend;
   final VoidCallback onSend;
   final String placeholder;
+
+  /// Anchor key for the mention overlay — lets [_ChatScreenState] locate the
+  /// composer's on-screen position without this widget knowing about
+  /// mentions itself.
+  final GlobalKey? textFieldKey;
 
   /// Open the image/file picker.
   final VoidCallback? onAttach;
@@ -1966,6 +2212,11 @@ class _SendBox extends StatelessWidget {
   final ChatMessage? replyTarget;
   final String? replyTargetName;
   final VoidCallback? onCancelReply;
+
+  /// Fires on every text change — used by [_ChatScreenState] to drive the
+  /// mention-overlay trigger. Optional so callers that don't support
+  /// mentions (none currently) needn't wire it.
+  final void Function(String text)? onChanged;
 
   /// Ctrl/Cmd+V handler: send a clipboard image if present, otherwise fall
   /// back to inserting clipboard text at the caret (the default paste, which
@@ -2061,13 +2312,16 @@ class _SendBox extends StatelessWidget {
                         const SingleActivator(LogicalKeyboardKey.keyV,
                             meta: true): _handlePaste,
                       },
-                      child: TextField(
+                      child: KeyedSubtree(
+                        key: textFieldKey,
+                        child: TextField(
                         controller: controller,
                         minLines: 1,
                         maxLines: null,
                         keyboardType: TextInputType.multiline,
                         textInputAction: TextInputAction.newline,
                         cursorColor: AppTokens.primary500,
+                        onChanged: onChanged,
                         style: TextStyle(
                           fontSize: 14,
                           color: AppTokens.gray700,
@@ -2089,6 +2343,7 @@ class _SendBox extends StatelessWidget {
                           focusedErrorBorder: InputBorder.none,
                           isCollapsed: true,
                           contentPadding: EdgeInsets.zero,
+                        ),
                         ),
                       ),
                     ),
@@ -2236,6 +2491,18 @@ class _StagedFileCard extends StatelessWidget {
                           width: thumbSize,
                           height: thumbSize,
                           fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                            width: thumbSize,
+                            height: thumbSize,
+                            color: AppTokens.borderSubtle,
+                            alignment: Alignment.center,
+                            child: Icon(
+                              Icons.broken_image_outlined,
+                              size: 34,
+                              color: AppTokens.textMuted,
+                            ),
+                          ),
                         )
                       : Container(
                           width: thumbSize,
@@ -2273,13 +2540,19 @@ class _StagedFileCard extends StatelessWidget {
             ),
           ),
           Positioned(
-            top: -6,
-            right: -6,
+            top: -10,
+            right: -10,
             child: Row(
               children: [
-                _CardActionButton(icon: Icons.edit_outlined, onTap: onRename),
+                _CardActionButton(
+                    icon: Icons.edit_outlined,
+                    tooltip: AppL10n.of(context).actionEdit,
+                    onTap: onRename),
                 const SizedBox(width: 4),
-                _CardActionButton(icon: Icons.close, onTap: onRemove),
+                _CardActionButton(
+                    icon: Icons.close,
+                    tooltip: AppL10n.of(context).actionCancel,
+                    onTap: onRemove),
               ],
             ),
           ),
@@ -2290,24 +2563,41 @@ class _StagedFileCard extends StatelessWidget {
 }
 
 class _CardActionButton extends StatelessWidget {
-  const _CardActionButton({required this.icon, required this.onTap});
+  const _CardActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
 
   final IconData icon;
+  final String tooltip;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 20,
-        height: 20,
-        decoration: BoxDecoration(
-          color: Colors.black54,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 1),
+    // The visual disc stays 20px (web parity) but the tappable area is
+    // widened to 28px for touch.
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: Center(
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1),
+              ),
+              child: Icon(icon, size: 12, color: Colors.white),
+            ),
+          ),
         ),
-        child: Icon(icon, size: 12, color: Colors.white),
       ),
     );
   }

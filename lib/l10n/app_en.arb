@@ -66,6 +66,44 @@
   "navChats": "Chats",
   "navContacts": "Contacts",
   "navSettings": "Settings",
+  "navSaved": "Saved",
+  "navFiles": "Files",
+  "comingSoon": "Coming soon",
+  "actionBack": "Back",
+  "actionClose": "Close",
+  "memberRoleOwner": "Owner",
+  "tooltipDownload": "Download",
+  "tooltipZoomIn": "Zoom in",
+  "tooltipZoomOut": "Zoom out",
+  "tooltipFullscreen": "Fullscreen",
+  "tooltipExitFullscreen": "Exit fullscreen",
+  "tooltipShowPassword": "Show password",
+  "tooltipHidePassword": "Hide password",
+  "reactionDeletedUser": "Deleted User",
+  "reactionTooltipMany": "{names} and {count} others reacted with {emoji}",
+  "@reactionTooltipMany": {
+    "placeholders": {
+      "names": {"type": "String"},
+      "count": {"type": "int"},
+      "emoji": {"type": "String"}
+    }
+  },
+  "reactionTooltipFew": "{names} reacted with {emoji}",
+  "@reactionTooltipFew": {
+    "placeholders": {
+      "names": {"type": "String"},
+      "emoji": {"type": "String"}
+    }
+  },
+  "expiredImageTitle": "Image not found",
+  "expiredImageBody": "Image expired or deleted",
+  "expiredVideoTitle": "Video not found",
+  "expiredVideoBody": "Video expired or deleted",
+  "expiredAudioTitle": "Audio not found",
+  "expiredAudioBody": "Audio expired or deleted",
+  "expiredFileTitle": "File not found",
+  "expiredFileBody": "File expired or deleted",
+  "featureUnavailable": "This feature is not available yet",
 
   "settingsTitle": "Settings",
   "settingsGroupGeneral": "general",
@@ -267,6 +305,7 @@
   "@errorPrefix": {
     "placeholders": {"message": {"type": "String"}}
   },
+  "errorRequestFailed": "Request failed",
 
   "authKickedFromOtherDevice": "Signed out: your account just signed in on another device.",
   "authAccountDeleted": "Your account has been deleted.",
@@ -290,5 +329,69 @@
   "@chatListMuteFailed": {
     "placeholders": {"error": {"type": "String"}}
   },
-  "chatListMarkReadFailed": "Mark read failed"
+  "chatListMarkReadFailed": "Mark read failed",
+
+  "createChannelTitle": "New Channel",
+  "createChannelNameLabel": "Channel name",
+  "channelPublicLabel": "Public channel",
+  "createChannelPublicAdminOnly": "Only admins can create public channels",
+  "createChannelSubmit": "Create",
+  "createChannelNameRequired": "Please input a channel name",
+  "createChannelFailed": "Failed to create channel",
+  "channelSettingsTitle": "Channel settings",
+  "channelUpdated": "Channel updated",
+  "avatarUpdated": "Avatar updated",
+  "channelVisibilityChanged": "Visibility changed",
+  "inviteLinkCopied": "Link copied",
+  "channelOverview": "Overview",
+  "channelNameLabel": "Name",
+  "channelDescriptionLabel": "Description",
+  "channelSaveChanges": "Save changes",
+  "channelAddMember": "Add member",
+  "channelInviteLinkSection": "Invite link",
+  "channelGenerateInviteLink": "Generate invite link",
+  "channelMuteLabel": "Mute channel",
+  "channelLeaveConfirmBody": "Are you sure you want to leave this channel?",
+  "channelDeleteTitle": "Delete channel",
+  "channelDeleteConfirmBody": "This will permanently delete the channel for all members. This cannot be undone.",
+  "actionLeave": "Leave",
+
+  "accountEditNameTitle": "Edit name",
+  "accountNameLabel": "Name",
+  "accountNameUpdated": "Name updated",
+  "accountChangePasswordTitle": "Change password",
+  "accountCurrentPasswordLabel": "Current password",
+  "accountNewPasswordLabel": "New password",
+  "accountPasswordChanged": "Password changed",
+
+  "chatActionCopy": "Copy",
+  "chatActionForward": "Forward",
+  "chatCopiedToClipboard": "Copied to clipboard",
+  "chatForwardedMessagePreview": "[Forwarded message]",
+  "chatAutoDeleteTitle": "Auto-delete messages",
+  "chatExpiresTooltip": "Disappears {duration} after being sent",
+  "@chatExpiresTooltip": {
+    "placeholders": {"duration": {"type": "String"}}
+  },
+  "chatAutoDeleteOff": "Off",
+  "chatAutoDelete5Min": "5 minutes",
+  "chatAutoDelete10Min": "10 minutes",
+  "chatAutoDelete1Hour": "1 hour",
+  "chatAutoDelete1Day": "1 day",
+  "chatAutoDelete1Week": "1 week",
+  "chatAutoDeleteSaved": "Saved",
+  "chatAutoDeleteSaveFailed": "Save failed",
+  "forwardSheetTitle": "Forward to...",
+  "forwardMessageSent": "Message forwarded",
+  "forwardFailed": "Forward failed: {error}",
+  "@forwardFailed": {
+    "placeholders": {"error": {"type": "String"}}
+  },
+  "forwardNoConversations": "No conversations",
+  "forwardSelectedCount": "{count} selected",
+  "@forwardSelectedCount": {
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "archiveForwardedLabel": "Forwarded message(s)",
+  "archiveLoadFailed": "Failed to load forwarded message"
 }

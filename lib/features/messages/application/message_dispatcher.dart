@@ -12,6 +12,7 @@ import '../../channels/domain/pin_chat_models.dart';
 import '../../contacts/application/presence_provider.dart';
 import '../data/message_cache.dart';
 import '../domain/message_models.dart';
+import 'burn_after_read_provider.dart';
 import 'chat_controller.dart';
 import 'reactions_provider.dart';
 import 'read_index_provider.dart';
@@ -100,12 +101,14 @@ class MessageDispatcher extends _$MessageDispatcher {
           _applyPinnedChatsSnapshot(event.data);
           _applyReadIndexSnapshot(event.data);
           _applyMuteSnapshot(event.data);
+          _applyBurnAfterReadSnapshot(event.data);
           return;
         }
         if (event is ChatEventUserSettingsChanged) {
           _applyPinnedChatsDelta(event.data);
           _applyReadIndexDelta(event.data);
           _applyMuteDelta(event.data);
+          _applyBurnAfterReadDelta(event.data);
           return;
         }
         if (event is ChatEventKick) {
@@ -207,6 +210,35 @@ class MessageDispatcher extends _$MessageDispatcher {
       final id = (e[idKey] as num?)?.toInt();
       final mid = (e['mid'] as num?)?.toInt();
       if (id != null && mid != null) out[id] = mid;
+    }
+    return out;
+  }
+
+  /// Burn-after-read snapshot from `user_settings`: replace wholesale.
+  void _applyBurnAfterReadSnapshot(Map<String, dynamic> data) {
+    final users = _parseBurnAfterReading(data['burn_after_reading_users'], 'uid');
+    final groups = _parseBurnAfterReading(data['burn_after_reading_groups'], 'gid');
+    ref.read(burnAfterReadProvider.notifier).applySnapshot(users, groups);
+  }
+
+  /// Burn-after-read delta from `user_settings_changed` (e.g. changed on
+  /// another device): per-entry upsert/remove based on `expires_in`.
+  void _applyBurnAfterReadDelta(Map<String, dynamic> data) {
+    final users = _parseBurnAfterReading(data['burn_after_reading_users'], 'uid');
+    final groups = _parseBurnAfterReading(data['burn_after_reading_groups'], 'gid');
+    if (users.isEmpty && groups.isEmpty) return;
+    ref.read(burnAfterReadProvider.notifier).applyDelta(users, groups);
+  }
+
+  /// Parse a `[{<idKey>, expires_in}]` list into an `{id: expiresIn}` map.
+  Map<int, int> _parseBurnAfterReading(dynamic raw, String idKey) {
+    if (raw is! List) return {};
+    final out = <int, int>{};
+    for (final e in raw) {
+      if (e is! Map) continue;
+      final id = (e[idKey] as num?)?.toInt();
+      final expiresIn = (e['expires_in'] as num?)?.toInt();
+      if (id != null && expiresIn != null) out[id] = expiresIn;
     }
     return out;
   }

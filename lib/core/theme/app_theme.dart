@@ -304,6 +304,114 @@ class AppTheme {
           ),
         ),
       ),
+      // Component themes below centralize shapes/sizes that screens used to
+      // re-specify ad hoc, so buttons/dialogs/sheets look consistent and stay
+      // dark-mode-aware without per-call-site colors.
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(64, 48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(64, 48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          side: BorderSide(
+            color: isDark
+                ? const Color(0xFF4B5563)
+                : const Color(0xFFD0D5DD),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          textStyle: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return Colors.white;
+          return isDark
+              ? const Color(0xFF9CA3AF)
+              : const Color(0xFFFFFFFF);
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return isDark
+                ? const Color(0xFF22CCEE)
+                : const Color(0xFF06AED4);
+          }
+          return isDark
+              ? const Color(0xFF374151)
+              : const Color(0xFFEAECF0);
+        }),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor:
+            isDark ? const Color(0xFF1F2937) : const Color(0xFFFFFFFF),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor:
+            isDark ? const Color(0xFF374151) : const Color(0xFF1D2939),
+        contentTextStyle: const TextStyle(
+          fontSize: 14,
+          color: Colors.white,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor:
+            isDark ? const Color(0xFF1F2937) : const Color(0xFFFFFFFF),
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        showDragHandle: false,
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor:
+            isDark ? const Color(0xFF22CCEE) : const Color(0xFF06AED4),
+        foregroundColor: isDark ? Colors.black : Colors.white,
+        elevation: 2,
+      ),
+      tooltipTheme: TooltipThemeData(
+        waitDuration: const Duration(milliseconds: 400),
+        decoration: BoxDecoration(
+          color: isDark
+              ? const Color(0xFF4B5563)
+              : const Color(0xFF1D2939),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        textStyle: const TextStyle(fontSize: 12, color: Colors.white),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: isDark ? const Color(0xFF22CCEE) : const Color(0xFF06AED4),
+      ),
     );
   }
 }

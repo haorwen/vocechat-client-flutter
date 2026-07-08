@@ -1,9 +1,14 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/i18n/locale_provider.dart';
+import '../../../core/network/dio_client.dart';
+import '../../../core/storage/server_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/safe_text.dart';
@@ -13,6 +18,17 @@ import '../../auth/application/auth_controller.dart';
 import '../../channels/application/conversation_providers.dart';
 import '../../messages/data/message_cache.dart';
 import '../application/app_info_provider.dart';
+import '../data/user_api.dart';
+
+void _showFeatureUnavailable(BuildContext context) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(AppL10n.of(context).featureUnavailable),
+      duration: const Duration(seconds: 1),
+      behavior: SnackBarBehavior.floating,
+    ),
+  );
+}
 
 // ---------------------------------------------------------------------------
 // SettingsScreen — port of vocechat-web's settings page.
@@ -200,6 +216,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         : '';
     final int userUid =
         user is AuthStateAuthenticated ? user.user.uid : 0;
+    final int? avatarUpdatedAt =
+        user is AuthStateAuthenticated ? user.user.avatarUpdatedAt : null;
 
     Widget content;
     switch (_nav) {
@@ -208,6 +226,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           name: userName,
           email: userEmail,
           uid: userUid,
+          avatarUpdatedAt: avatarUpdatedAt,
         );
       case _SettingsNav.notifications:
         content = _NotificationsPane(
@@ -529,20 +548,209 @@ class _SecondaryButton extends StatelessWidget {
 // each with an "Edit" affordance. Matches web/src/routes/setting/MyAccount.tsx.
 // ---------------------------------------------------------------------------
 
-class _MyAccountPane extends StatelessWidget {
+class _MyAccountPane extends ConsumerStatefulWidget {
   const _MyAccountPane({
     required this.name,
     required this.email,
     required this.uid,
+    required this.avatarUpdatedAt,
   });
 
   final String name;
   final String email;
   final int uid;
+  final int? avatarUpdatedAt;
+
+  @override
+  ConsumerState<_MyAccountPane> createState() => _MyAccountPaneState();
+}
+
+class _MyAccountPaneState extends ConsumerState<_MyAccountPane> {
+  bool _uploadingAvatar = false;
+
+  /// Mirrors `_friendlyError` in channel_settings_screen.dart: unwrap the
+  /// shared Dio client's `ApiException` (set by the auth interceptor for any
+  /// non-2xx response) into its human-readable message.
+  String _friendlyError(Object e) {
+    if (e is DioException) {
+      final inner = e.error;
+      if (inner is ApiException) return inner.message;
+      return e.message ?? AppL10n.of(context).errorRequestFailed;
+    }
+    return e.toString();
+  }
+
+  void _showError(Object e) {
+    if (!mounted) return;
+    final l = AppL10n.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(safeText(l.errorPrefix(_friendlyError(e))))),
+    );
+  }
+
+  void _showSuccess(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    if (_uploadingAvatar) return;
+    final l = AppL10n.of(context);
+    setState(() => _uploadingAvatar = true);
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: ImageSource.gallery);
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      await ref.read(userApiProvider).uploadAvatar(bytes);
+      await ref.read(authControllerProvider.notifier).refreshUser();
+      _showSuccess(l.avatarUpdated);
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _uploadingAvatar = false);
+    }
+  }
+
+  Future<void> _editName() async {
+    final l = AppL10n.of(context);
+    final controller = TextEditingController(text: widget.name);
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.accountEditNameTitle),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(labelText: l.accountNameLabel),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(AppL10n.of(ctx).actionCancel),
+          ),
+          TextButton(
+            onPressed: () {
+              final trimmed = controller.text.trim();
+              if (trimmed.isEmpty) return;
+              Navigator.of(ctx).pop(trimmed);
+            },
+            child: Text(AppL10n.of(ctx).chatEditSave),
+          ),
+        ],
+      ),
+    );
+    if (newName == null || newName == widget.name) return;
+
+    try {
+      await ref.read(userApiProvider).updateInfo(name: newName);
+      await ref.read(authControllerProvider.notifier).refreshUser();
+      _showSuccess(l.accountNameUpdated);
+    } catch (e) {
+      _showError(e);
+    }
+  }
+
+  Future<void> _changePassword() async {
+    final l = AppL10n.of(context);
+    final formKey = GlobalKey<FormState>();
+    final oldCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l.accountChangePasswordTitle),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: oldCtrl,
+                obscureText: true,
+                autofocus: true,
+                decoration:
+                    InputDecoration(labelText: l.accountCurrentPasswordLabel),
+                validator: (v) =>
+                    (v == null || v.isEmpty) ? l.loginPasswordRequired : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: newCtrl,
+                obscureText: true,
+                decoration:
+                    InputDecoration(labelText: l.accountNewPasswordLabel),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return l.loginPasswordRequired;
+                  if (v.length < 6) return l.loginPasswordTooShort;
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: confirmCtrl,
+                obscureText: true,
+                decoration:
+                    InputDecoration(labelText: l.registerConfirmPassword),
+                validator: (v) {
+                  if (v == null || v.isEmpty) {
+                    return l.registerConfirmRequired;
+                  }
+                  if (v != newCtrl.text) return l.registerConfirmMismatch;
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l.actionCancel),
+          ),
+          TextButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.of(ctx).pop(true);
+              }
+            },
+            child: Text(l.chatEditSave),
+          ),
+        ],
+      ),
+    );
+    if (result != true) return;
+
+    try {
+      await ref.read(userApiProvider).changePassword(
+            oldPassword: oldCtrl.text,
+            newPassword: newCtrl.text,
+          );
+      _showSuccess(l.accountPasswordChanged);
+    } catch (e) {
+      _showError(e);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
+    final serverState = ref.watch(serverStoreProvider).valueOrNull;
+    final baseUrl = serverState?.servers
+            .where((s) => s.id == serverState.currentServerId)
+            .firstOrNull
+            ?.baseUrl ??
+        '';
+    String? avatarUrl;
+    if ((widget.avatarUpdatedAt ?? 0) > 0 && baseUrl.isNotEmpty) {
+      avatarUrl =
+          '$baseUrl/api/resource/avatar?uid=${widget.uid}&t=${widget.avatarUpdatedAt}';
+    }
+
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -550,7 +758,54 @@ class _MyAccountPane extends StatelessWidget {
           Center(
             child: Column(
               children: [
-                VoceAvatar(name: safeText(name), size: 80),
+                InkWell(
+                  onTap: _uploadingAvatar ? null : _pickAndUploadAvatar,
+                  customBorder: const CircleBorder(),
+                  child: Stack(
+                    children: [
+                      VoceAvatar(
+                        name: safeText(widget.name),
+                        imageUrl: avatarUrl,
+                        size: 80,
+                      ),
+                      if (_uploadingAvatar)
+                        const Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.black26,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: AppTokens.primary500,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: AppTokens.gray100, width: 2),
+                            ),
+                            child: const Icon(Icons.camera_alt,
+                                size: 12, color: Colors.white),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 12),
                 RichText(
                   text: TextSpan(
@@ -560,9 +815,9 @@ class _MyAccountPane extends StatelessWidget {
                       color: AppTokens.gray800,
                     ),
                     children: [
-                      TextSpan(text: safeText(name)),
+                      TextSpan(text: safeText(widget.name)),
                       TextSpan(
-                        text: '  #$uid',
+                        text: '  #${widget.uid}',
                         style: TextStyle(
                           fontWeight: FontWeight.w400,
                           color: AppTokens.gray500,
@@ -577,17 +832,19 @@ class _MyAccountPane extends StatelessWidget {
           ),
           _LabeledRow(
             label: l.accountEmail,
-            value: safeText(email).isEmpty ? '—' : safeText(email),
+            value: safeText(widget.email).isEmpty ? '—' : safeText(widget.email),
           ),
           _LabeledRow(
             label: l.accountUsername,
-            value: '${safeText(name)}  #$uid',
-            trailing: _SecondaryButton(label: l.actionEdit, onTap: () {}),
+            value: '${safeText(widget.name)}  #${widget.uid}',
+            trailing: _SecondaryButton(
+                label: l.actionEdit, onTap: _editName),
           ),
           _LabeledRow(
             label: l.accountPassword,
             value: l.accountPasswordMasked,
-            trailing: _SecondaryButton(label: l.actionEdit, onTap: () {}),
+            trailing: _SecondaryButton(
+                label: l.actionEdit, onTap: _changePassword),
           ),
         ],
       ),
@@ -696,7 +953,7 @@ class _SwitchTile extends StatelessWidget {
           Switch.adaptive(
             value: value,
             onChanged: onChanged,
-            activeColor: AppTokens.primary500,
+            activeTrackColor: AppTokens.primary500,
           ),
         ],
       ),
@@ -979,7 +1236,9 @@ class _StoragePaneState extends ConsumerState<_StoragePane> {
           _LabeledRow(
             label: l.storageAutoDownload,
             value: l.storageWifiOnly,
-            trailing: _SecondaryButton(label: l.actionChange, onTap: () {}),
+            trailing: _SecondaryButton(
+                label: l.actionChange,
+                onTap: () => _showFeatureUnavailable(context)),
           ),
           Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -1023,7 +1282,8 @@ class _AboutPane extends ConsumerWidget {
             trailing: _SecondaryButton(
               label: l.actionOpen,
               icon: Icons.open_in_new_outlined,
-              onTap: () {},
+              onTap: () =>
+                  launchUrl(Uri.parse('https://voce.chat')),
             ),
           ),
           _LabeledRow(
@@ -1031,7 +1291,8 @@ class _AboutPane extends ConsumerWidget {
             value: l.aboutReportBugSubtitle,
             trailing: _SecondaryButton(
               label: l.actionContact,
-              onTap: () {},
+              onTap: () => launchUrl(Uri.parse(
+                  'https://github.com/Privoce/vocechat-web/issues')),
             ),
           ),
         ],

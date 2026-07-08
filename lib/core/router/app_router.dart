@@ -8,6 +8,7 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/channels/presentation/home_shell_screen.dart';
 import '../../features/channels/presentation/chat_list_screen.dart';
+import '../../features/channels/presentation/channel_settings_screen.dart';
 import '../../features/contacts/presentation/contacts_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/messages/presentation/chat_screen.dart';
@@ -99,11 +100,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
       // Validate nested chat route IDs — redirect invalid ones to /home.
       // Tile IDs are emitted as `u-<uid>` / `g-<gid>`, so the hyphen is part
-      // of the canonical shape and the regex must include it.
-      final chatMatch = RegExp(r'^/home/chat/(.+)$').firstMatch(location);
+      // of the canonical shape and the regex must include it. The id segment
+      // may be followed by an optional `/settings` suffix (channel settings
+      // subroute), which must not be swallowed into the id capture group.
+      final chatMatch =
+          RegExp(r'^/home/chat/([^/]+)(?:/settings)?$').firstMatch(location);
       if (chatMatch != null) {
         final id = chatMatch.group(1)!;
         if (!RegExp(r'^[ug]-\d+$').hasMatch(id)) return '/home';
+        // Channel settings is only valid for channels, not DMs.
+        if (location.endsWith('/settings') && !id.startsWith('g-')) {
+          return '/home/chat/$id';
+        }
       }
 
       return null;
@@ -139,6 +147,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                     path: 'chat/:id',
                     builder: (context, state) =>
                         ChatScreen(id: state.pathParameters['id']!),
+                    routes: [
+                      GoRoute(
+                        path: 'settings',
+                        builder: (context, state) {
+                          final id = state.pathParameters['id']!;
+                          final gid = int.tryParse(id.substring(2)) ?? 0;
+                          return ChannelSettingsScreen(gid: gid);
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),

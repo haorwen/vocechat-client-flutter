@@ -220,7 +220,15 @@ class _ContactsHeader extends StatelessWidget {
           IconButton(
             icon: Icon(Icons.person_add_alt_1,
                 size: 22, color: AppTokens.gray500),
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(l.comingSoon),
+                  duration: const Duration(seconds: 1),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
             tooltip: l.contactsAdd,
           ),
         ],
@@ -430,6 +438,8 @@ class _ContactProfile extends ConsumerWidget {
             const SizedBox(height: 4),
             Text(
               '@${safeText(contact.email).split('@').first}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 14,
                 color: AppTokens.gray400,
@@ -437,40 +447,48 @@ class _ContactProfile extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 24),
+            // Flexible actions: each caps at 128px but shrinks near the
+            // 700px two-pane breakpoint instead of overflowing the pane.
             Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _ProfileAction(
-                  icon: Icons.chat_bubble_outline,
-                  label: l.contactsMessage,
-                  isPrimary: true,
-                  onTap: () {
-                    final width = MediaQuery.sizeOf(context).width;
-                    final isWide = width >= 700;
-                    if (isWide) {
-                      // Tell the chat list which conversation to select, then
-                      // switch to the home tab — the list's didChangeDependencies
-                      // picks up the request and renders the two-pane view.
-                      ref
-                          .read(pendingChatSelectionProvider.notifier)
-                          .request('u-${contact.uid}');
-                      context.go('/home');
-                    } else {
-                      context.go('/home/chat/u-${contact.uid}');
-                    }
-                  },
+                Flexible(
+                  child: _ProfileAction(
+                    icon: Icons.chat_bubble_outline,
+                    label: l.contactsMessage,
+                    isPrimary: true,
+                    onTap: () {
+                      final width = MediaQuery.sizeOf(context).width;
+                      final isWide = width >= 700;
+                      if (isWide) {
+                        // Tell the chat list which conversation to select, then
+                        // switch to the home tab — the list's didChangeDependencies
+                        // picks up the request and renders the two-pane view.
+                        ref
+                            .read(pendingChatSelectionProvider.notifier)
+                            .request('u-${contact.uid}');
+                        context.go('/home');
+                      } else {
+                        context.go('/home/chat/u-${contact.uid}');
+                      }
+                    },
+                  ),
                 ),
                 const SizedBox(width: 8),
-                _ProfileAction(
-                  icon: Icons.call_outlined,
-                  label: l.contactsCall,
-                  onTap: () {},
+                Flexible(
+                  child: _ProfileAction(
+                    icon: Icons.call_outlined,
+                    label: l.contactsCall,
+                    onTap: () => _showComingSoon(context),
+                  ),
                 ),
                 const SizedBox(width: 8),
-                _ProfileAction(
-                  icon: Icons.more_horiz,
-                  label: l.actionMore,
-                  onTap: () {},
+                Flexible(
+                  child: _ProfileAction(
+                    icon: Icons.more_horiz,
+                    label: l.actionMore,
+                    onTap: () => _showComingSoon(context),
+                  ),
                 ),
               ],
             ),
@@ -479,6 +497,16 @@ class _ContactProfile extends ConsumerWidget {
       ),
     );
   }
+}
+
+void _showComingSoon(BuildContext context) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(AppL10n.of(context).comingSoon),
+      duration: const Duration(seconds: 1),
+      behavior: SnackBarBehavior.floating,
+    ),
+  );
 }
 
 class _ProfileAction extends StatelessWidget {
@@ -499,10 +527,11 @@ class _ProfileAction extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
+      hoverColor: AppTokens.hover,
       child: Container(
-        width: 128,
+        constraints: const BoxConstraints(maxWidth: 128, minWidth: 88),
         padding:
-            const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: isPrimary ? AppTokens.gray50 : AppTokens.gray100,
           borderRadius: BorderRadius.circular(8),
@@ -513,6 +542,8 @@ class _ProfileAction extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,

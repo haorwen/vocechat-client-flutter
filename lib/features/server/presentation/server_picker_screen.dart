@@ -90,7 +90,14 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                   actionLabel: l.serverPickerAddFirst,
                   onAction: _showAddSheet,
                 )
-              : ListView.separated(
+              : RadioGroup<int>(
+                  groupValue: effectiveIndex,
+                  onChanged: (v) {
+                    if (v != null) {
+                      setState(() => _selectedId = servers[v].id);
+                    }
+                  },
+                  child: ListView.separated(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   itemCount: servers.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 4),
@@ -122,8 +129,8 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                                     safeText(server.name.isNotEmpty
                                         ? server.name[0].toUpperCase()
                                         : 'V'),
-                                    style: const TextStyle(
-                                        color: Colors.white,
+                                    style: TextStyle(
+                                        color: theme.colorScheme.onPrimary,
                                         fontWeight: FontWeight.w700),
                                   ),
                                 ),
@@ -135,6 +142,8 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                                     children: [
                                       Text(
                                         safeText(server.name),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: theme.textTheme.titleSmall
                                             ?.copyWith(
                                           fontWeight: FontWeight.w600,
@@ -162,12 +171,7 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                                     ],
                                   ),
                                 ),
-                                Radio<int>(
-                                  value: i,
-                                  groupValue: effectiveIndex,
-                                  onChanged: (v) => setState(
-                                      () => _selectedId = servers[v!].id),
-                                ),
+                                Radio<int>(value: i),
                               ],
                             ),
                           ),
@@ -175,6 +179,7 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                       ),
                     );
                   },
+                ),
                 ),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: _showAddSheet,
@@ -244,25 +249,23 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
         receiveTimeout: const Duration(seconds: 10),
       ));
       await testDio.get('$url/api/admin/system/organization');
+      if (!mounted) return;
       setState(() {
         _testing = false;
         _tested = true;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.serverTestSuccess)),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.serverTestSuccess)),
+      );
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _testing = false;
         _tested = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l.serverTestFailed)),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l.serverTestFailed)),
+      );
     }
   }
 
@@ -296,7 +299,7 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l = AppL10n.of(context);
-    return Padding(
+    return SingleChildScrollView(
       padding: EdgeInsets.only(
         left: 24,
         right: 24,
@@ -366,6 +369,33 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
                 ),
               ),
             ),
+            if (_showHttpLocalhostWarning) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.errorContainer
+                      .withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded,
+                        size: 18, color: theme.colorScheme.error),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l.serverUrlHttpNotAllowed,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             OutlinedButton.icon(
               onPressed: _testing ? null : _testConnection,

@@ -385,6 +385,156 @@ abstract class AppL10n {
   /// **'Settings'**
   String get navSettings;
 
+  /// No description provided for @navSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get navSaved;
+
+  /// No description provided for @navFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Files'**
+  String get navFiles;
+
+  /// No description provided for @comingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming soon'**
+  String get comingSoon;
+
+  /// No description provided for @actionBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get actionBack;
+
+  /// No description provided for @actionClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get actionClose;
+
+  /// No description provided for @memberRoleOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner'**
+  String get memberRoleOwner;
+
+  /// No description provided for @tooltipDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get tooltipDownload;
+
+  /// No description provided for @tooltipZoomIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom in'**
+  String get tooltipZoomIn;
+
+  /// No description provided for @tooltipZoomOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom out'**
+  String get tooltipZoomOut;
+
+  /// No description provided for @tooltipFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Fullscreen'**
+  String get tooltipFullscreen;
+
+  /// No description provided for @tooltipExitFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit fullscreen'**
+  String get tooltipExitFullscreen;
+
+  /// No description provided for @tooltipShowPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Show password'**
+  String get tooltipShowPassword;
+
+  /// No description provided for @tooltipHidePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide password'**
+  String get tooltipHidePassword;
+
+  /// No description provided for @reactionDeletedUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted User'**
+  String get reactionDeletedUser;
+
+  /// No description provided for @reactionTooltipMany.
+  ///
+  /// In en, this message translates to:
+  /// **'{names} and {count} others reacted with {emoji}'**
+  String reactionTooltipMany(String names, int count, String emoji);
+
+  /// No description provided for @reactionTooltipFew.
+  ///
+  /// In en, this message translates to:
+  /// **'{names} reacted with {emoji}'**
+  String reactionTooltipFew(String names, String emoji);
+
+  /// No description provided for @expiredImageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Image not found'**
+  String get expiredImageTitle;
+
+  /// No description provided for @expiredImageBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Image expired or deleted'**
+  String get expiredImageBody;
+
+  /// No description provided for @expiredVideoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Video not found'**
+  String get expiredVideoTitle;
+
+  /// No description provided for @expiredVideoBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Video expired or deleted'**
+  String get expiredVideoBody;
+
+  /// No description provided for @expiredAudioTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio not found'**
+  String get expiredAudioTitle;
+
+  /// No description provided for @expiredAudioBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio expired or deleted'**
+  String get expiredAudioBody;
+
+  /// No description provided for @expiredFileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'File not found'**
+  String get expiredFileTitle;
+
+  /// No description provided for @expiredFileBody.
+  ///
+  /// In en, this message translates to:
+  /// **'File expired or deleted'**
+  String get expiredFileBody;
+
+  /// No description provided for @featureUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This feature is not available yet'**
+  String get featureUnavailable;
+
   /// No description provided for @settingsTitle.
   ///
   /// In en, this message translates to:
@@ -1231,6 +1381,12 @@ abstract class AppL10n {
   /// **'Error: {message}'**
   String errorPrefix(String message);
 
+  /// No description provided for @errorRequestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Request failed'**
+  String get errorRequestFailed;
+
   /// No description provided for @authKickedFromOtherDevice.
   ///
   /// In en, this message translates to:
@@ -1326,6 +1482,318 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Mark read failed'**
   String get chatListMarkReadFailed;
+
+  /// No description provided for @createChannelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New Channel'**
+  String get createChannelTitle;
+
+  /// No description provided for @createChannelNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel name'**
+  String get createChannelNameLabel;
+
+  /// No description provided for @channelPublicLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Public channel'**
+  String get channelPublicLabel;
+
+  /// No description provided for @createChannelPublicAdminOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only admins can create public channels'**
+  String get createChannelPublicAdminOnly;
+
+  /// No description provided for @createChannelSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get createChannelSubmit;
+
+  /// No description provided for @createChannelNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please input a channel name'**
+  String get createChannelNameRequired;
+
+  /// No description provided for @createChannelFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create channel'**
+  String get createChannelFailed;
+
+  /// No description provided for @channelSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel settings'**
+  String get channelSettingsTitle;
+
+  /// No description provided for @channelUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel updated'**
+  String get channelUpdated;
+
+  /// No description provided for @avatarUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Avatar updated'**
+  String get avatarUpdated;
+
+  /// No description provided for @channelVisibilityChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Visibility changed'**
+  String get channelVisibilityChanged;
+
+  /// No description provided for @inviteLinkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied'**
+  String get inviteLinkCopied;
+
+  /// No description provided for @channelOverview.
+  ///
+  /// In en, this message translates to:
+  /// **'Overview'**
+  String get channelOverview;
+
+  /// No description provided for @channelNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get channelNameLabel;
+
+  /// No description provided for @channelDescriptionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get channelDescriptionLabel;
+
+  /// No description provided for @channelSaveChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get channelSaveChanges;
+
+  /// No description provided for @channelAddMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Add member'**
+  String get channelAddMember;
+
+  /// No description provided for @channelInviteLinkSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite link'**
+  String get channelInviteLinkSection;
+
+  /// No description provided for @channelGenerateInviteLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate invite link'**
+  String get channelGenerateInviteLink;
+
+  /// No description provided for @channelMuteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute channel'**
+  String get channelMuteLabel;
+
+  /// No description provided for @channelLeaveConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to leave this channel?'**
+  String get channelLeaveConfirmBody;
+
+  /// No description provided for @channelDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete channel'**
+  String get channelDeleteTitle;
+
+  /// No description provided for @channelDeleteConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This will permanently delete the channel for all members. This cannot be undone.'**
+  String get channelDeleteConfirmBody;
+
+  /// No description provided for @actionLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get actionLeave;
+
+  /// No description provided for @accountEditNameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit name'**
+  String get accountEditNameTitle;
+
+  /// No description provided for @accountNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get accountNameLabel;
+
+  /// No description provided for @accountNameUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Name updated'**
+  String get accountNameUpdated;
+
+  /// No description provided for @accountChangePasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change password'**
+  String get accountChangePasswordTitle;
+
+  /// No description provided for @accountCurrentPasswordLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Current password'**
+  String get accountCurrentPasswordLabel;
+
+  /// No description provided for @accountNewPasswordLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get accountNewPasswordLabel;
+
+  /// No description provided for @accountPasswordChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Password changed'**
+  String get accountPasswordChanged;
+
+  /// No description provided for @chatActionCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get chatActionCopy;
+
+  /// No description provided for @chatActionForward.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward'**
+  String get chatActionForward;
+
+  /// No description provided for @chatCopiedToClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied to clipboard'**
+  String get chatCopiedToClipboard;
+
+  /// No description provided for @chatForwardedMessagePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'[Forwarded message]'**
+  String get chatForwardedMessagePreview;
+
+  /// No description provided for @chatAutoDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-delete messages'**
+  String get chatAutoDeleteTitle;
+
+  /// No description provided for @chatExpiresTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Disappears {duration} after being sent'**
+  String chatExpiresTooltip(String duration);
+
+  /// No description provided for @chatAutoDeleteOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get chatAutoDeleteOff;
+
+  /// No description provided for @chatAutoDelete5Min.
+  ///
+  /// In en, this message translates to:
+  /// **'5 minutes'**
+  String get chatAutoDelete5Min;
+
+  /// No description provided for @chatAutoDelete10Min.
+  ///
+  /// In en, this message translates to:
+  /// **'10 minutes'**
+  String get chatAutoDelete10Min;
+
+  /// No description provided for @chatAutoDelete1Hour.
+  ///
+  /// In en, this message translates to:
+  /// **'1 hour'**
+  String get chatAutoDelete1Hour;
+
+  /// No description provided for @chatAutoDelete1Day.
+  ///
+  /// In en, this message translates to:
+  /// **'1 day'**
+  String get chatAutoDelete1Day;
+
+  /// No description provided for @chatAutoDelete1Week.
+  ///
+  /// In en, this message translates to:
+  /// **'1 week'**
+  String get chatAutoDelete1Week;
+
+  /// No description provided for @chatAutoDeleteSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get chatAutoDeleteSaved;
+
+  /// No description provided for @chatAutoDeleteSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Save failed'**
+  String get chatAutoDeleteSaveFailed;
+
+  /// No description provided for @forwardSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward to...'**
+  String get forwardSheetTitle;
+
+  /// No description provided for @forwardMessageSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Message forwarded'**
+  String get forwardMessageSent;
+
+  /// No description provided for @forwardFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Forward failed: {error}'**
+  String forwardFailed(String error);
+
+  /// No description provided for @forwardNoConversations.
+  ///
+  /// In en, this message translates to:
+  /// **'No conversations'**
+  String get forwardNoConversations;
+
+  /// No description provided for @forwardSelectedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String forwardSelectedCount(int count);
+
+  /// No description provided for @archiveForwardedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Forwarded message(s)'**
+  String get archiveForwardedLabel;
+
+  /// No description provided for @archiveLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load forwarded message'**
+  String get archiveLoadFailed;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

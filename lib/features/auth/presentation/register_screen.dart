@@ -24,7 +24,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _confirmCtrl = TextEditingController();
   bool _obscurePass = true;
   bool _obscureConfirm = true;
-  bool _isMagicLinkLoading = false;
 
   @override
   void dispose() {
@@ -37,30 +36,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   Future<void> _createAccount() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    // Ignore Enter-key submits while a registration is already in flight.
+    if (ref.read(authControllerProvider).isLoading) return;
 
+    // Navigation + error surfacing happen in the ref.listen in build —
+    // doing it here as well produced duplicate snackbars / double context.go.
     await ref.read(authControllerProvider.notifier).register(
           _nameCtrl.text.trim(),
           _emailCtrl.text.trim(),
           _passwordCtrl.text,
         );
-
-    if (!mounted) return;
-
-    final authState = ref.read(authControllerProvider);
-    authState.whenOrNull(
-      data: (state) {
-        if (state is AuthStateAuthenticated) {
-          context.go('/home');
-        }
-      },
-      error: (e, _) {
-        final msg = e is DioException && e.error is ApiException
-            ? (e.error as ApiException).message
-            : e.toString();
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(safeText(msg))));
-      },
-    );
   }
 
   Future<void> _sendMagicLink() async {
@@ -72,16 +57,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       );
       return;
     }
-    setState(() => _isMagicLinkLoading = true);
-    // Magic-link registration not yet implemented on this server version
-    await Future.delayed(const Duration(seconds: 1));
-    if (mounted) {
-      setState(() => _isMagicLinkLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(l.registerInvitationSent)),
-      );
-    }
+    // Magic-link registration is not implemented on this server version —
+    // say so instead of faking a success message.
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l.featureUnavailable)),
+    );
   }
 
   @override
@@ -123,7 +103,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
           child: Form(
             key: _formKey,
-            child: Column(
+            child: AutofillGroup(
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
@@ -152,6 +133,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.name],
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
                       return l.registerNameRequired;
@@ -175,6 +157,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.email],
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
                       return l.registerEmailRequired;
@@ -198,6 +181,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           BorderRadius.all(Radius.circular(12)),
                     ),
                     suffixIcon: IconButton(
+                      tooltip: _obscurePass
+                          ? l.tooltipShowPassword
+                          : l.tooltipHidePassword,
                       icon: Icon(_obscurePass
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined),
@@ -207,6 +193,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   obscureText: _obscurePass,
                   textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.newPassword],
                   validator: (v) {
                     if (v == null || v.isEmpty) {
                       return l.registerPasswordRequired;
@@ -228,6 +215,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           BorderRadius.all(Radius.circular(12)),
                     ),
                     suffixIcon: IconButton(
+                      tooltip: _obscureConfirm
+                          ? l.tooltipShowPassword
+                          : l.tooltipHidePassword,
                       icon: Icon(_obscureConfirm
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined),
@@ -237,6 +227,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   obscureText: _obscureConfirm,
                   textInputAction: TextInputAction.done,
+                  autofillHints: const [AutofillHints.newPassword],
                   onFieldSubmitted: (_) => _createAccount(),
                   validator: (v) {
                     if (v == null || v.isEmpty) {
@@ -256,17 +247,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
-                  onPressed:
-                      _isMagicLinkLoading ? null : _sendMagicLink,
-                  icon: _isMagicLinkLoading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child:
-                              CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.auto_awesome_outlined,
-                          size: 18),
+                  onPressed: _sendMagicLink,
+                  icon: const Icon(Icons.auto_awesome_outlined,
+                      size: 18),
                   label:
                       Text(l.registerMagicLink),
                   style: OutlinedButton.styleFrom(
@@ -290,6 +273,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ],
                 ),
               ],
+              ),
             ),
           ),
         ),

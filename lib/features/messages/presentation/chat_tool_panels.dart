@@ -7,6 +7,7 @@ import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../../contacts/application/user_directory_provider.dart';
+import '../application/burn_after_read_provider.dart';
 import '../application/chat_tools_provider.dart';
 import '../domain/message_models.dart';
 
@@ -21,7 +22,7 @@ import '../domain/message_models.dart';
 // Narrow (<700): show as a near-full bottom sheet (90% of screen height).
 // ---------------------------------------------------------------------------
 
-enum ChatTool { pin, saved, members }
+enum ChatTool { pin, saved, members, autoDelete }
 
 Future<void> showChatToolOverlay(
   BuildContext context, {
@@ -36,6 +37,7 @@ Future<void> showChatToolOverlay(
     ChatTool.pin => l.chatToolPin,
     ChatTool.saved => l.chatToolSaved,
     ChatTool.members => l.chatToolMembers,
+    ChatTool.autoDelete => l.chatAutoDeleteTitle,
   };
 
   Widget body() {
@@ -46,6 +48,8 @@ Future<void> showChatToolOverlay(
         return _FavListPanel(targetId: targetId, isChannel: isChannel);
       case ChatTool.members:
         return _MembersListPanel(gid: targetId);
+      case ChatTool.autoDelete:
+        return _AutoDeletePanel(targetId: targetId, isChannel: isChannel);
     }
   }
 
@@ -54,7 +58,7 @@ Future<void> showChatToolOverlay(
     return showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
-      barrierLabel: 'dismiss',
+      barrierLabel: l.actionClose,
       barrierColor: Colors.black.withValues(alpha: 0.18),
       pageBuilder: (ctx, _, __) {
         return SafeArea(
@@ -168,6 +172,7 @@ class _ToolHeader extends StatelessWidget {
             ),
             const Spacer(),
             IconButton(
+              tooltip: AppL10n.of(context).actionClose,
               icon: Icon(Icons.close,
                   size: 18, color: AppTokens.gray500),
               onPressed: () => Navigator.of(context).pop(),
@@ -190,9 +195,21 @@ class _PinListPanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppL10n.of(context);
-    final group = ref.watch(groupDirectoryProvider).valueOrNull?[gid];
-    final pins = group?.pinnedMessages ?? const [];
+    final groupsAsync = ref.watch(groupDirectoryProvider);
     final userDir = ref.watch(userDirectoryProvider).valueOrNull ?? {};
+
+    // While the directory is loading, show a spinner instead of flashing the
+    // "no pins" empty state.
+    if (groupsAsync.isLoading && !groupsAsync.hasValue) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    final group = groupsAsync.valueOrNull?[gid];
+    final pins = group?.pinnedMessages ?? const [];
 
     if (pins.isEmpty) {
       return _EmptyState(label: l.chatToolPinEmpty);
@@ -314,8 +331,18 @@ class _MembersListPanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppL10n.of(context);
-    final group = ref.watch(groupDirectoryProvider).valueOrNull?[gid];
+    final groupsAsync = ref.watch(groupDirectoryProvider);
     final userDir = ref.watch(userDirectoryProvider).valueOrNull ?? {};
+
+    if (groupsAsync.isLoading && !groupsAsync.hasValue) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    final group = groupsAsync.valueOrNull?[gid];
 
     if (group == null) {
       return _EmptyState(label: l.chatToolMembersEmpty);
@@ -364,12 +391,137 @@ class _MembersListPanel extends ConsumerWidget {
             ),
           ),
           subtitle: isOwner
-              ? Text('Owner',
+              ? Text(l.memberRoleOwner,
                   style: TextStyle(
                       fontSize: 12, color: AppTokens.gray500))
               : null,
         );
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Auto-delete (burn-after-read) settings — radio picker + save.
+//
+// Server contract: POST /api/user/burn-after-reading with
+// {"users":[{"uid","expires_in"}]} or {"groups":[{"gid","expires_in"}]}.
+// Options mirror the web reference's AutoDeleteMessages.tsx exactly: Off (0),
+// 5 min (300), 10 min (600), 1 hour (3600), 1 day (86400), 1 week (604800).
+// No countdown/deletion animation here — the task scopes that out even
+// though the web reference's ExpireTimer.tsx implements a live countdown;
+// this panel only sets the sender-side setting, which the server then stamps
+// onto subsequently-sent messages' `expires_in` automatically.
+// ---------------------------------------------------------------------------
+
+class _AutoDeletePanel extends ConsumerStatefulWidget {
+  const _AutoDeletePanel({required this.targetId, required this.isChannel});
+  final int targetId;
+  final bool isChannel;
+
+  @override
+  ConsumerState<_AutoDeletePanel> createState() => _AutoDeletePanelState();
+}
+
+class _AutoDeletePanelState extends ConsumerState<_AutoDeletePanel> {
+  static const _options = <int>[0, 300, 600, 3600, 86400, 604800];
+
+  String _labelFor(AppL10n l, int value) {
+    return switch (value) {
+      0 => l.chatAutoDeleteOff,
+      300 => l.chatAutoDelete5Min,
+      600 => l.chatAutoDelete10Min,
+      3600 => l.chatAutoDelete1Hour,
+      86400 => l.chatAutoDelete1Day,
+      604800 => l.chatAutoDelete1Week,
+      _ => '$value',
+    };
+  }
+
+  late int _selected;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final state = ref.read(burnAfterReadProvider);
+    _selected = widget.isChannel
+        ? state.groupExpiresIn(widget.targetId)
+        : state.userExpiresIn(widget.targetId);
+    if (!_options.contains(_selected)) _selected = 0;
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final notifier = ref.read(burnAfterReadProvider.notifier);
+    final ok = widget.isChannel
+        ? await notifier.setGroup(widget.targetId, _selected)
+        : await notifier.setUser(widget.targetId, _selected);
+    if (!mounted) return;
+    final l = AppL10n.of(context);
+    setState(() => _saving = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(ok ? l.chatAutoDeleteSaved : l.chatAutoDeleteSaveFailed),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: _options.length,
+            separatorBuilder: (_, __) =>
+                Divider(height: 1, color: AppTokens.gray200),
+            itemBuilder: (ctx, i) {
+              final value = _options[i];
+              return RadioListTile<int>(
+                value: value,
+                groupValue: _selected,
+                onChanged: (v) => setState(() => _selected = v ?? 0),
+                activeColor: AppTokens.primary400,
+                title: Text(
+                  _labelFor(l, value),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppTokens.textHeading,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        Divider(height: 1, color: AppTokens.gray200),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _saving ? null : _save,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTokens.primary500,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(l.chatEditSave),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -484,10 +636,26 @@ class _EmptyState extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: AppTokens.gray500),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppTokens.gray100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.inbox_outlined,
+                  size: 22, color: AppTokens.gray400),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: AppTokens.gray500),
+            ),
+          ],
         ),
       ),
     );
@@ -535,7 +703,7 @@ Future<void> showSearchOverlay(
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
-    barrierLabel: 'dismiss',
+    barrierLabel: AppL10n.of(context).actionClose,
     barrierColor: Colors.transparent,
     pageBuilder: (ctx, _, __) {
       final width = isWide ? 320.0 : screen.width - 16.0;
@@ -699,6 +867,7 @@ class _SearchPopoverState extends State<_SearchPopover> {
                   ),
                 ),
                 IconButton(
+                  tooltip: l.actionClose,
                   icon: Icon(Icons.close,
                       size: 18, color: AppTokens.gray500),
                   onPressed: () => Navigator.of(context).pop(),
@@ -730,8 +899,8 @@ class _SearchPopoverState extends State<_SearchPopover> {
                         itemBuilder: (ctx, i) {
                           final msg = results[i];
                           final user = widget.userDir[msg.fromUid];
-                          final name =
-                              user?.name ?? 'uid:${msg.fromUid}';
+                          final name = user?.name ??
+                              l.chatUserFallback(msg.fromUid);
                           final content = switch (msg.detail) {
                             NormalMessageDetail() =>
                               (msg.detail as NormalMessageDetail).content,

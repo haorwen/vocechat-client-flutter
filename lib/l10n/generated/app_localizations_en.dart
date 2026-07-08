@@ -161,6 +161,85 @@ class AppL10nEn extends AppL10n {
   String get navSettings => 'Settings';
 
   @override
+  String get navSaved => 'Saved';
+
+  @override
+  String get navFiles => 'Files';
+
+  @override
+  String get comingSoon => 'Coming soon';
+
+  @override
+  String get actionBack => 'Back';
+
+  @override
+  String get actionClose => 'Close';
+
+  @override
+  String get memberRoleOwner => 'Owner';
+
+  @override
+  String get tooltipDownload => 'Download';
+
+  @override
+  String get tooltipZoomIn => 'Zoom in';
+
+  @override
+  String get tooltipZoomOut => 'Zoom out';
+
+  @override
+  String get tooltipFullscreen => 'Fullscreen';
+
+  @override
+  String get tooltipExitFullscreen => 'Exit fullscreen';
+
+  @override
+  String get tooltipShowPassword => 'Show password';
+
+  @override
+  String get tooltipHidePassword => 'Hide password';
+
+  @override
+  String get reactionDeletedUser => 'Deleted User';
+
+  @override
+  String reactionTooltipMany(String names, int count, String emoji) {
+    return '$names and $count others reacted with $emoji';
+  }
+
+  @override
+  String reactionTooltipFew(String names, String emoji) {
+    return '$names reacted with $emoji';
+  }
+
+  @override
+  String get expiredImageTitle => 'Image not found';
+
+  @override
+  String get expiredImageBody => 'Image expired or deleted';
+
+  @override
+  String get expiredVideoTitle => 'Video not found';
+
+  @override
+  String get expiredVideoBody => 'Video expired or deleted';
+
+  @override
+  String get expiredAudioTitle => 'Audio not found';
+
+  @override
+  String get expiredAudioBody => 'Audio expired or deleted';
+
+  @override
+  String get expiredFileTitle => 'File not found';
+
+  @override
+  String get expiredFileBody => 'File expired or deleted';
+
+  @override
+  String get featureUnavailable => 'This feature is not available yet';
+
+  @override
   String get settingsTitle => 'Settings';
 
   @override
@@ -621,6 +700,9 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String get errorRequestFailed => 'Request failed';
+
+  @override
   String get authKickedFromOtherDevice =>
       'Signed out: your account just signed in on another device.';
 
@@ -672,4 +754,169 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get chatListMarkReadFailed => 'Mark read failed';
+
+  @override
+  String get createChannelTitle => 'New Channel';
+
+  @override
+  String get createChannelNameLabel => 'Channel name';
+
+  @override
+  String get channelPublicLabel => 'Public channel';
+
+  @override
+  String get createChannelPublicAdminOnly =>
+      'Only admins can create public channels';
+
+  @override
+  String get createChannelSubmit => 'Create';
+
+  @override
+  String get createChannelNameRequired => 'Please input a channel name';
+
+  @override
+  String get createChannelFailed => 'Failed to create channel';
+
+  @override
+  String get channelSettingsTitle => 'Channel settings';
+
+  @override
+  String get channelUpdated => 'Channel updated';
+
+  @override
+  String get avatarUpdated => 'Avatar updated';
+
+  @override
+  String get channelVisibilityChanged => 'Visibility changed';
+
+  @override
+  String get inviteLinkCopied => 'Link copied';
+
+  @override
+  String get channelOverview => 'Overview';
+
+  @override
+  String get channelNameLabel => 'Name';
+
+  @override
+  String get channelDescriptionLabel => 'Description';
+
+  @override
+  String get channelSaveChanges => 'Save changes';
+
+  @override
+  String get channelAddMember => 'Add member';
+
+  @override
+  String get channelInviteLinkSection => 'Invite link';
+
+  @override
+  String get channelGenerateInviteLink => 'Generate invite link';
+
+  @override
+  String get channelMuteLabel => 'Mute channel';
+
+  @override
+  String get channelLeaveConfirmBody =>
+      'Are you sure you want to leave this channel?';
+
+  @override
+  String get channelDeleteTitle => 'Delete channel';
+
+  @override
+  String get channelDeleteConfirmBody =>
+      'This will permanently delete the channel for all members. This cannot be undone.';
+
+  @override
+  String get actionLeave => 'Leave';
+
+  @override
+  String get accountEditNameTitle => 'Edit name';
+
+  @override
+  String get accountNameLabel => 'Name';
+
+  @override
+  String get accountNameUpdated => 'Name updated';
+
+  @override
+  String get accountChangePasswordTitle => 'Change password';
+
+  @override
+  String get accountCurrentPasswordLabel => 'Current password';
+
+  @override
+  String get accountNewPasswordLabel => 'New password';
+
+  @override
+  String get accountPasswordChanged => 'Password changed';
+
+  @override
+  String get chatActionCopy => 'Copy';
+
+  @override
+  String get chatActionForward => 'Forward';
+
+  @override
+  String get chatCopiedToClipboard => 'Copied to clipboard';
+
+  @override
+  String get chatForwardedMessagePreview => '[Forwarded message]';
+
+  @override
+  String get chatAutoDeleteTitle => 'Auto-delete messages';
+
+  @override
+  String chatExpiresTooltip(String duration) {
+    return 'Disappears $duration after being sent';
+  }
+
+  @override
+  String get chatAutoDeleteOff => 'Off';
+
+  @override
+  String get chatAutoDelete5Min => '5 minutes';
+
+  @override
+  String get chatAutoDelete10Min => '10 minutes';
+
+  @override
+  String get chatAutoDelete1Hour => '1 hour';
+
+  @override
+  String get chatAutoDelete1Day => '1 day';
+
+  @override
+  String get chatAutoDelete1Week => '1 week';
+
+  @override
+  String get chatAutoDeleteSaved => 'Saved';
+
+  @override
+  String get chatAutoDeleteSaveFailed => 'Save failed';
+
+  @override
+  String get forwardSheetTitle => 'Forward to...';
+
+  @override
+  String get forwardMessageSent => 'Message forwarded';
+
+  @override
+  String forwardFailed(String error) {
+    return 'Forward failed: $error';
+  }
+
+  @override
+  String get forwardNoConversations => 'No conversations';
+
+  @override
+  String forwardSelectedCount(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String get archiveForwardedLabel => 'Forwarded message(s)';
+
+  @override
+  String get archiveLoadFailed => 'Failed to load forwarded message';
 }

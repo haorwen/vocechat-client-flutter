@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 class LoadingCapsule extends StatelessWidget {
   const LoadingCapsule({
     super.key,
-    this.label = 'Updating…',
+    required this.label,
     this.compact = false,
     this.subtle = false,
   });
@@ -86,7 +86,7 @@ class LoadingCapsuleOverlay extends StatelessWidget {
   const LoadingCapsuleOverlay({
     super.key,
     required this.visible,
-    this.label = 'Updating…',
+    required this.label,
     this.bottomPadding = 10,
     this.rightPadding = 12,
   });

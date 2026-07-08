@@ -15,6 +15,7 @@ import '../../../core/storage/secure_token_store.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/safe_text.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import 'file_display_utils.dart';
 
 /// Renders a `vocechat/file` message — image, video, audio, or generic file.
@@ -273,7 +274,19 @@ class _LocalImageBubble extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.memory(bytes, fit: BoxFit.cover),
+            Image.memory(
+              bytes,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: AppTokens.gray100,
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.broken_image_outlined,
+                  color: AppTokens.gray400,
+                  size: 32,
+                ),
+              ),
+            ),
             if (sending)
               Container(
                 color: Colors.white.withValues(alpha: 0.5),
@@ -532,27 +545,27 @@ class _ImagePreviewScreenState extends State<_ImagePreviewScreen> {
                       ),
                       _ToolbarBtn(
                         icon: Icons.download_outlined,
-                        tooltip: 'Download',
+                        tooltip: AppL10n.of(context).tooltipDownload,
                         onTap: () => _launchExternal(widget.downloadUrl),
                       ),
                       _ToolbarBtn(
                         icon: Icons.zoom_in_outlined,
-                        tooltip: 'Zoom in',
+                        tooltip: AppL10n.of(context).tooltipZoomIn,
                         onTap: () => _zoom(1.25),
                       ),
                       _ToolbarBtn(
                         icon: Icons.zoom_out_outlined,
-                        tooltip: 'Zoom out',
+                        tooltip: AppL10n.of(context).tooltipZoomOut,
                         onTap: () => _zoom(0.8),
                       ),
                       _ToolbarBtn(
                         icon: Icons.fullscreen_outlined,
-                        tooltip: 'Fullscreen',
+                        tooltip: AppL10n.of(context).tooltipFullscreen,
                         onTap: _toggleFullscreen,
                       ),
                       _ToolbarBtn(
                         icon: Icons.close,
-                        tooltip: 'Close',
+                        tooltip: AppL10n.of(context).actionClose,
                         onTap: () => Navigator.of(context).maybePop(),
                       ),
                     ],
@@ -567,7 +580,7 @@ class _ImagePreviewScreenState extends State<_ImagePreviewScreen> {
               child: SafeArea(
                 child: _ToolbarBtn(
                   icon: Icons.fullscreen_exit_outlined,
-                  tooltip: 'Exit fullscreen',
+                  tooltip: AppL10n.of(context).tooltipExitFullscreen,
                   onTap: _toggleFullscreen,
                 ),
               ),
@@ -803,7 +816,7 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
         ),
         actions: [
           IconButton(
-            tooltip: 'Download',
+            tooltip: AppL10n.of(context).tooltipDownload,
             icon: const Icon(Icons.download_outlined),
             onPressed: () => _launchExternal(widget.downloadUrl),
           ),
@@ -1068,7 +1081,7 @@ class _FileCard extends StatelessWidget {
           ),
           if (canDownload)
             IconButton(
-              tooltip: 'Download',
+              tooltip: AppL10n.of(context).tooltipDownload,
               icon: Icon(
                 Icons.download_outlined,
                 color: AppTokens.gray500,
@@ -1096,26 +1109,27 @@ class _ExpiredCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     final spec = switch (kind) {
       _ExpiredKind.image => (
           Icons.image_outlined,
-          'Image not Found',
-          'Image expired or deleted',
+          l.expiredImageTitle,
+          l.expiredImageBody,
         ),
       _ExpiredKind.video => (
           Icons.movie_outlined,
-          'Video not Found',
-          'Video expired or deleted',
+          l.expiredVideoTitle,
+          l.expiredVideoBody,
         ),
       _ExpiredKind.audio => (
           Icons.audiotrack_outlined,
-          'Audio not Found',
-          'Audio expired or deleted',
+          l.expiredAudioTitle,
+          l.expiredAudioBody,
         ),
       _ExpiredKind.file => (
           Icons.insert_drive_file_outlined,
-          'File not Found',
-          'File expired or deleted',
+          l.expiredFileTitle,
+          l.expiredFileBody,
         ),
     };
     return Container(

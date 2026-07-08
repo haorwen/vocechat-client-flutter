@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../contacts/application/user_directory_provider.dart';
 import '../application/reactions_provider.dart';
@@ -68,13 +69,15 @@ class _ReactionChip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppL10n.of(context);
     final userDir = ref.watch(userDirectoryProvider).valueOrNull ?? const {};
     final names = uids
-        .map((id) => userDir[id]?.name ?? 'Deleted User')
+        .map((id) => userDir[id]?.name ?? l.reactionDeletedUser)
         .toList(growable: false);
     final tooltip = names.length > 3
-        ? '${names.take(3).join(', ')} and ${names.length - 3} others reacted with $emoji'
-        : '${names.join(', ')} reacted with $emoji';
+        ? l.reactionTooltipMany(
+            names.take(3).join(', '), names.length - 3, emoji)
+        : l.reactionTooltipFew(names.join(', '), emoji);
 
     final bg = reactedByCurrentUser ? AppTokens.primary50 : AppTokens.gray100;
     final border = reactedByCurrentUser
@@ -86,7 +89,10 @@ class _ReactionChip extends ConsumerWidget {
       child: InkWell(
         onTap: () => _toggle(ref),
         borderRadius: BorderRadius.circular(12),
-        child: Container(
+        hoverColor: AppTokens.hover,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOut,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           decoration: BoxDecoration(
             color: bg,
@@ -169,11 +175,14 @@ class ReactionPicker extends ConsumerWidget {
       decoration: BoxDecoration(
         color: AppTokens.surface,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
+        border: Border.all(color: AppTokens.borderSubtle),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x1A000000),
+            color: AppTokens.brightness == Brightness.dark
+                ? const Color(0x66000000)
+                : const Color(0x1A000000),
             blurRadius: 12,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -236,9 +245,10 @@ class _PickerCell extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
+      hoverColor: AppTokens.hover,
       child: Container(
-        width: 36,
-        height: 36,
+        width: 40,
+        height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: reacted ? AppTokens.primary50 : Colors.transparent,

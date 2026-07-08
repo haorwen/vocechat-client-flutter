@@ -96,26 +96,28 @@ class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
     if (isWide) {
       return Scaffold(
         backgroundColor: AppTokens.canvas,
-        body: Row(
-          children: [
-            _DesktopLeftRail(
-              currentIndex: navigationShell.currentIndex,
-              onDestinationSelected: _onDestinationSelected,
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    color: AppTokens.surface,
-                    child: navigationShell,
+        body: SafeArea(
+          child: Row(
+            children: [
+              _DesktopLeftRail(
+                currentIndex: navigationShell.currentIndex,
+                onDestinationSelected: _onDestinationSelected,
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      color: AppTokens.surface,
+                      child: navigationShell,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-          ],
+              const SizedBox(width: 12),
+            ],
+          ),
         ),
       );
     }
@@ -171,6 +173,17 @@ class _DesktopLeftRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    void comingSoon() {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l.comingSoon),
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+
     return SizedBox(
       width: 72,
       child: Column(
@@ -196,7 +209,7 @@ class _DesktopLeftRail extends StatelessWidget {
             isSelected: currentIndex == 0,
             hasBadge: true,
             onTap: () => onDestinationSelected(0),
-            tooltip: 'Chats',
+            tooltip: l.navChats,
           ),
           const SizedBox(height: 8),
           _RailItem(
@@ -204,23 +217,23 @@ class _DesktopLeftRail extends StatelessWidget {
             selectedIcon: Icons.people_rounded,
             isSelected: currentIndex == 1,
             onTap: () => onDestinationSelected(1),
-            tooltip: 'Contacts',
+            tooltip: l.navContacts,
           ),
           const SizedBox(height: 8),
           _RailItem(
             icon: Icons.bookmark_outline_rounded,
             selectedIcon: Icons.bookmark_rounded,
             isSelected: false,
-            onTap: () {},
-            tooltip: 'Saved',
+            onTap: comingSoon,
+            tooltip: l.navSaved,
           ),
           const SizedBox(height: 8),
           _RailItem(
             icon: Icons.folder_outlined,
             selectedIcon: Icons.folder_rounded,
             isSelected: false,
-            onTap: () {},
-            tooltip: 'Files',
+            onTap: comingSoon,
+            tooltip: l.navFiles,
           ),
           const Spacer(),
           _RailItem(
@@ -228,7 +241,7 @@ class _DesktopLeftRail extends StatelessWidget {
             selectedIcon: Icons.settings_rounded,
             isSelected: currentIndex == 2,
             onTap: () => onDestinationSelected(2),
-            tooltip: 'Settings',
+            tooltip: l.navSettings,
           ),
           const SizedBox(height: 12),
         ],
@@ -257,15 +270,21 @@ class _RailItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = isSelected ? AppTokens.primary400 : Colors.transparent;
-    final fg = isSelected ? Colors.white : AppTokens.gray500;
+    final fg = isSelected
+        ? Theme.of(context).colorScheme.onPrimary
+        : AppTokens.gray500;
 
     return Tooltip(
       message: tooltip,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        hoverColor: AppTokens.hover,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 44),
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(8),
