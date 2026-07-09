@@ -24,9 +24,10 @@ import '../domain/message_models.dart';
 // screens get a bottom sheet (radius 16 top corners, 92% height).
 // ---------------------------------------------------------------------------
 
-/// Shows the forward target-picker for [mids]. Returns after the sheet is
-/// dismissed (whether messages were sent or the user cancelled).
-Future<void> showForwardSheet(BuildContext context, {required List<int> mids}) {
+/// Shows the forward target-picker for [mids]. Resolves to `true` when the
+/// messages were sent, and `null` when the user dismissed without sending.
+Future<bool?> showForwardSheet(BuildContext context,
+    {required List<int> mids}) {
   final size = MediaQuery.sizeOf(context);
   final isWide = size.width >= 700;
   final title = AppL10n.of(context).forwardSheetTitle;
@@ -34,7 +35,7 @@ Future<void> showForwardSheet(BuildContext context, {required List<int> mids}) {
   Widget body() => _ForwardBody(mids: mids);
 
   if (isWide) {
-    return showGeneralDialog<void>(
+    return showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
       barrierLabel: AppL10n.of(context).actionClose,
@@ -69,7 +70,7 @@ Future<void> showForwardSheet(BuildContext context, {required List<int> mids}) {
     );
   }
 
-  return showModalBottomSheet<void>(
+  return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
@@ -192,7 +193,7 @@ class _ForwardBodyState extends ConsumerState<_ForwardBody> {
         await api.sendArchive(target, archiveId);
       }
       if (!mounted) return;
-      navigator.pop();
+      navigator.pop(true);
       messenger.showSnackBar(
         SnackBar(content: Text(l.forwardMessageSent)),
       );

@@ -844,6 +844,9 @@ class AppL10nZh extends AppL10n {
   String get chatActionForward => '转发';
 
   @override
+  String get chatActionSelect => '选择';
+
+  @override
   String get chatCopiedToClipboard => '已复制到剪贴板';
 
   @override
@@ -905,4 +908,12 @@ class AppL10nZh extends AppL10n {
 
   @override
   String get archiveLoadFailed => '加载转发消息失败';
+
+  @override
+  String get archiveTapToView => '点击查看详情';
+
+  @override
+  String archiveViewAll(int count) {
+    return '查看全部 $count 条消息';
+  }
 }

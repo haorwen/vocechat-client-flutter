@@ -409,7 +409,7 @@ class _ImageBubbleState extends ConsumerState<_ImageBubble> {
     Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => _ImagePreviewScreen(
+        builder: (_) => ImagePreviewScreen(
           originUrl: widget.urls.origin,
           downloadUrl: widget.urls.download,
           headers: headers,
@@ -420,8 +420,11 @@ class _ImageBubbleState extends ConsumerState<_ImageBubble> {
   }
 }
 
-class _ImagePreviewScreen extends StatefulWidget {
-  const _ImagePreviewScreen({
+/// Full-screen image viewer (download / zoom / fullscreen / close toolbar).
+/// Public so other message renderers (e.g. archive detail) can reuse it.
+class ImagePreviewScreen extends StatefulWidget {
+  const ImagePreviewScreen({
+    super.key,
     required this.originUrl,
     required this.downloadUrl,
     required this.headers,
@@ -434,10 +437,10 @@ class _ImagePreviewScreen extends StatefulWidget {
   final String title;
 
   @override
-  State<_ImagePreviewScreen> createState() => _ImagePreviewScreenState();
+  State<ImagePreviewScreen> createState() => _ImagePreviewScreenState();
 }
 
-class _ImagePreviewScreenState extends State<_ImagePreviewScreen> {
+class _ImagePreviewScreenState extends State<ImagePreviewScreen> {
   final PhotoViewController _photoCtrl = PhotoViewController();
   bool _isFullscreen = false;
 

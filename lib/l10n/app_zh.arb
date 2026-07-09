@@ -300,6 +300,7 @@
 
   "chatActionCopy": "复制",
   "chatActionForward": "转发",
+  "chatActionSelect": "选择",
   "chatCopiedToClipboard": "已复制到剪贴板",
   "chatForwardedMessagePreview": "[转发的消息]",
   "chatAutoDeleteTitle": "阅后即焚",
@@ -318,5 +319,7 @@
   "forwardNoConversations": "暂无会话",
   "forwardSelectedCount": "已选择 {count} 个",
   "archiveForwardedLabel": "转发的消息",
-  "archiveLoadFailed": "加载转发消息失败"
+  "archiveLoadFailed": "加载转发消息失败",
+  "archiveTapToView": "点击查看详情",
+  "archiveViewAll": "查看全部 {count} 条消息"
 }

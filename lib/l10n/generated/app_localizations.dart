@@ -1675,6 +1675,12 @@ abstract class AppL10n {
   /// **'Forward'**
   String get chatActionForward;
 
+  /// No description provided for @chatActionSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get chatActionSelect;
+
   /// No description provided for @chatCopiedToClipboard.
   ///
   /// In en, this message translates to:
@@ -1788,6 +1794,18 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Failed to load forwarded message'**
   String get archiveLoadFailed;
+
+  /// No description provided for @archiveTapToView.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to view details'**
+  String get archiveTapToView;
+
+  /// No description provided for @archiveViewAll.
+  ///
+  /// In en, this message translates to:
+  /// **'View all {count} messages'**
+  String archiveViewAll(int count);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

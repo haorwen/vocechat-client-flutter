@@ -89,6 +89,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// dashed-border drop overlay (web parity with `DnDTip`).
   bool _dragActive = false;
 
+  /// Multi-select mode (web parity with `updateSelectMessages` + the
+  /// `Operations` bar): null when inactive; a (possibly empty) set of selected
+  /// mids while active. Entered via the "Select" context-menu action, exited
+  /// via the bar's close button or after a bulk action completes.
+  Set<int>? _selectedMids;
+
   late MessageTarget _target;
 
   /// Send is enabled when there's text OR at least one staged image.
@@ -114,6 +120,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (oldWidget.id != widget.id) {
       setState(() {
         _target = _parseTarget(widget.id);
+        _selectedMids = null;
       });
       // New conversation: reset the read-report guard so its first visible
       // message gets marked read.
@@ -591,6 +598,89 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Multi-select mode (web `Operations.tsx` parity): enter via the context
+  // menu's "Select" action, toggle rows by tapping/checkbox, then forward /
+  // save / delete the batch from the operations bar that replaces the composer.
+  // -------------------------------------------------------------------------
+
+  void _enterSelectMode(int mid) {
+    setState(() => _selectedMids = {if (mid > 0) mid});
+  }
+
+  void _exitSelectMode() {
+    setState(() => _selectedMids = null);
+  }
+
+  void _toggleSelected(int mid) {
+    final selected = _selectedMids;
+    if (selected == null || mid <= 0) return;
+    setState(() {
+      if (!selected.remove(mid)) selected.add(mid);
+    });
+  }
+
+  /// Selected mids in chat order (oldest first) so the forwarded archive and
+  /// bulk operations preserve reading order — the set itself is insertion-
+  /// ordered by tap sequence, which is not what the receiver should see.
+  List<int> _selectedMidsInOrder() {
+    final selected = _selectedMids ?? const <int>{};
+    final messages =
+        ref.read(chatControllerProvider(_target)).valueOrNull ?? const [];
+    return [
+      for (final m in messages.reversed)
+        if (selected.contains(m.mid)) m.mid,
+    ];
+  }
+
+  Future<void> _forwardSelected() async {
+    final mids = _selectedMidsInOrder();
+    if (mids.isEmpty) return;
+    final sent = await showForwardSheet(context, mids: mids);
+    if (sent == true && mounted) _exitSelectMode();
+  }
+
+  Future<void> _favoriteSelected() async {
+    final l = AppL10n.of(context);
+    final mids = _selectedMidsInOrder();
+    if (mids.isEmpty) return;
+    final ok = await ref.read(favoritesProvider.notifier).add(mids);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(ok ? l.chatToolSavedAdded : l.chatToolSaveFail),
+    ));
+    if (ok) _exitSelectMode();
+  }
+
+  Future<void> _deleteSelected() async {
+    final l = AppL10n.of(context);
+    final mids = _selectedMidsInOrder();
+    if (mids.isEmpty) return;
+    final ok = await showVoceConfirm(
+      context: context,
+      title: l.chatDeleteConfirmTitle,
+      body: l.chatDeleteConfirmBody,
+      confirmLabel: l.chatActionDelete,
+      cancelLabel: l.actionCancel,
+      danger: true,
+    );
+    if (ok != true || !mounted) return;
+    try {
+      final notifier = ref.read(chatControllerProvider(_target).notifier);
+      for (final mid in mids) {
+        await notifier.deleteMessage(mid);
+      }
+      if (!mounted) return;
+      _exitSelectMode();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content:
+                Text(safeText(l.chatDeleteFailed(_friendlyError(e, l))))));
+      }
+    }
+  }
+
   /// Extract a short user-safe error message from a thrown error. `Dio` and
   /// the redacting interceptor scrub headers from logs, but `.toString()` on a
   /// `DioException` still contains the request URL, status line, and raw
@@ -839,6 +929,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                           onEdit: () => _startEdit(msg),
                                           onDelete: () => _confirmDelete(msg),
                                           onJumpToMid: _scrollToMid,
+                                          selecting: _selectedMids != null,
+                                          selected: _selectedMids
+                                                  ?.contains(msg.mid) ??
+                                              false,
+                                          onToggleSelect: () =>
+                                              _toggleSelected(msg.mid),
+                                          onEnterSelect: () =>
+                                              _enterSelectMode(msg.mid),
                                           onRetry: msg.mid < 0 &&
                                                   statuses[msg.mid] ==
                                                       MessageSendStatus.failed
@@ -856,27 +954,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               },
                             ),
                           ),
-                          _SendBox(
-                            controller: _textCtrl,
-                            canSend: _canSend,
-                            onSend: _sendMessage,
-                            onAttach: _pickAndStageFile,
-                            onPasteImage: _pasteFromClipboard,
-                            staged: _staged,
-                            onRemoveStaged: _removeStaged,
-                            onRenameStaged: _showRenameDialog,
-                            placeholder: isChannel
-                                ? l.chatMessagePlaceholderChannel(title)
-                                : l.chatMessagePlaceholderUser(title),
-                            replyTarget: _replyTarget,
-                            replyTargetName: _replyTarget == null
-                                ? null
-                                : (userDir[_replyTarget!.fromUid]?.name ??
-                                    l.chatUserFallback(_replyTarget!.fromUid)),
-                            onCancelReply: _cancelReply,
-                            textFieldKey: _sendBoxKey,
-                            onChanged: isChannel ? _onComposerChanged : null,
-                          ),
+                          if (_selectedMids != null)
+                            _SelectionBar(
+                              count: _selectedMids!.length,
+                              onForward: _forwardSelected,
+                              onFavorite: _favoriteSelected,
+                              onDelete: _deleteSelected,
+                              onClose: _exitSelectMode,
+                            )
+                          else
+                            _SendBox(
+                              controller: _textCtrl,
+                              canSend: _canSend,
+                              onSend: _sendMessage,
+                              onAttach: _pickAndStageFile,
+                              onPasteImage: _pasteFromClipboard,
+                              staged: _staged,
+                              onRemoveStaged: _removeStaged,
+                              onRenameStaged: _showRenameDialog,
+                              placeholder: isChannel
+                                  ? l.chatMessagePlaceholderChannel(title)
+                                  : l.chatMessagePlaceholderUser(title),
+                              replyTarget: _replyTarget,
+                              replyTargetName: _replyTarget == null
+                                  ? null
+                                  : (userDir[_replyTarget!.fromUid]?.name ??
+                                      l.chatUserFallback(
+                                          _replyTarget!.fromUid)),
+                              onCancelReply: _cancelReply,
+                              textFieldKey: _sendBoxKey,
+                              onChanged: isChannel ? _onComposerChanged : null,
+                            ),
                         ],
                       ),
                       if (_dragActive)
@@ -1418,6 +1526,10 @@ class _MessageRow extends ConsumerStatefulWidget {
     this.onEdit,
     this.onDelete,
     this.onJumpToMid,
+    this.selecting = false,
+    this.selected = false,
+    this.onToggleSelect,
+    this.onEnterSelect,
   });
 
   final ChatMessage message;
@@ -1436,6 +1548,13 @@ class _MessageRow extends ConsumerStatefulWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final void Function(int mid)? onJumpToMid;
+
+  /// Multi-select mode: while [selecting], rows render a leading checkbox and
+  /// any tap toggles membership instead of opening menus/pickers.
+  final bool selecting;
+  final bool selected;
+  final VoidCallback? onToggleSelect;
+  final VoidCallback? onEnterSelect;
 
   @override
   ConsumerState<_MessageRow> createState() => _MessageRowState();
@@ -1649,9 +1768,13 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
 
     final pinned = _isPinned;
     final highlighted = widget.highlighted;
+    final selecting = widget.selecting;
+    final selectable = selecting && msg.mid > 0;
     final rowBg = highlighted
         ? AppTokens.gray200
-        : (pinned ? AppTokens.primary50 : Colors.transparent);
+        : (widget.selected
+            ? AppTokens.primary50
+            : (pinned ? AppTokens.primary50 : Colors.transparent));
 
     final mainRow = AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -1688,6 +1811,21 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (selecting) ...[
+                // AbsorbPointer: the whole row is the toggle target in select
+                // mode; the checkbox is display-only so taps don't race.
+                AbsorbPointer(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8, right: 4),
+                    child: Checkbox(
+                      value: widget.selected,
+                      onChanged: selectable ? (_) {} : null,
+                      activeColor: AppTokens.primary400,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ),
+              ],
               VoceAvatar(
                   name: senderName,
                   imageUrl: senderAvatarUrl,
@@ -1768,6 +1906,19 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         ],
       ),
     );
+
+    // Select mode: the entire row becomes a toggle target — inner interactive
+    // content (image viewers, markdown links, reaction chips) is absorbed so
+    // it can't swallow the tap, and the hover toolbar/context menu stay off.
+    if (selecting) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: selectable ? widget.onToggleSelect : null,
+        child: AbsorbPointer(
+          child: Opacity(opacity: selectable ? 1 : 0.55, child: mainRow),
+        ),
+      );
+    }
 
     Widget row = MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -1925,6 +2076,8 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         VoceContextMenuItem('copy', l.chatActionCopy, icon: Icons.copy_outlined),
       VoceContextMenuItem('forward', l.chatActionForward,
           icon: Icons.forward_outlined),
+      VoceContextMenuItem('select', l.chatActionSelect,
+          icon: Icons.check_circle_outline),
       if (canEdit)
         VoceContextMenuItem('edit', l.chatActionEdit, icon: Icons.edit_outlined),
       if (isChannel)
@@ -1950,6 +2103,8 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
       await _copyToClipboard();
     } else if (selection == 'forward') {
       await _forward();
+    } else if (selection == 'select') {
+      widget.onEnterSelect?.call();
     } else if (selection == 'edit') {
       widget.onEdit?.call();
     } else if (selection == 'delete') {
@@ -2155,6 +2310,108 @@ class _ReplyIcon extends StatelessWidget {
 //   • right-side toolbar: markdown, attach (+), send (zoom-in when text)
 //   • icons are flat gray — no IconButton ripple boxes, no primary fill
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// _SelectionBar — replaces the composer while multi-select mode is active
+// (web parity with chat Layout's `Operations`): forward / save / delete the
+// selected batch, plus a close button that exits the mode.
+// ---------------------------------------------------------------------------
+
+class _SelectionBar extends StatelessWidget {
+  const _SelectionBar({
+    required this.count,
+    required this.onForward,
+    required this.onFavorite,
+    required this.onDelete,
+    required this.onClose,
+  });
+
+  final int count;
+  final VoidCallback onForward;
+  final VoidCallback onFavorite;
+  final VoidCallback onDelete;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    final enabled = count > 0;
+
+    Widget action({
+      required IconData icon,
+      required String tooltip,
+      required VoidCallback onTap,
+      Color? color,
+    }) {
+      return Tooltip(
+        message: tooltip,
+        child: Material(
+          color: AppTokens.gray100,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: enabled ? onTap : null,
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Icon(
+                icon,
+                size: 20,
+                color: enabled
+                    ? (color ?? AppTokens.gray700)
+                    : AppTokens.gray400,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTokens.surface,
+        border: Border(top: BorderSide(color: AppTokens.gray200)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                l.forwardSelectedCount(count),
+                style: TextStyle(fontSize: 13, color: AppTokens.gray500),
+              ),
+            ),
+            action(
+              icon: Icons.forward_outlined,
+              tooltip: l.chatActionForward,
+              onTap: onForward,
+            ),
+            const SizedBox(width: 12),
+            action(
+              icon: Icons.bookmark_outline,
+              tooltip: l.chatToolSaved,
+              onTap: onFavorite,
+            ),
+            const SizedBox(width: 12),
+            action(
+              icon: Icons.delete_outline,
+              tooltip: l.chatActionDelete,
+              onTap: onDelete,
+              color: AppTokens.error,
+            ),
+            const SizedBox(width: 16),
+            IconButton(
+              tooltip: l.actionClose,
+              icon: Icon(Icons.close, size: 20, color: AppTokens.gray500),
+              onPressed: onClose,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _SendBox extends StatelessWidget {
   const _SendBox({

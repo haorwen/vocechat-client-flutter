@@ -365,6 +365,7 @@
 
   "chatActionCopy": "Copy",
   "chatActionForward": "Forward",
+  "chatActionSelect": "Select",
   "chatCopiedToClipboard": "Copied to clipboard",
   "chatForwardedMessagePreview": "[Forwarded message]",
   "chatAutoDeleteTitle": "Auto-delete messages",
@@ -392,5 +393,10 @@
     "placeholders": {"count": {"type": "int"}}
   },
   "archiveForwardedLabel": "Forwarded message(s)",
-  "archiveLoadFailed": "Failed to load forwarded message"
+  "archiveLoadFailed": "Failed to load forwarded message",
+  "archiveTapToView": "Tap to view details",
+  "archiveViewAll": "View all {count} messages",
+  "@archiveViewAll": {
+    "placeholders": {"count": {"type": "int"}}
+  }
 }

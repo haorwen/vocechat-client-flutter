@@ -855,6 +855,9 @@ class AppL10nEn extends AppL10n {
   String get chatActionForward => 'Forward';
 
   @override
+  String get chatActionSelect => 'Select';
+
+  @override
   String get chatCopiedToClipboard => 'Copied to clipboard';
 
   @override
@@ -916,4 +919,12 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get archiveLoadFailed => 'Failed to load forwarded message';
+
+  @override
+  String get archiveTapToView => 'Tap to view details';
+
+  @override
+  String archiveViewAll(int count) {
+    return 'View all $count messages';
+  }
 }
