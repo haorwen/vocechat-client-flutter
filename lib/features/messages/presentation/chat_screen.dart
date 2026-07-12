@@ -476,6 +476,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       // file from its URI on desktop, giving us bytes + a suggested name.
       var staged = false;
       for (final item in reader.items) {
+        // getFile(null) will happily synthesize a "file" out of plain text or
+        // HTML on the clipboard. Only treat the item as a file when it carries
+        // a real file URI; otherwise let the default text paste handle it.
+        final isTextOnly = !item.canProvide(Formats.fileUri) &&
+            (item.canProvide(Formats.plainText) ||
+                item.canProvide(Formats.htmlText));
+        if (isTextOnly) continue;
         final result = await _readFileFromReader(item);
         if (result != null && result.$1.isNotEmpty) {
           _stageFile(result.$1, result.$2);
