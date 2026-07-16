@@ -136,14 +136,28 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                   error: (e, _) =>
                       Center(child: Text(safeText(l.errorPrefix(e.toString())))),
                   data: (conversations) {
+                    // Hide DM contacts with no message history — mirrors the
+                    // web client, whose session list is built from
+                    // userMessage.ids (only gains an id once a message
+                    // exists) rather than the full /api/user roster. Channels
+                    // are never filtered: membership alone makes them visible
+                    // on web (store.channels.ids). Pinned DMs are exempt too:
+                    // web's pinTmps renders every pinned target regardless of
+                    // message history.
+                    final visible = conversations
+                        .where((c) =>
+                            c.isChannel ||
+                            c.lastAt != null ||
+                            pinOrder.containsKey(c.key))
+                        .toList();
                     final lowerQuery = _query.toLowerCase();
                     final filtered = lowerQuery.isEmpty
-                        ? conversations
-                        : conversations
+                        ? visible
+                        : visible
                             .where((c) =>
                                 c.name.toLowerCase().contains(lowerQuery))
                             .toList();
-                    if (conversations.isEmpty) {
+                    if (visible.isEmpty) {
                       return _EmptyState(
                           message: l.chatListEmpty);
                     }
