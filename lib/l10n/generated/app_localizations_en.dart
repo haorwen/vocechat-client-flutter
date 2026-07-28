@@ -400,6 +400,21 @@ class AppL10nEn extends AppL10n {
   String get loginSignUp => 'Sign up';
 
   @override
+  String get loginErrorInvalidCredentials => 'Incorrect email or password';
+
+  @override
+  String get loginErrorAccountFrozen => 'This account has been frozen. Contact your admin.';
+
+  @override
+  String get loginErrorNotInvited => 'No associated account found. Ask an admin for an invitation link.';
+
+  @override
+  String get loginErrorMethodNotSupported => 'This login method isn\'t supported by the server.';
+
+  @override
+  String get loginErrorCannotReachServer => 'Can\'t reach the server. Check your network or the server URL.';
+
+  @override
   String get registerTitle => 'Create account';
 
   @override

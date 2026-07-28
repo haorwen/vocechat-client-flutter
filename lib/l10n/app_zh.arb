@@ -139,6 +139,11 @@
   "loginSwitchServer": "切换服务器",
   "loginNoAccount": "还没有账户？ ",
   "loginSignUp": "注册",
+  "loginErrorInvalidCredentials": "邮箱或密码不正确",
+  "loginErrorAccountFrozen": "该账户已被冻结，请联系管理员。",
+  "loginErrorNotInvited": "未找到关联账户，请联系管理员获取邀请链接。",
+  "loginErrorMethodNotSupported": "服务器不支持此登录方式。",
+  "loginErrorCannotReachServer": "无法连接到服务器，请检查网络或服务器地址。",
 
   "registerTitle": "创建账户",
   "registerHeader": "加入对话",

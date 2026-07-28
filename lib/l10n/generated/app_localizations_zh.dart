@@ -400,6 +400,21 @@ class AppL10nZh extends AppL10n {
   String get loginSignUp => '注册';
 
   @override
+  String get loginErrorInvalidCredentials => '邮箱或密码不正确';
+
+  @override
+  String get loginErrorAccountFrozen => '该账户已被冻结，请联系管理员。';
+
+  @override
+  String get loginErrorNotInvited => '未找到关联账户，请联系管理员获取邀请链接。';
+
+  @override
+  String get loginErrorMethodNotSupported => '服务器不支持此登录方式。';
+
+  @override
+  String get loginErrorCannotReachServer => '无法连接到服务器，请检查网络或服务器地址。';
+
+  @override
   String get registerTitle => '创建账户';
 
   @override

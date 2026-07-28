@@ -139,6 +139,14 @@ class VoceDioClient {
 /// refresh logic when the renew itself returns 401 (dead refresh token).
 const String _kRenewRequest = '__voce_renew_request__';
 
+/// Marker key set in `RequestOptions.extra` on requests where a 401 means a
+/// definitive rejection (e.g. wrong credentials on `/api/token/login`)
+/// rather than an expired access token. Without this, the interceptor would
+/// try to silently refresh using an unrelated/absent refresh token and
+/// retry the very same login POST, swallowing the real "wrong password"
+/// error behind a generic refresh-failure error.
+const String kSkipRefreshOn401 = '__voce_skip_refresh_on_401__';
+
 class _AuthInterceptor extends Interceptor {
   _AuthInterceptor(this._dio, this._ref);
 
@@ -230,6 +238,9 @@ class _AuthInterceptor extends Interceptor {
       if (err.requestOptions.extra[_kRenewRequest] == true) {
         AppLog.w(LogTag.token,
             () => '🔑 renew request itself returned 401 — refresh token dead');
+      } else if (err.requestOptions.extra[kSkipRefreshOn401] == true) {
+        // e.g. wrong email/password on login — nothing to refresh, and
+        // retrying would just resend the same bad credentials.
       } else {
       final serverId =
           _ref.read(serverStoreProvider).valueOrNull?.currentServerId;

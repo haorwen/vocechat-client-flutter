@@ -78,9 +78,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         },
         error: (e, _) {
           if (!mounted) return;
-          final msg = e is DioException && e.error is ApiException
-              ? (e.error as ApiException).message
-              : e.toString();
+          final msg = _loginErrorMessage(context, e);
           ScaffoldMessenger.of(context)
               .showSnackBar(SnackBar(content: Text(safeText(msg))));
         },
@@ -270,6 +268,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
+}
+
+/// Maps a login failure to a specific, localized reason instead of a raw
+/// exception string. Status codes follow the server's `LoginApiResponse`
+/// (`vocechat-server/src/api/token.rs`); status 0 is what `dio_client.dart`
+/// assigns to network/timeout/TLS failures that never reached the server.
+String _loginErrorMessage(BuildContext context, Object error) {
+  final l = AppL10n.of(context);
+  if (error is DioException && error.error is ApiException) {
+    final status = (error.error as ApiException).status;
+    return switch (status) {
+      401 || 404 => l.loginErrorInvalidCredentials,
+      423 => l.loginErrorAccountFrozen,
+      410 => l.loginErrorNotInvited,
+      403 => l.loginErrorMethodNotSupported,
+      0 => l.loginErrorCannotReachServer,
+      _ => (error.error as ApiException).message,
+    };
+  }
+  return error.toString();
 }
 
 class _TertiaryAction {

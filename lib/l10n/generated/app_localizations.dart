@@ -857,6 +857,36 @@ abstract class AppL10n {
   /// **'Sign up'**
   String get loginSignUp;
 
+  /// No description provided for @loginErrorInvalidCredentials.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect email or password'**
+  String get loginErrorInvalidCredentials;
+
+  /// No description provided for @loginErrorAccountFrozen.
+  ///
+  /// In en, this message translates to:
+  /// **'This account has been frozen. Contact your admin.'**
+  String get loginErrorAccountFrozen;
+
+  /// No description provided for @loginErrorNotInvited.
+  ///
+  /// In en, this message translates to:
+  /// **'No associated account found. Ask an admin for an invitation link.'**
+  String get loginErrorNotInvited;
+
+  /// No description provided for @loginErrorMethodNotSupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This login method isn\'t supported by the server.'**
+  String get loginErrorMethodNotSupported;
+
+  /// No description provided for @loginErrorCannotReachServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t reach the server. Check your network or the server URL.'**
+  String get loginErrorCannotReachServer;
+
   /// No description provided for @registerTitle.
   ///
   /// In en, this message translates to:

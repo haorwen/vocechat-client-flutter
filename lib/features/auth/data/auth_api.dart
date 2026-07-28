@@ -25,6 +25,10 @@ class AuthApi {
     final resp = await _dio.post(
       '/api/token/login',
       data: request.toJson(),
+      // A 401 here means wrong credentials, not an expired access token —
+      // skip the auth interceptor's refresh-and-retry so the real error
+      // (ApiException) reaches the caller instead of a generic one.
+      options: Options(extra: {kSkipRefreshOn401: true}),
     );
     return AuthResponse.fromJson(resp.data as Map<String, dynamic>);
   }
