@@ -401,6 +401,7 @@ class MessageApi {
       'webp': 'image/webp',
       'mp4': 'video/mp4',
       'mp3': 'audio/mpeg',
+      'm4a': 'audio/mp4',
       'pdf': 'application/pdf',
     };
     final byExt = map[ext];

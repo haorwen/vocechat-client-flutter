@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:camera/camera.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
@@ -10,8 +11,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:super_clipboard/super_clipboard.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/storage/server_store.dart';
@@ -68,6 +72,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final ItemPositionsListener _itemPositionsListener =
       ItemPositionsListener.create();
   bool _canSend = false;
+
+  /// True while a native file-picker dialog is in flight — guards
+  /// [_pickAndStageFile] against a second concurrent invocation.
+  bool _pickingFile = false;
+
+  /// Explicit markdown mode toggled via the composer's Markdown icon —
+  /// forces the next send's content-type instead of relying on heuristics.
+  /// Resets to off after each send (web parity: per-message, not sticky).
+  bool _markdownMode = false;
   int? _highlightMid;
   Timer? _highlightTimer;
 
@@ -286,6 +299,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final text = _textCtrl.text.trim();
     final l = AppL10n.of(context);
     final replyMid = _replyToMid;
+    final markdown = _markdownMode;
     // Snapshot + clear the staging area; uploads fire below (web parity:
     // staged files only upload on send, then the stage resets).
     final staged = List<_StagedFile>.from(_staged);
@@ -298,15 +312,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _replyTarget = null;
       _staged.clear();
       _pendingMentions.clear();
+      _markdownMode = false;
     });
     try {
       final notifier = ref.read(chatControllerProvider(_target).notifier);
       // 1) Text first (only when non-empty — images can be sent caption-less).
       if (text.isNotEmpty) {
         if (replyMid != null) {
-          await notifier.sendReply(replyMid, text, mentions: mentions);
+          await notifier.sendReply(replyMid, text,
+              mentions: mentions, markdown: markdown);
         } else {
-          await notifier.sendText(text, mentions: mentions);
+          await notifier.sendText(text, mentions: mentions, markdown: markdown);
         }
       }
       // 2) Then each staged image (each becomes its own optimistic row).
@@ -393,7 +409,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// Pick one or more files (any type) via file_picker on every platform and
   /// STAGE them for preview. Reads bytes in-memory so the clipboard + picker
   /// paths share one staging entry point.
+  ///
+  /// Guarded by [_pickingFile]: a second tap while the native picker dialog
+  /// is still open would otherwise race a concurrent `pickFiles` call, which
+  /// file_picker surfaces as a `PlatformException(already_active)` on some
+  /// platforms — from the user's perspective the button just "does nothing".
   Future<void> _pickAndStageFile() async {
+    if (_pickingFile) return;
+    setState(() => _pickingFile = true);
     final l = AppL10n.of(context);
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -410,6 +433,64 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         if (bytes == null || bytes.isEmpty) continue;
         _stageFile(bytes, picked.name);
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(safeText(l.chatSendFailed(_friendlyError(e, l))))));
+      }
+    } finally {
+      if (mounted) setState(() => _pickingFile = false);
+    }
+  }
+
+  /// Open the voice-recording sheet; on confirm, upload the recorded clip
+  /// through the same `sendImage` pipeline used for staged files (reusing
+  /// the existing optimistic-row + upload machinery rather than adding a
+  /// parallel send path).
+  Future<void> _recordVoiceMessage() async {
+    final l = AppL10n.of(context);
+    final bytes = await showModalBottomSheet<Uint8List>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => const _VoiceRecordSheet(),
+    );
+    if (bytes == null || bytes.isEmpty || !mounted) return;
+    try {
+      final notifier = ref.read(chatControllerProvider(_target).notifier);
+      await notifier.sendImage(
+        bytes: bytes,
+        filename: 'voice_${DateTime.now().millisecondsSinceEpoch}.m4a',
+        contentType: 'audio/mp4',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(safeText(l.chatSendFailed(_friendlyError(e, l))))));
+      }
+    }
+  }
+
+  /// Open the full-screen camera capture screen; on confirm, upload the
+  /// recorded clip through the same `sendImage` pipeline as staged files.
+  /// Mobile-only (gated in `_SendBox`) — the `camera` plugin's desktop
+  /// support is not solid enough for this repo's Windows-first workflow.
+  Future<void> _recordVideoMessage() async {
+    final l = AppL10n.of(context);
+    final bytes = await Navigator.of(context, rootNavigator: true).push<Uint8List>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => const _VideoCaptureScreen(),
+      ),
+    );
+    if (bytes == null || bytes.isEmpty || !mounted) return;
+    try {
+      final notifier = ref.read(chatControllerProvider(_target).notifier);
+      await notifier.sendImage(
+        bytes: bytes,
+        filename: 'video_${DateTime.now().millisecondsSinceEpoch}.mp4',
+        contentType: 'video/mp4',
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -974,7 +1055,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               controller: _textCtrl,
                               canSend: _canSend,
                               onSend: _sendMessage,
-                              onAttach: _pickAndStageFile,
+                              onAttach:
+                                  _pickingFile ? null : _pickAndStageFile,
                               onPasteImage: _pasteFromClipboard,
                               staged: _staged,
                               onRemoveStaged: _removeStaged,
@@ -991,6 +1073,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               onCancelReply: _cancelReply,
                               textFieldKey: _sendBoxKey,
                               onChanged: isChannel ? _onComposerChanged : null,
+                              markdownActive: _markdownMode,
+                              onToggleMarkdown: () => setState(
+                                  () => _markdownMode = !_markdownMode),
+                              onRecordVoice: _recordVoiceMessage,
+                              onRecordVideo: _recordVideoMessage,
                             ),
                         ],
                       ),
@@ -2436,6 +2523,10 @@ class _SendBox extends StatelessWidget {
     this.onCancelReply,
     this.textFieldKey,
     this.onChanged,
+    this.markdownActive = false,
+    this.onToggleMarkdown,
+    this.onRecordVoice,
+    this.onRecordVideo,
   });
 
   final TextEditingController controller;
@@ -2472,6 +2563,16 @@ class _SendBox extends StatelessWidget {
   /// mention-overlay trigger. Optional so callers that don't support
   /// mentions (none currently) needn't wire it.
   final void Function(String text)? onChanged;
+
+  /// Whether the next send will use `text/markdown` instead of `text/plain`.
+  final bool markdownActive;
+  final VoidCallback? onToggleMarkdown;
+
+  /// Open the voice-recording sheet / video-capture screen. Both are only
+  /// shown when the composer has no text/staged files (mirrors web's
+  /// mic/send mutual-exclusion pattern).
+  final VoidCallback? onRecordVoice;
+  final VoidCallback? onRecordVideo;
 
   /// Ctrl/Cmd+V handler: send a clipboard image if present, otherwise fall
   /// back to inserting clipboard text at the caret (the default paste, which
@@ -2608,7 +2709,8 @@ class _SendBox extends StatelessWidget {
                 _SendIcon(
                   icon: Icons.code,
                   tooltip: l.chatMarkdown,
-                  onTap: () {},
+                  onTap: onToggleMarkdown,
+                  color: markdownActive ? AppTokens.primary400 : null,
                 ),
                 const SizedBox(width: 10),
                 _SendIcon(
@@ -2616,6 +2718,24 @@ class _SendBox extends StatelessWidget {
                   tooltip: l.chatAttach,
                   onTap: onAttach,
                 ),
+                if (!canSend && onRecordVoice != null) ...[
+                  const SizedBox(width: 10),
+                  _SendIcon(
+                    icon: Icons.mic_none,
+                    tooltip: l.chatVoiceMessage,
+                    onTap: onRecordVoice,
+                  ),
+                ],
+                if (!canSend &&
+                    onRecordVideo != null &&
+                    (Platform.isAndroid || Platform.isIOS)) ...[
+                  const SizedBox(width: 10),
+                  _SendIcon(
+                    icon: Icons.videocam_outlined,
+                    tooltip: l.chatVideoMessage,
+                    onTap: onRecordVideo,
+                  ),
+                ],
                 ClipRect(
                   child: AnimatedAlign(
                     alignment: Alignment.centerRight,
@@ -2646,6 +2766,468 @@ class _SendBox extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _VoiceRecordSheet — bottom sheet with record/stop, elapsed timer, and
+// cancel/send actions. Pops with the recorded bytes on send, or null on
+// cancel/dismiss. Uses the `record` package (cross-platform, incl. desktop).
+// ---------------------------------------------------------------------------
+
+class _VoiceRecordSheet extends StatefulWidget {
+  const _VoiceRecordSheet();
+
+  @override
+  State<_VoiceRecordSheet> createState() => _VoiceRecordSheetState();
+}
+
+class _VoiceRecordSheetState extends State<_VoiceRecordSheet> {
+  final AudioRecorder _recorder = AudioRecorder();
+  Timer? _ticker;
+  Duration _elapsed = Duration.zero;
+  bool _recording = false;
+  bool _finishing = false;
+  String? _path;
+  bool _permissionDenied = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  Future<void> _start() async {
+    final hasPermission = await _recorder.hasPermission();
+    if (!hasPermission) {
+      if (mounted) setState(() => _permissionDenied = true);
+      return;
+    }
+    final dir = await getTemporaryDirectory();
+    final path =
+        '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    await _recorder.start(const RecordConfig(), path: path);
+    if (!mounted) return;
+    setState(() {
+      _recording = true;
+      _path = path;
+      _elapsed = Duration.zero;
+    });
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _elapsed += const Duration(seconds: 1));
+    });
+  }
+
+  Future<void> _stop() async {
+    if (!_recording) return;
+    _ticker?.cancel();
+    await _recorder.stop();
+    if (mounted) setState(() => _recording = false);
+  }
+
+  Future<void> _cancel() async {
+    _ticker?.cancel();
+    if (_recording) await _recorder.stop();
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _confirm() async {
+    if (_finishing) return;
+    setState(() => _finishing = true);
+    _ticker?.cancel();
+    if (_recording) await _recorder.stop();
+    final path = _path;
+    if (path == null) {
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+    final bytes = await File(path).readAsBytes();
+    if (mounted) Navigator.of(context).pop(bytes);
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    _recorder.dispose();
+    super.dispose();
+  }
+
+  String _formatElapsed(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    return SafeArea(
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTokens.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              l.chatVoiceRecording,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppTokens.textHeading,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_permissionDenied)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  l.chatRecordingPermissionDenied,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: AppTokens.error),
+                ),
+              )
+            else ...[
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: _recording
+                      ? AppTokens.error.withValues(alpha: 0.12)
+                      : AppTokens.gray100,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _recording ? Icons.mic : Icons.mic_none,
+                  size: 32,
+                  color: _recording ? AppTokens.error : AppTokens.gray500,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _formatElapsed(_elapsed),
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  color: AppTokens.textHeading,
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _finishing ? null : _cancel,
+                    child: Text(l.chatVoiceRecordingCancel),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _permissionDenied || _finishing
+                        ? null
+                        : (_recording ? _stop : _confirm),
+                    child: Text(_recording
+                        ? l.actionSend
+                        : (_finishing
+                            ? l.actionSend
+                            : l.chatVoiceRecordingSend)),
+                  ),
+                ),
+              ],
+            ),
+            if (_recording)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: TextButton(
+                  onPressed: _finishing
+                      ? null
+                      : () async {
+                          await _stop();
+                          if (mounted) await _confirm();
+                        },
+                  child: Text(l.chatVoiceRecordingSend),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _VideoCaptureScreen — full-screen camera preview with record/stop and a
+// confirm/discard step. Pops with the recorded bytes on confirm, or null on
+// discard/back. Mobile-only (gated at the call site in `_SendBox`).
+// ---------------------------------------------------------------------------
+
+class _VideoCaptureScreen extends StatefulWidget {
+  const _VideoCaptureScreen();
+
+  @override
+  State<_VideoCaptureScreen> createState() => _VideoCaptureScreenState();
+}
+
+class _VideoCaptureScreenState extends State<_VideoCaptureScreen> {
+  CameraController? _controller;
+  List<CameraDescription> _cameras = const [];
+  int _cameraIndex = 0;
+  bool _recording = false;
+  bool _initFailed = false;
+  bool _permissionDenied = false;
+  String? _recordedPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    try {
+      _cameras = await availableCameras();
+      if (_cameras.isEmpty) {
+        if (mounted) setState(() => _initFailed = true);
+        return;
+      }
+      await _openCamera(_cameraIndex);
+    } catch (_) {
+      if (mounted) setState(() => _initFailed = true);
+    }
+  }
+
+  Future<void> _openCamera(int index) async {
+    final previous = _controller;
+    _controller = CameraController(
+      _cameras[index],
+      ResolutionPreset.medium,
+      enableAudio: true,
+    );
+    try {
+      await _controller!.initialize();
+      await previous?.dispose();
+      if (!mounted) return;
+      setState(() => _cameraIndex = index);
+    } on CameraException catch (e) {
+      if (e.code == 'CameraAccessDenied' ||
+          e.code == 'CameraAccessDeniedWithoutPrompt') {
+        if (mounted) setState(() => _permissionDenied = true);
+      } else if (mounted) {
+        setState(() => _initFailed = true);
+      }
+    }
+  }
+
+  Future<void> _switchCamera() async {
+    if (_cameras.length < 2) return;
+    final next = (_cameraIndex + 1) % _cameras.length;
+    await _openCamera(next);
+  }
+
+  Future<void> _toggleRecord() async {
+    final ctrl = _controller;
+    if (ctrl == null || !ctrl.value.isInitialized) return;
+    if (_recording) {
+      final file = await ctrl.stopVideoRecording();
+      if (mounted) {
+        setState(() {
+          _recording = false;
+          _recordedPath = file.path;
+        });
+      }
+    } else {
+      await ctrl.startVideoRecording();
+      if (mounted) setState(() => _recording = true);
+    }
+  }
+
+  Future<void> _confirm() async {
+    final path = _recordedPath;
+    if (path == null) return;
+    final bytes = await File(path).readAsBytes();
+    if (mounted) Navigator.of(context).pop(bytes);
+  }
+
+  void _discard() {
+    setState(() => _recordedPath = null);
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    final recordedPath = _recordedPath;
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: recordedPath != null
+            ? _RecordedVideoPreview(
+                path: recordedPath,
+                onDiscard: _discard,
+                onConfirm: _confirm,
+              )
+            : _permissionDenied
+                ? Center(
+                    child: Text(
+                      l.chatRecordingPermissionDenied,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  )
+                : _initFailed || _controller?.value.isInitialized != true
+                    ? const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      )
+                    : Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CameraPreview(_controller!),
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: IconButton(
+                              icon: const Icon(Icons.close,
+                                  color: Colors.white),
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                          ),
+                          if (_cameras.length > 1)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: IconButton(
+                                icon: const Icon(
+                                    Icons.cameraswitch_outlined,
+                                    color: Colors.white),
+                                onPressed: _recording ? null : _switchCamera,
+                              ),
+                            ),
+                          Positioned(
+                            bottom: 32,
+                            left: 0,
+                            right: 0,
+                            child: Center(
+                              child: GestureDetector(
+                                onTap: _toggleRecord,
+                                child: Container(
+                                  width: 72,
+                                  height: 72,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white, width: 3),
+                                  ),
+                                  padding: const EdgeInsets.all(6),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      shape: _recording
+                                          ? BoxShape.rectangle
+                                          : BoxShape.circle,
+                                      borderRadius: _recording
+                                          ? BorderRadius.circular(6)
+                                          : null,
+                                      color: Colors.redAccent,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+      ),
+    );
+  }
+}
+
+class _RecordedVideoPreview extends StatefulWidget {
+  const _RecordedVideoPreview({
+    required this.path,
+    required this.onDiscard,
+    required this.onConfirm,
+  });
+
+  final String path;
+  final VoidCallback onDiscard;
+  final VoidCallback onConfirm;
+
+  @override
+  State<_RecordedVideoPreview> createState() => _RecordedVideoPreviewState();
+}
+
+class _RecordedVideoPreviewState extends State<_RecordedVideoPreview> {
+  VideoPlayerController? _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = VideoPlayerController.file(File(widget.path))
+      ..initialize().then((_) {
+        if (mounted) setState(() {});
+        _ctrl?.play();
+        _ctrl?.setLooping(true);
+      });
+  }
+
+  @override
+  void dispose() {
+    _ctrl?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    final ctrl = _ctrl;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Center(
+          child: ctrl != null && ctrl.value.isInitialized
+              ? AspectRatio(
+                  aspectRatio: ctrl.value.aspectRatio,
+                  child: VideoPlayer(ctrl),
+                )
+              : const CircularProgressIndicator(color: Colors.white),
+        ),
+        Positioned(
+          bottom: 32,
+          left: 24,
+          right: 24,
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white),
+                  ),
+                  onPressed: widget.onDiscard,
+                  child: Text(l.chatVoiceRecordingCancel),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: widget.onConfirm,
+                  child: Text(l.actionSend),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -3020,15 +3602,17 @@ class _SendIcon extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     this.onTap,
+    this.color,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback? onTap;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
-    final iconWidget = Icon(icon, size: 22, color: AppTokens.gray500);
+    final iconWidget = Icon(icon, size: 22, color: color ?? AppTokens.gray500);
     return Tooltip(
       message: tooltip,
       child: InkResponse(

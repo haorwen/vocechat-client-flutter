@@ -65,6 +65,10 @@ dependencies:
   chewie: ^1.8.5
   just_audio: ^0.9.42
 
+  # Media capture (voice/video messages)
+  record: ^5.2.0
+  camera: ^0.11.0+2
+
   # External
   url_launcher: ^6.3.1
 

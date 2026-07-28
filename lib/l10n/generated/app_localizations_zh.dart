@@ -1,5 +1,3 @@
-// ignore: unused_import
-import 'package:intl/intl.dart' as intl;
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -647,6 +645,24 @@ class AppL10nZh extends AppL10n {
 
   @override
   String get chatAttach => '附件';
+
+  @override
+  String get chatVoiceMessage => '语音消息';
+
+  @override
+  String get chatVideoMessage => '视频消息';
+
+  @override
+  String get chatVoiceRecording => '正在录制语音消息';
+
+  @override
+  String get chatVoiceRecordingCancel => '取消';
+
+  @override
+  String get chatVoiceRecordingSend => '发送';
+
+  @override
+  String get chatRecordingPermissionDenied => '权限被拒绝，请在系统设置中开启麦克风/摄像头权限';
 
   @override
   String chatDropOverlayTitle(String name) {

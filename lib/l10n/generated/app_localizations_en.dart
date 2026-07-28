@@ -1,5 +1,3 @@
-// ignore: unused_import
-import 'package:intl/intl.dart' as intl;
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -267,8 +265,7 @@ class AppL10nEn extends AppL10n {
   String get settingsLogoutConfirmTitle => 'Log out?';
 
   @override
-  String get settingsLogoutConfirmContent =>
-      'You will need to sign in again to access this server.';
+  String get settingsLogoutConfirmContent => 'You will need to sign in again to access this server.';
 
   @override
   String get accountEmail => 'Email';
@@ -286,8 +283,7 @@ class AppL10nEn extends AppL10n {
   String get notificationsPush => 'Push notifications';
 
   @override
-  String get notificationsPushSubtitle =>
-      'Get notified about new messages and mentions.';
+  String get notificationsPushSubtitle => 'Get notified about new messages and mentions.';
 
   @override
   String get notificationsSound => 'Notification sounds';
@@ -341,8 +337,7 @@ class AppL10nEn extends AppL10n {
   String get storageClearCacheConfirmTitle => 'Clear cache?';
 
   @override
-  String get storageClearCacheConfirmBody =>
-      'This removes locally cached messages and images. They will be re-downloaded as needed.';
+  String get storageClearCacheConfirmBody => 'This removes locally cached messages and images. They will be re-downloaded as needed.';
 
   @override
   String get storageClearCacheConfirm => 'Clear';
@@ -465,8 +460,7 @@ class AppL10nEn extends AppL10n {
   String get serverPickerEmptyTitle => 'Connect to a VoceChat server';
 
   @override
-  String get serverPickerEmptySubtitle =>
-      'Add a server to get started chatting with your team.';
+  String get serverPickerEmptySubtitle => 'Add a server to get started chatting with your team.';
 
   @override
   String get serverPickerAddFirst => 'Add your first server';
@@ -493,8 +487,7 @@ class AppL10nEn extends AppL10n {
   String get serverUrlMustHttps => 'Must start with https://';
 
   @override
-  String get serverUrlHttpNotAllowed =>
-      'Only https:// is allowed (http not permitted for remote servers)';
+  String get serverUrlHttpNotAllowed => 'Only https:// is allowed (http not permitted for remote servers)';
 
   @override
   String get serverAlias => 'Alias (optional)';
@@ -541,8 +534,7 @@ class AppL10nEn extends AppL10n {
   String get chatListSelectTitle => 'Select a conversation';
 
   @override
-  String get chatListSelectSubtitle =>
-      'Pick a chat from the left panel to start messaging';
+  String get chatListSelectSubtitle => 'Pick a chat from the left panel to start messaging';
 
   @override
   String get chatListPin => 'Pin to top';
@@ -604,8 +596,7 @@ class AppL10nEn extends AppL10n {
   String get contactsSelectTitle => 'Select a contact';
 
   @override
-  String get contactsSelectSubtitle =>
-      'Pick someone from the list to see their profile';
+  String get contactsSelectSubtitle => 'Pick someone from the list to see their profile';
 
   @override
   String get contactsMessage => 'Message';
@@ -656,6 +647,24 @@ class AppL10nEn extends AppL10n {
   String get chatAttach => 'Attach';
 
   @override
+  String get chatVoiceMessage => 'Voice Message';
+
+  @override
+  String get chatVideoMessage => 'Video Message';
+
+  @override
+  String get chatVoiceRecording => 'Recording voice message';
+
+  @override
+  String get chatVoiceRecordingCancel => 'Cancel';
+
+  @override
+  String get chatVoiceRecordingSend => 'Send';
+
+  @override
+  String get chatRecordingPermissionDenied => 'Permission denied — enable microphone/camera access in system settings';
+
+  @override
   String chatDropOverlayTitle(String name) {
     return 'Send to $name';
   }
@@ -700,8 +709,7 @@ class AppL10nEn extends AppL10n {
   String get errorRequestFailed => 'Request failed';
 
   @override
-  String get authKickedFromOtherDevice =>
-      'Signed out: your account just signed in on another device.';
+  String get authKickedFromOtherDevice => 'Signed out: your account just signed in on another device.';
 
   @override
   String get authAccountDeleted => 'Your account has been deleted.';
@@ -762,8 +770,7 @@ class AppL10nEn extends AppL10n {
   String get channelPublicLabel => 'Public channel';
 
   @override
-  String get createChannelPublicAdminOnly =>
-      'Only admins can create public channels';
+  String get createChannelPublicAdminOnly => 'Only admins can create public channels';
 
   @override
   String get createChannelSubmit => 'Create';
@@ -814,15 +821,13 @@ class AppL10nEn extends AppL10n {
   String get channelMuteLabel => 'Mute channel';
 
   @override
-  String get channelLeaveConfirmBody =>
-      'Are you sure you want to leave this channel?';
+  String get channelLeaveConfirmBody => 'Are you sure you want to leave this channel?';
 
   @override
   String get channelDeleteTitle => 'Delete channel';
 
   @override
-  String get channelDeleteConfirmBody =>
-      'This will permanently delete the channel for all members. This cannot be undone.';
+  String get channelDeleteConfirmBody => 'This will permanently delete the channel for all members. This cannot be undone.';
 
   @override
   String get actionLeave => 'Leave';

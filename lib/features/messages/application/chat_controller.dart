@@ -566,7 +566,11 @@ class ChatController extends _$ChatController {
   /// [mentions] (uids referenced via ` @{uid} ` tokens, group chats only) is
   /// carried in `properties.mentions` for both the optimistic row and the
   /// outgoing request.
-  Future<void> sendText(String text, {List<int>? mentions}) async {
+  Future<void> sendText(
+    String text, {
+    List<int>? mentions,
+    bool markdown = false,
+  }) async {
     final currentUid = _currentUid() ?? -1;
     final tempMid = -DateTime.now().microsecondsSinceEpoch;
     final properties = (mentions == null || mentions.isEmpty)
@@ -579,7 +583,7 @@ class ChatController extends _$ChatController {
       createdAt: DateTime.now().millisecondsSinceEpoch,
       target: target,
       detail: MessageDetail.normal(
-        contentType: 'text/plain',
+        contentType: markdown ? 'text/markdown' : 'text/plain',
         content: text,
         properties: properties,
       ),
@@ -595,11 +599,8 @@ class ChatController extends _$ChatController {
     );
 
     try {
-      final isMarkdown = text.startsWith('>') ||
-          text.contains('**') ||
-          text.contains('```');
       final int realMid;
-      if (isMarkdown) {
+      if (markdown) {
         realMid = await ref
             .read(messageApiProvider)
             .sendMarkdown(target, text, mentions: mentions);

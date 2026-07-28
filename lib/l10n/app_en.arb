@@ -279,6 +279,12 @@
   "chatUnsupported": "[unsupported message]",
   "chatMarkdown": "Markdown",
   "chatAttach": "Attach",
+  "chatVoiceMessage": "Voice Message",
+  "chatVideoMessage": "Video Message",
+  "chatVoiceRecording": "Recording voice message",
+  "chatVoiceRecordingCancel": "Cancel",
+  "chatVoiceRecordingSend": "Send",
+  "chatRecordingPermissionDenied": "Permission denied — enable microphone/camera access in system settings",
   "chatDropOverlayTitle": "Send to {name}",
   "@chatDropOverlayTitle": {
     "placeholders": {"name": {"type": "String"}}
