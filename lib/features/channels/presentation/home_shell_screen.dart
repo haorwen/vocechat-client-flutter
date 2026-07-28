@@ -276,7 +276,8 @@ class _RailItem extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOut,
-          constraints: const BoxConstraints(minWidth: 48, minHeight: 44),
+          width: 44,
+          height: 40,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: bg,
