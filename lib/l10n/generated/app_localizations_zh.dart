@@ -322,6 +322,24 @@ class AppL10nZh extends AppL10n {
   String get languageChinese => '简体中文';
 
   @override
+  String get languageJapanese => '日本語';
+
+  @override
+  String get languageKorean => '한국어';
+
+  @override
+  String get languageSpanish => 'Español';
+
+  @override
+  String get languageFrench => 'Français';
+
+  @override
+  String get languageRussian => 'Русский';
+
+  @override
+  String get languagePortuguese => 'Português';
+
+  @override
   String get storageUsage => '存储用量';
 
   @override

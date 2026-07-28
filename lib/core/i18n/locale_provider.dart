@@ -13,8 +13,24 @@ class AppLocale {
   static const system = AppLocale(code: 'system');
   static const english = AppLocale(code: 'en', locale: Locale('en'));
   static const chinese = AppLocale(code: 'zh', locale: Locale('zh'));
+  static const japanese = AppLocale(code: 'ja', locale: Locale('ja'));
+  static const korean = AppLocale(code: 'ko', locale: Locale('ko'));
+  static const spanish = AppLocale(code: 'es', locale: Locale('es'));
+  static const french = AppLocale(code: 'fr', locale: Locale('fr'));
+  static const russian = AppLocale(code: 'ru', locale: Locale('ru'));
+  static const portuguese = AppLocale(code: 'pt', locale: Locale('pt'));
 
-  static const values = [system, english, chinese];
+  static const values = [
+    system,
+    english,
+    chinese,
+    japanese,
+    korean,
+    spanish,
+    french,
+    russian,
+    portuguese,
+  ];
 
   static AppLocale fromCode(String? code) {
     for (final v in values) {
