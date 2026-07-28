@@ -183,9 +183,20 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                         (pinOrder[a.key] ?? 0).compareTo(pinOrder[b.key] ?? 0));
 
                     return RefreshIndicator(
-                      onRefresh: () async => ref
-                          .read(conversationsProvider.notifier)
-                          .refresh(),
+                      onRefresh: () async {
+                        // Cap how long the pull-down spinner stays visible:
+                        // the refresh itself (and the bottom-right "updating"
+                        // capsule) keep running past this, but the spinner
+                        // hiding early avoids it looking stuck on a slow
+                        // network. `.timeout` still listens to the original
+                        // future, so a late error/completion is discarded
+                        // silently rather than reported as unhandled.
+                        await ref
+                            .read(conversationsProvider.notifier)
+                            .refresh()
+                            .timeout(const Duration(seconds: 5),
+                                onTimeout: () {});
+                      },
                       child: ListView.builder(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 0, vertical: 4),
