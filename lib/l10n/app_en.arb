@@ -165,6 +165,7 @@
   "loginPasswordRequired": "Password is required",
   "loginPasswordTooShort": "Password must be at least 6 characters",
   "loginForgotPassword": "Forgot password?",
+  "loginRememberMe": "Remember password",
   "loginSignIn": "Sign in",
   "loginMagicLink": "Use magic link",
   "loginPasskey": "Sign in with passkey",

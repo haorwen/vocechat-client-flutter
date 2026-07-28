@@ -400,6 +400,9 @@ class AppL10nFr extends AppL10n {
   String get loginForgotPassword => 'Mot de passe oublié ?';
 
   @override
+  String get loginRememberMe => 'Se souvenir du mot de passe';
+
+  @override
   String get loginSignIn => 'Se connecter';
 
   @override

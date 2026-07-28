@@ -138,6 +138,7 @@
   "loginPasswordRequired": "Введите пароль",
   "loginPasswordTooShort": "Пароль должен содержать не менее 6 символов",
   "loginForgotPassword": "Забыли пароль?",
+  "loginRememberMe": "Запомнить пароль",
   "loginSignIn": "Войти",
   "loginMagicLink": "Использовать magic-ссылку",
   "loginPasskey": "Войти с помощью passkey",

@@ -139,6 +139,7 @@
   "loginPasswordRequired": "비밀번호를 입력해 주세요",
   "loginPasswordTooShort": "비밀번호는 6자 이상이어야 합니다",
   "loginForgotPassword": "비밀번호를 잊으셨나요?",
+  "loginRememberMe": "비밀번호 저장",
   "loginSignIn": "로그인",
   "loginMagicLink": "매직 링크 사용",
   "loginPasskey": "패스키로 로그인",

@@ -400,6 +400,9 @@ class AppL10nZh extends AppL10n {
   String get loginForgotPassword => '忘记密码？';
 
   @override
+  String get loginRememberMe => '记住密码';
+
+  @override
   String get loginSignIn => '登录';
 
   @override

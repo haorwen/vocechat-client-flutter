@@ -139,6 +139,7 @@
   "loginPasswordRequired": "La contraseña es obligatoria",
   "loginPasswordTooShort": "La contraseña debe tener al menos 6 caracteres",
   "loginForgotPassword": "¿Olvidaste tu contraseña?",
+  "loginRememberMe": "Recordar contraseña",
   "loginSignIn": "Iniciar sesión",
   "loginMagicLink": "Usar enlace mágico",
   "loginPasskey": "Iniciar sesión con clave de acceso",

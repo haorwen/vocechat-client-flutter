@@ -139,6 +139,7 @@
   "loginPasswordRequired": "请输入密码",
   "loginPasswordTooShort": "密码至少需要 6 个字符",
   "loginForgotPassword": "忘记密码？",
+  "loginRememberMe": "记住密码",
   "loginSignIn": "登录",
   "loginMagicLink": "使用魔法链接",
   "loginPasskey": "使用通行密钥登录",

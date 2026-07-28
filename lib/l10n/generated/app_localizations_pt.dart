@@ -400,6 +400,9 @@ class AppL10nPt extends AppL10n {
   String get loginForgotPassword => 'Esqueceu a senha?';
 
   @override
+  String get loginRememberMe => 'Lembrar senha';
+
+  @override
   String get loginSignIn => 'Entrar';
 
   @override

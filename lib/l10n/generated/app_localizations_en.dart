@@ -400,6 +400,9 @@ class AppL10nEn extends AppL10n {
   String get loginForgotPassword => 'Forgot password?';
 
   @override
+  String get loginRememberMe => 'Remember password';
+
+  @override
   String get loginSignIn => 'Sign in';
 
   @override

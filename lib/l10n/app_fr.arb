@@ -139,6 +139,7 @@
   "loginPasswordRequired": "Le mot de passe est requis",
   "loginPasswordTooShort": "Le mot de passe doit contenir au moins 6 caractères",
   "loginForgotPassword": "Mot de passe oublié ?",
+  "loginRememberMe": "Se souvenir du mot de passe",
   "loginSignIn": "Se connecter",
   "loginMagicLink": "Utiliser un lien magique",
   "loginPasskey": "Se connecter avec une clé d'accès",

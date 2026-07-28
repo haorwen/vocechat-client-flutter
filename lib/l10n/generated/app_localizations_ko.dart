@@ -400,6 +400,9 @@ class AppL10nKo extends AppL10n {
   String get loginForgotPassword => '비밀번호를 잊으셨나요?';
 
   @override
+  String get loginRememberMe => '비밀번호 저장';
+
+  @override
   String get loginSignIn => '로그인';
 
   @override

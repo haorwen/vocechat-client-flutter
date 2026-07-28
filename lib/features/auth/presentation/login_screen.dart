@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/dio_client.dart';
+import '../../../core/storage/secure_token_store.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/utils/safe_text.dart';
 import '../../../features/messages/application/message_dispatcher.dart';
@@ -23,6 +24,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _obscurePassword = true;
+  bool _rememberMe = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRememberedCredential();
+  }
+
+  Future<void> _loadRememberedCredential() async {
+    final serverState = await ref.read(serverStoreProvider.future);
+    final serverId = serverState.currentServerId;
+    if (serverId == null) return;
+    final remembered =
+        await ref.read(secureTokenStoreProvider(serverId)).readRememberedCredential();
+    if (remembered == null || !mounted) return;
+    setState(() {
+      _emailCtrl.text = remembered.email;
+      _passwordCtrl.text = remembered.password;
+      _rememberMe = true;
+    });
+  }
 
   @override
   void dispose() {
@@ -47,9 +69,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     // Navigation + error surfacing happen in the ref.listen below — doing it
     // here as well produced duplicate snackbars / double context.go.
-    await ref
-        .read(authControllerProvider.notifier)
-        .login(_emailCtrl.text.trim(), _passwordCtrl.text);
+    await ref.read(authControllerProvider.notifier).login(
+          _emailCtrl.text.trim(),
+          _passwordCtrl.text,
+          rememberMe: _rememberMe,
+        );
   }
 
   void _showUnavailable() {
@@ -212,13 +236,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: _showUnavailable,
-                    child: Text(l.loginForgotPassword),
-                  ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _rememberMe,
+                      onChanged: (v) =>
+                          setState(() => _rememberMe = v ?? false),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () =>
+                            setState(() => _rememberMe = !_rememberMe),
+                        child: Text(
+                          l.loginRememberMe,
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _showUnavailable,
+                      child: Text(l.loginForgotPassword),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 PrimaryButton(

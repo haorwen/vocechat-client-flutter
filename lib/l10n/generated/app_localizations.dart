@@ -869,6 +869,12 @@ abstract class AppL10n {
   /// **'Forgot password?'**
   String get loginForgotPassword;
 
+  /// No description provided for @loginRememberMe.
+  ///
+  /// In en, this message translates to:
+  /// **'Remember password'**
+  String get loginRememberMe;
+
   /// No description provided for @loginSignIn.
   ///
   /// In en, this message translates to:

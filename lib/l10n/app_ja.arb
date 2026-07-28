@@ -139,6 +139,7 @@
   "loginPasswordRequired": "パスワードを入力してください",
   "loginPasswordTooShort": "パスワードは6文字以上で入力してください",
   "loginForgotPassword": "パスワードをお忘れですか？",
+  "loginRememberMe": "パスワードを保存",
   "loginSignIn": "ログイン",
   "loginMagicLink": "マジックリンクを使用",
   "loginPasskey": "パスキーでログイン",

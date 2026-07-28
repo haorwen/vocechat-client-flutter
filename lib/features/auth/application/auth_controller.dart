@@ -169,7 +169,11 @@ class AuthController extends _$AuthController {
   }
 
   /// Login with email + password (MD5-hashed internally).
-  Future<void> login(String email, String password) async {
+  Future<void> login(
+    String email,
+    String password, {
+    bool rememberMe = false,
+  }) async {
     state = const AsyncLoading();
 
     state = await AsyncValue.guard(() async {
@@ -230,6 +234,15 @@ class AuthController extends _$AuthController {
           () =>
               '🟢 login: tokens saved for serverId=${response.serverId} expires=${DateTime.now().add(Duration(seconds: response.expiredIn))}',
         );
+
+        if (rememberMe) {
+          await tokenStore.saveRememberedCredential(
+            email: email,
+            password: password,
+          );
+        } else {
+          await tokenStore.clearRememberedCredential();
+        }
 
         return AuthState.authenticated(user: response.user);
       } catch (e, st) {

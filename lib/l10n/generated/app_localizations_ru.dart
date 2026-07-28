@@ -400,6 +400,9 @@ class AppL10nRu extends AppL10n {
   String get loginForgotPassword => 'Забыли пароль?';
 
   @override
+  String get loginRememberMe => 'Запомнить пароль';
+
+  @override
   String get loginSignIn => 'Войти';
 
   @override

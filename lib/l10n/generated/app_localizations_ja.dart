@@ -400,6 +400,9 @@ class AppL10nJa extends AppL10n {
   String get loginForgotPassword => 'パスワードをお忘れですか？';
 
   @override
+  String get loginRememberMe => 'パスワードを保存';
+
+  @override
   String get loginSignIn => 'ログイン';
 
   @override

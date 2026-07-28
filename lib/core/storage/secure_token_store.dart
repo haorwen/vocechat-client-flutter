@@ -22,6 +22,13 @@ class TokenData {
   });
 }
 
+class RememberedCredential {
+  final String email;
+  final String password;
+
+  const RememberedCredential({required this.email, required this.password});
+}
+
 final _log = _TokenLogShim();
 bool _webWarningLogged = false;
 bool _keyringFailureLogged = false;
@@ -200,6 +207,26 @@ class SecureTokenStore {
     await _deleteOne(_key('access'));
     await _deleteOne(_key('refresh'));
     await _deleteOne(_key('expires_at'));
+  }
+
+  Future<void> saveRememberedCredential({
+    required String email,
+    required String password,
+  }) async {
+    await _writeOne(_key('remember_email'), email);
+    await _writeOne(_key('remember_password'), password);
+  }
+
+  Future<RememberedCredential?> readRememberedCredential() async {
+    final email = await _readOne(_key('remember_email'));
+    final password = await _readOne(_key('remember_password'));
+    if (email == null || password == null) return null;
+    return RememberedCredential(email: email, password: password);
+  }
+
+  Future<void> clearRememberedCredential() async {
+    await _deleteOne(_key('remember_email'));
+    await _deleteOne(_key('remember_password'));
   }
 }
 
