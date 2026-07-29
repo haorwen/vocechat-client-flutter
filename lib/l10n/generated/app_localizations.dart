@@ -1121,18 +1121,6 @@ abstract class AppL10n {
   /// **'Only https:// is allowed (http not permitted for remote servers)'**
   String get serverUrlHttpNotAllowed;
 
-  /// No description provided for @serverAlias.
-  ///
-  /// In en, this message translates to:
-  /// **'Alias (optional)'**
-  String get serverAlias;
-
-  /// No description provided for @serverAliasHint.
-  ///
-  /// In en, this message translates to:
-  /// **'My Work Server'**
-  String get serverAliasHint;
-
   /// No description provided for @serverTesting.
   ///
   /// In en, this message translates to:

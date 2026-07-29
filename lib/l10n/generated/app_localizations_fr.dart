@@ -526,12 +526,6 @@ class AppL10nFr extends AppL10n {
   String get serverUrlHttpNotAllowed => 'Seul https:// est autorisé (http non permis pour les serveurs distants)';
 
   @override
-  String get serverAlias => 'Alias (facultatif)';
-
-  @override
-  String get serverAliasHint => 'Mon serveur professionnel';
-
-  @override
   String get serverTesting => 'Test en cours…';
 
   @override

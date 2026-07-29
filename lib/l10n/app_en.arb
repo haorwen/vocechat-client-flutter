@@ -209,8 +209,6 @@
   "serverUrlRequired": "URL is required",
   "serverUrlMustHttps": "Must start with https://",
   "serverUrlHttpNotAllowed": "Only https:// is allowed (http not permitted for remote servers)",
-  "serverAlias": "Alias (optional)",
-  "serverAliasHint": "My Work Server",
   "serverTesting": "Testing…",
   "serverTestConnection": "Test connection",
   "serverTestSuccess": "Connection successful",

@@ -526,12 +526,6 @@ class AppL10nKo extends AppL10n {
   String get serverUrlHttpNotAllowed => 'https://만 허용됩니다 (원격 서버에는 http를 사용할 수 없습니다)';
 
   @override
-  String get serverAlias => '별칭 (선택 사항)';
-
-  @override
-  String get serverAliasHint => '내 업무용 서버';
-
-  @override
   String get serverTesting => '테스트 중…';
 
   @override

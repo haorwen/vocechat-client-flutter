@@ -183,8 +183,6 @@
   "serverUrlRequired": "L'URL est requise",
   "serverUrlMustHttps": "Doit commencer par https://",
   "serverUrlHttpNotAllowed": "Seul https:// est autorisé (http non permis pour les serveurs distants)",
-  "serverAlias": "Alias (facultatif)",
-  "serverAliasHint": "Mon serveur professionnel",
   "serverTesting": "Test en cours…",
   "serverTestConnection": "Tester la connexion",
   "serverTestSuccess": "Connexion réussie",

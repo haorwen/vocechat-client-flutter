@@ -216,7 +216,6 @@ class _AddServerSheet extends ConsumerStatefulWidget {
 class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
   final _formKey = GlobalKey<FormState>();
   final _urlCtrl = TextEditingController(text: 'https://');
-  final _aliasCtrl = TextEditingController();
   bool _testing = false;
   bool _tested = false;
   bool _saving = false;
@@ -273,9 +272,7 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
     final l = AppL10n.of(context);
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final url = _urlCtrl.text.trim().replaceAll(RegExp(r'/+$'), '');
-    final alias = _aliasCtrl.text.trim();
-    final name =
-        alias.isNotEmpty ? alias : Uri.tryParse(url)?.host ?? url;
+    final name = Uri.tryParse(url)?.host ?? url;
     final config = ServerConfig(
       id: '${Uri.parse(url).host.replaceAll('.', '_')}_${DateTime.now().millisecondsSinceEpoch}',
       baseUrl: url,
@@ -356,18 +353,6 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
                 }
                 return null;
               },
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _aliasCtrl,
-              decoration: InputDecoration(
-                labelText: l.serverAlias,
-                hintText: l.serverAliasHint,
-                prefixIcon: const Icon(Icons.label_outline),
-                border: const OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                ),
-              ),
             ),
             if (_showHttpLocalhostWarning) ...[
               const SizedBox(height: 12),

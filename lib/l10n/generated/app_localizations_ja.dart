@@ -526,12 +526,6 @@ class AppL10nJa extends AppL10n {
   String get serverUrlHttpNotAllowed => 'https:// のみ使用できます（リモートサーバーでは http は使用できません）';
 
   @override
-  String get serverAlias => 'エイリアス（任意）';
-
-  @override
-  String get serverAliasHint => '会社のサーバー';
-
-  @override
   String get serverTesting => 'テスト中…';
 
   @override

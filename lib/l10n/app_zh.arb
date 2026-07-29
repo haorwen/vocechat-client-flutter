@@ -183,8 +183,6 @@
   "serverUrlRequired": "请输入服务器地址",
   "serverUrlMustHttps": "地址必须以 https:// 开头",
   "serverUrlHttpNotAllowed": "仅允许 https://（远程服务器不允许使用 http）",
-  "serverAlias": "别名（可选）",
-  "serverAliasHint": "我的工作服务器",
   "serverTesting": "测试中…",
   "serverTestConnection": "测试连接",
   "serverTestSuccess": "连接成功",

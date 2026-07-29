@@ -182,8 +182,6 @@
   "serverUrlRequired": "Введите адрес",
   "serverUrlMustHttps": "Адрес должен начинаться с https://",
   "serverUrlHttpNotAllowed": "Разрешён только https:// (http не поддерживается для удалённых серверов)",
-  "serverAlias": "Псевдоним (необязательно)",
-  "serverAliasHint": "Мой рабочий сервер",
   "serverTesting": "Проверка…",
   "serverTestConnection": "Проверить подключение",
   "serverTestSuccess": "Подключение успешно",

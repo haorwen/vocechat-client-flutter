@@ -183,8 +183,6 @@
   "serverUrlRequired": "URL を入力してください",
   "serverUrlMustHttps": "https:// で始まる必要があります",
   "serverUrlHttpNotAllowed": "https:// のみ使用できます（リモートサーバーでは http は使用できません）",
-  "serverAlias": "エイリアス（任意）",
-  "serverAliasHint": "会社のサーバー",
   "serverTesting": "テスト中…",
   "serverTestConnection": "接続をテスト",
   "serverTestSuccess": "接続に成功しました",

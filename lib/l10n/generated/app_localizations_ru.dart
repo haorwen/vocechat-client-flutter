@@ -526,12 +526,6 @@ class AppL10nRu extends AppL10n {
   String get serverUrlHttpNotAllowed => 'Разрешён только https:// (http не поддерживается для удалённых серверов)';
 
   @override
-  String get serverAlias => 'Псевдоним (необязательно)';
-
-  @override
-  String get serverAliasHint => 'Мой рабочий сервер';
-
-  @override
   String get serverTesting => 'Проверка…';
 
   @override

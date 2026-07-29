@@ -183,8 +183,6 @@
   "serverUrlRequired": "URL을 입력해 주세요",
   "serverUrlMustHttps": "https://로 시작해야 합니다",
   "serverUrlHttpNotAllowed": "https://만 허용됩니다 (원격 서버에는 http를 사용할 수 없습니다)",
-  "serverAlias": "별칭 (선택 사항)",
-  "serverAliasHint": "내 업무용 서버",
   "serverTesting": "테스트 중…",
   "serverTestConnection": "연결 테스트",
   "serverTestSuccess": "연결 성공",
