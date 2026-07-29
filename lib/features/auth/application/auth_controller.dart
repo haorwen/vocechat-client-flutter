@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/network/dio_client.dart';
 import '../../../core/storage/account_store.dart';
 import '../../../core/storage/secure_token_store.dart';
 import '../../../core/storage/server_store.dart';
@@ -208,42 +209,62 @@ class AuthController extends _$AuthController {
   /// Align the local server entry with the server-issued id, so token
   /// namespace and currentServerId stay in sync — and we never grow the
   /// servers list with a duplicate on every login.
-  Future<void> _reconcileServerEntry(String responseServerId) async {
+  ///
+  /// [targetBaseUrl] is the base URL the login/register call actually hit —
+  /// normally the currently-configured server, but may point at a different
+  /// server entirely when logging into a second account elsewhere (see
+  /// [login]'s `serverUrl` override). Matching by id first (same server as
+  /// before) then by normalized baseUrl (a server already saved under a
+  /// different local id) avoids creating duplicate [ServerConfig] entries.
+  Future<void> _reconcileServerEntry(
+    String responseServerId,
+    String targetBaseUrl,
+  ) async {
     final serverStore = ref.read(serverStoreProvider.notifier);
     final existing = ref.read(serverStoreProvider).valueOrNull;
-    final localCurrentId = existing?.currentServerId;
-    final hasServerEntry =
-        existing?.servers.any((s) => s.id == responseServerId) ?? false;
+    final normalized = targetBaseUrl.trim().replaceAll(RegExp(r'/+$'), '');
 
-    if (!hasServerEntry) {
-      if (localCurrentId != null &&
-          localCurrentId != responseServerId &&
-          (existing?.servers.any((s) => s.id == localCurrentId) ?? false)) {
-        // Replace the placeholder local id with the canonical server id.
-        await serverStore.replaceServerId(
-          oldId: localCurrentId,
-          newId: responseServerId,
-        );
-      } else {
-        // Cold path: no existing entry to rename — add one keyed by the
-        // server-issued id, using whatever baseUrl is configured.
-        await serverStore.addServer(ServerConfig(
-          id: responseServerId,
-          baseUrl: existing?.servers.firstOrNull?.baseUrl ?? '',
-          name: responseServerId,
-        ));
+    if (existing?.servers.any((s) => s.id == responseServerId) ?? false) {
+      if (existing?.currentServerId != responseServerId) {
         await serverStore.selectServer(responseServerId);
       }
-    } else if (localCurrentId != responseServerId) {
-      await serverStore.selectServer(responseServerId);
+      return;
     }
+
+    final matchByUrl = existing?.servers
+        .where((s) =>
+            s.baseUrl.trim().replaceAll(RegExp(r'/+$'), '') == normalized)
+        .firstOrNull;
+    if (matchByUrl != null) {
+      await serverStore.replaceServerId(
+        oldId: matchByUrl.id,
+        newId: responseServerId,
+      );
+    } else {
+      await serverStore.addServer(ServerConfig(
+        id: responseServerId,
+        baseUrl: normalized,
+        name: Uri.tryParse(normalized)?.host ?? normalized,
+      ));
+    }
+    await serverStore.selectServer(responseServerId);
   }
 
   /// Login with email + password (MD5-hashed internally).
+  ///
+  /// [serverUrl], when provided, targets that server instead of the
+  /// currently-configured one — used by the account-switcher's "Add
+  /// account" screen to sign into a second identity on a different
+  /// VoceChat server. The request is issued through a scoped, disposable
+  /// [VoceDioClient] (same interceptor stack: Referer injection, UTF-16
+  /// sanitization, error mapping) rather than the shared [dioClientProvider],
+  /// so the currently-active session's Dio instance — and any in-flight
+  /// requests relying on it — are left untouched until this login succeeds.
   Future<void> login(
     String email,
     String password, {
     bool rememberMe = false,
+    String? serverUrl,
   }) async {
     // Preserve the previous value (hasValue stays true) instead of a bare
     // AsyncLoading(). The router's redirect uses `authAsync.hasValue` to
@@ -262,6 +283,20 @@ class AuthController extends _$AuthController {
     state = await AsyncValue.guard(() async {
       _suppressStoreReact = true;
       try {
+        final currentServer = ref.read(serverStoreProvider).valueOrNull;
+        final currentBaseUrl = currentServer?.servers
+                .where((s) => s.id == currentServer.currentServerId)
+                .firstOrNull
+                ?.baseUrl ??
+            '';
+        final targetBaseUrl =
+            (serverUrl != null && serverUrl.trim().isNotEmpty)
+                ? serverUrl.trim().replaceAll(RegExp(r'/+$'), '')
+                : currentBaseUrl;
+        final api = targetBaseUrl == currentBaseUrl
+            ? ref.read(authApiProvider)
+            : AuthApi(VoceDioClient(baseUrl: targetBaseUrl, ref: ref).dio);
+
         final request = LoginRequest(
           credential: Credential.password(
             email: email,
@@ -269,9 +304,9 @@ class AuthController extends _$AuthController {
           ),
           device: 'flutter',
         );
-        final response = await ref.read(authApiProvider).login(request);
+        final response = await api.login(request);
 
-        await _reconcileServerEntry(response.serverId);
+        await _reconcileServerEntry(response.serverId, targetBaseUrl);
 
         // Save tokens under an account-scoped key so the same server can
         // hold multiple logged-in accounts side by side.
@@ -414,7 +449,13 @@ class AuthController extends _$AuthController {
             .read(authApiProvider)
             .register(email: email, password: password, name: name);
 
-        await _reconcileServerEntry(response.serverId);
+        final currentServer = ref.read(serverStoreProvider).valueOrNull;
+        final currentBaseUrl = currentServer?.servers
+                .where((s) => s.id == currentServer.currentServerId)
+                .firstOrNull
+                ?.baseUrl ??
+            '';
+        await _reconcileServerEntry(response.serverId, currentBaseUrl);
 
         final accountId =
             AccountStore.makeId(response.serverId, response.user.uid);

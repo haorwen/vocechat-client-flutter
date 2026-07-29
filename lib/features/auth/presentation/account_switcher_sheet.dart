@@ -8,6 +8,7 @@ import '../../../core/storage/server_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/utils/server_url_validator.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../../../shared/widgets/voce_dialog.dart';
 import '../application/auth_controller.dart';
@@ -192,7 +193,8 @@ class _AccountSwitcherSheetState extends ConsumerState<_AccountSwitcherSheet> {
 }
 
 // ---------------------------------------------------------------------------
-// _AddAccountScreen — sign in a second identity on the current server.
+// _AddAccountScreen — sign in a second identity, defaulting to the current
+// server but allowing a different one.
 // ---------------------------------------------------------------------------
 //
 // Pushed imperatively (not through GoRouter), so the router's "authenticated
@@ -200,6 +202,12 @@ class _AccountSwitcherSheetState extends ConsumerState<_AccountSwitcherSheet> {
 // signed in and fully functional underneath this modal until the new login
 // succeeds, at which point `AuthController.login()` makes the new account the
 // active one and this screen pops itself.
+//
+// The server URL field is pre-filled with the current server's baseUrl (the
+// common case: another user on the same VoceChat instance) but is editable,
+// so a different server can be targeted without a detour through
+// /server-picker and without disturbing the active session — see
+// `AuthController.login`'s `serverUrl` override.
 
 class _AddAccountScreen extends ConsumerStatefulWidget {
   const _AddAccountScreen();
@@ -210,14 +218,17 @@ class _AddAccountScreen extends ConsumerStatefulWidget {
 
 class _AddAccountScreenState extends ConsumerState<_AddAccountScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _urlCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _obscurePassword = true;
   bool _submitting = false;
+  bool _urlInitialized = false;
   String? _error;
 
   @override
   void dispose() {
+    _urlCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
@@ -233,6 +244,7 @@ class _AddAccountScreenState extends ConsumerState<_AddAccountScreen> {
       await ref.read(authControllerProvider.notifier).login(
             _emailCtrl.text.trim(),
             _passwordCtrl.text,
+            serverUrl: _urlCtrl.text.trim(),
           );
       final state = ref.read(authControllerProvider).valueOrNull;
       if (state is AuthStateAuthenticated && mounted) {
@@ -272,6 +284,10 @@ class _AddAccountScreenState extends ConsumerState<_AddAccountScreen> {
     final currentServer = serverState?.servers
         .where((s) => s.id == serverState.currentServerId)
         .firstOrNull;
+    if (!_urlInitialized && currentServer != null) {
+      _urlInitialized = true;
+      _urlCtrl.text = currentServer.baseUrl;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -289,15 +305,21 @@ class _AddAccountScreenState extends ConsumerState<_AddAccountScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (currentServer != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    child: Text(
-                      safeText(currentServer.name),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AppTokens.gray500),
+                TextFormField(
+                  controller: _urlCtrl,
+                  decoration: InputDecoration(
+                    labelText: l.serverUrl,
+                    hintText: l.serverUrlHint,
+                    prefixIcon: const Icon(Icons.link),
+                    border: const OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
                     ),
                   ),
+                  keyboardType: TextInputType.url,
+                  textInputAction: TextInputAction.next,
+                  validator: (v) => validateServerUrl(v, l),
+                ),
+                const SizedBox(height: 14),
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),

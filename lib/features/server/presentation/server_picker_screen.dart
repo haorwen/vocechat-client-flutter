@@ -8,6 +8,7 @@ import '../../../core/storage/account_store.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/utils/server_url_validator.dart';
 import '../../../shared/widgets/empty_state_view.dart';
 import '../../../shared/widgets/primary_button.dart';
 
@@ -345,23 +346,7 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
               ),
               keyboardType: TextInputType.url,
               autofocus: true,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return l.serverUrlRequired;
-                final uri = Uri.tryParse(v.trim());
-                if (uri == null || !uri.hasScheme) {
-                  return l.serverUrlMustHttps;
-                }
-                final host = uri.host.toLowerCase();
-                final isLocalhost =
-                    host == 'localhost' || host == '127.0.0.1';
-                if (uri.scheme == 'http' && !isLocalhost) {
-                  return l.serverUrlHttpNotAllowed;
-                }
-                if (uri.scheme != 'https' && uri.scheme != 'http') {
-                  return l.serverUrlMustHttps;
-                }
-                return null;
-              },
+              validator: (v) => validateServerUrl(v, l),
             ),
             if (_showHttpLocalhostWarning) ...[
               const SizedBox(height: 12),
