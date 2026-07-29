@@ -158,21 +158,24 @@ class _UserInfo {
 // ---------------------------------------------------------------------------
 
 String _previewFor(ChatMessage msg) {
-  return msg.detail.map(
-    normal: (d) {
-      final ct = d.contentType;
-      if (ct == 'text/plain' || ct == 'text/markdown') {
-        return d.content.replaceAll('\n', ' ').trim();
-      }
-      if (ct == 'vocechat/file') return '[File]';
-      if (ct == 'vocechat/audio') return '[Voice]';
-      if (ct == 'vocechat/archive') return '[Archive]';
-      if (ct.startsWith('image/')) return '[Image]';
-      return '[${ct.split('/').last}]';
-    },
-    reply: (d) => d.content.replaceAll('\n', ' ').trim(),
-    reaction: (d) => '[Reaction]',
-  );
+  // Reactions (like/edit/delete sidecars) are never displayable on their own.
+  // They should never reach here after enrichment filters them out, but guard
+  // anyway so a stray one can't surface as "[Reaction]" in the list.
+  if (msg.detail is ReactionMessageDetail) return '';
+
+  // Use displayContent/displayContentType so an edited message previews with
+  // its EDITED text, matching exactly what the chat body renders (which also
+  // reads these getters). Reading raw detail.content would desync the preview
+  // from the detail screen after an edit.
+  final ct = msg.displayContentType;
+  if (ct == 'text/plain' || ct == 'text/markdown') {
+    return msg.displayContent.replaceAll('\n', ' ').trim();
+  }
+  if (ct == 'vocechat/file') return '[File]';
+  if (ct == 'vocechat/audio') return '[Voice]';
+  if (ct == 'vocechat/archive') return '[Archive]';
+  if (ct.startsWith('image/')) return '[Image]';
+  return '[${ct.split('/').last}]';
 }
 
 // ---------------------------------------------------------------------------
@@ -463,9 +466,30 @@ class Conversations extends _$Conversations {
           UserConversationKey(uid: final uid) => MessageTarget.user(uid: uid),
         };
         try {
-          final msgs = await api.getHistory(target, limit: 1);
-          if (msgs.isNotEmpty) {
-            final last = msgs.first;
+          // Cache-first: the SQLite cache is the SAME reaction-free,
+          // edit-overlaid store the chat screen (ChatController) reads back,
+          // so sourcing the preview from it makes the two views converge by
+          // construction. `read` is newest-first and never contains reaction
+          // rows (MessageCache.appendOne rejects them), so `.first` is the
+          // real head message.
+          ChatMessage? last;
+          final cached = await cache.read(target, limit: 1);
+          if (cached.isNotEmpty) {
+            last = cached.first;
+          } else {
+            // Cold start / never-opened conversation: cache is legitimately
+            // empty because enrichment runs before any chat is opened. Fall
+            // back to the network, but fetch a small window and drop reaction
+            // sidecars so a trailing like/edit/delete can't become the
+            // preview (getHistory returns them unfiltered, newest-first).
+            final msgs = await api.getHistory(target, limit: 20);
+            for (final m in msgs) {
+              if (m.detail is ReactionMessageDetail) continue;
+              last = m;
+              break;
+            }
+          }
+          if (last != null) {
             pending[item.key] = item.copyWith(
               lastMid: last.mid,
               lastAt: last.createdAt,
