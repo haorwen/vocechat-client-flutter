@@ -66,7 +66,11 @@ class MessageDispatcher extends _$MessageDispatcher {
           final cache = cacheAsync.valueOrNull;
           if (cache != null) {
             // Fire-and-forget — appendOne handles its own errors.
-            cache.appendOne(msg.target, msg);
+            // Use the peer-resolved target, not the raw server-perspective
+            // `msg.target` — for an incoming DM, `msg.target` is always
+            // ourselves, so caching under it would file the message into a
+            // "chat with self" row instead of the actual peer conversation.
+            cache.appendOne(_conversationTargetFor(msg), msg);
             if (msg.mid > 0) cache.setCursor(msg.mid);
           }
 
