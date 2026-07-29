@@ -66,7 +66,7 @@ dependencies:
   just_audio: ^0.9.42
 
   # Media capture (voice/video messages)
-  record: ^5.2.0
+  record: ^6.2.1
   camera: ^0.11.0+2
 
   # External
