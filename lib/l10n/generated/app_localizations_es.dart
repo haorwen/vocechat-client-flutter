@@ -1,3 +1,5 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -265,7 +267,8 @@ class AppL10nEs extends AppL10n {
   String get settingsLogoutConfirmTitle => '¿Cerrar sesión?';
 
   @override
-  String get settingsLogoutConfirmContent => 'Deberás iniciar sesión de nuevo para acceder a este servidor.';
+  String get settingsLogoutConfirmContent =>
+      'Deberás iniciar sesión de nuevo para acceder a este servidor.';
 
   @override
   String get accountEmail => 'Correo electrónico';
@@ -283,19 +286,22 @@ class AppL10nEs extends AppL10n {
   String get notificationsPush => 'Notificaciones push';
 
   @override
-  String get notificationsPushSubtitle => 'Recibe avisos de nuevos mensajes y menciones.';
+  String get notificationsPushSubtitle =>
+      'Recibe avisos de nuevos mensajes y menciones.';
 
   @override
   String get notificationsSound => 'Sonidos de notificación';
 
   @override
-  String get notificationsSoundSubtitle => 'Reproduce un sonido al recibir mensajes.';
+  String get notificationsSoundSubtitle =>
+      'Reproduce un sonido al recibir mensajes.';
 
   @override
   String get notificationsMentionsOnly => 'Solo menciones';
 
   @override
-  String get notificationsMentionsOnlySubtitle => 'Notificar solo para @menciones.';
+  String get notificationsMentionsOnlySubtitle =>
+      'Notificar solo para @menciones.';
 
   @override
   String get appearanceTheme => 'TEMA';
@@ -355,7 +361,8 @@ class AppL10nEs extends AppL10n {
   String get storageClearCacheConfirmTitle => '¿Borrar caché?';
 
   @override
-  String get storageClearCacheConfirmBody => 'Esto elimina los mensajes e imágenes almacenados localmente. Se volverán a descargar cuando sea necesario.';
+  String get storageClearCacheConfirmBody =>
+      'Esto elimina los mensajes e imágenes almacenados localmente. Se volverán a descargar cuando sea necesario.';
 
   @override
   String get storageClearCacheConfirm => 'Borrar';
@@ -394,7 +401,8 @@ class AppL10nEs extends AppL10n {
   String get loginPasswordRequired => 'La contraseña es obligatoria';
 
   @override
-  String get loginPasswordTooShort => 'La contraseña debe tener al menos 6 caracteres';
+  String get loginPasswordTooShort =>
+      'La contraseña debe tener al menos 6 caracteres';
 
   @override
   String get loginForgotPassword => '¿Olvidaste tu contraseña?';
@@ -421,19 +429,24 @@ class AppL10nEs extends AppL10n {
   String get loginSignUp => 'Registrarse';
 
   @override
-  String get loginErrorInvalidCredentials => 'Correo electrónico o contraseña incorrectos';
+  String get loginErrorInvalidCredentials =>
+      'Correo electrónico o contraseña incorrectos';
 
   @override
-  String get loginErrorAccountFrozen => 'Esta cuenta ha sido congelada. Contacta con tu administrador.';
+  String get loginErrorAccountFrozen =>
+      'Esta cuenta ha sido congelada. Contacta con tu administrador.';
 
   @override
-  String get loginErrorNotInvited => 'No se encontró ninguna cuenta asociada. Pide a un administrador un enlace de invitación.';
+  String get loginErrorNotInvited =>
+      'No se encontró ninguna cuenta asociada. Pide a un administrador un enlace de invitación.';
 
   @override
-  String get loginErrorMethodNotSupported => 'El servidor no admite este método de inicio de sesión.';
+  String get loginErrorMethodNotSupported =>
+      'El servidor no admite este método de inicio de sesión.';
 
   @override
-  String get loginErrorCannotReachServer => 'No se puede contactar con el servidor. Comprueba tu red o la URL del servidor.';
+  String get loginErrorCannotReachServer =>
+      'No se puede contactar con el servidor. Comprueba tu red o la URL del servidor.';
 
   @override
   String get registerTitle => 'Crear cuenta';
@@ -451,7 +464,8 @@ class AppL10nEs extends AppL10n {
   String get registerNameRequired => 'El nombre es obligatorio';
 
   @override
-  String get registerNameTooShort => 'El nombre debe tener al menos 2 caracteres';
+  String get registerNameTooShort =>
+      'El nombre debe tener al menos 2 caracteres';
 
   @override
   String get registerEmailRequired => 'El correo electrónico es obligatorio';
@@ -496,7 +510,8 @@ class AppL10nEs extends AppL10n {
   String get serverPickerEmptyTitle => 'Conéctate a un servidor VoceChat';
 
   @override
-  String get serverPickerEmptySubtitle => 'Agrega un servidor para empezar a chatear con tu equipo.';
+  String get serverPickerEmptySubtitle =>
+      'Agrega un servidor para empezar a chatear con tu equipo.';
 
   @override
   String get serverPickerAddFirst => 'Agrega tu primer servidor';
@@ -523,7 +538,8 @@ class AppL10nEs extends AppL10n {
   String get serverUrlMustHttps => 'Debe empezar con https://';
 
   @override
-  String get serverUrlHttpNotAllowed => 'Solo se permite https:// (http no está permitido en servidores remotos)';
+  String get serverUrlHttpNotAllowed =>
+      'Solo se permite https:// (http no está permitido en servidores remotos)';
 
   @override
   String get serverTesting => 'Probando…';
@@ -564,7 +580,8 @@ class AppL10nEs extends AppL10n {
   String get chatListSelectTitle => 'Selecciona una conversación';
 
   @override
-  String get chatListSelectSubtitle => 'Elige un chat del panel izquierdo para empezar a escribir';
+  String get chatListSelectSubtitle =>
+      'Elige un chat del panel izquierdo para empezar a escribir';
 
   @override
   String get chatListPin => 'Fijar arriba';
@@ -626,7 +643,8 @@ class AppL10nEs extends AppL10n {
   String get contactsSelectTitle => 'Selecciona un contacto';
 
   @override
-  String get contactsSelectSubtitle => 'Elige a alguien de la lista para ver su perfil';
+  String get contactsSelectSubtitle =>
+      'Elige a alguien de la lista para ver su perfil';
 
   @override
   String get contactsMessage => 'Mensaje';
@@ -692,7 +710,8 @@ class AppL10nEs extends AppL10n {
   String get chatVoiceRecordingSend => 'Enviar';
 
   @override
-  String get chatRecordingPermissionDenied => 'Permiso denegado: habilita el acceso al micrófono o la cámara en la configuración del sistema';
+  String get chatRecordingPermissionDenied =>
+      'Permiso denegado: habilita el acceso al micrófono o la cámara en la configuración del sistema';
 
   @override
   String chatDropOverlayTitle(String name) {
@@ -739,13 +758,15 @@ class AppL10nEs extends AppL10n {
   String get errorRequestFailed => 'Error en la solicitud';
 
   @override
-  String get authKickedFromOtherDevice => 'Sesión cerrada: tu cuenta acaba de iniciar sesión en otro dispositivo.';
+  String get authKickedFromOtherDevice =>
+      'Sesión cerrada: tu cuenta acaba de iniciar sesión en otro dispositivo.';
 
   @override
   String get authAccountDeleted => 'Tu cuenta ha sido eliminada.';
 
   @override
-  String get authSessionEnded => 'Tu sesión ha finalizado. Inicia sesión de nuevo.';
+  String get authSessionEnded =>
+      'Tu sesión ha finalizado. Inicia sesión de nuevo.';
 
   @override
   String get chatListMarkRead => 'Marcar como leído';
@@ -800,7 +821,8 @@ class AppL10nEs extends AppL10n {
   String get channelPublicLabel => 'Canal público';
 
   @override
-  String get createChannelPublicAdminOnly => 'Solo los administradores pueden crear canales públicos';
+  String get createChannelPublicAdminOnly =>
+      'Solo los administradores pueden crear canales públicos';
 
   @override
   String get createChannelSubmit => 'Crear';
@@ -851,13 +873,15 @@ class AppL10nEs extends AppL10n {
   String get channelMuteLabel => 'Silenciar canal';
 
   @override
-  String get channelLeaveConfirmBody => '¿Seguro que quieres abandonar este canal?';
+  String get channelLeaveConfirmBody =>
+      '¿Seguro que quieres abandonar este canal?';
 
   @override
   String get channelDeleteTitle => 'Eliminar canal';
 
   @override
-  String get channelDeleteConfirmBody => 'Esto eliminará permanentemente el canal para todos los miembros. Esta acción no se puede deshacer.';
+  String get channelDeleteConfirmBody =>
+      'Esto eliminará permanentemente el canal para todos los miembros. Esta acción no se puede deshacer.';
 
   @override
   String get actionLeave => 'Abandonar';

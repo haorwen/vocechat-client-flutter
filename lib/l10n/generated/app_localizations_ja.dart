@@ -1,3 +1,5 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -265,7 +267,8 @@ class AppL10nJa extends AppL10n {
   String get settingsLogoutConfirmTitle => 'ログアウトしますか？';
 
   @override
-  String get settingsLogoutConfirmContent => 'このサーバーに再度アクセスするには、もう一度ログインする必要があります。';
+  String get settingsLogoutConfirmContent =>
+      'このサーバーに再度アクセスするには、もう一度ログインする必要があります。';
 
   @override
   String get accountEmail => 'メールアドレス';
@@ -355,7 +358,8 @@ class AppL10nJa extends AppL10n {
   String get storageClearCacheConfirmTitle => 'キャッシュを削除しますか？';
 
   @override
-  String get storageClearCacheConfirmBody => 'ローカルに保存されたメッセージと画像のキャッシュが削除されます。必要に応じて再ダウンロードされます。';
+  String get storageClearCacheConfirmBody =>
+      'ローカルに保存されたメッセージと画像のキャッシュが削除されます。必要に応じて再ダウンロードされます。';
 
   @override
   String get storageClearCacheConfirm => '削除';
@@ -433,7 +437,8 @@ class AppL10nJa extends AppL10n {
   String get loginErrorMethodNotSupported => 'このログイン方法はサーバーでサポートされていません。';
 
   @override
-  String get loginErrorCannotReachServer => 'サーバーに接続できません。ネットワークまたはサーバーの URL を確認してください。';
+  String get loginErrorCannotReachServer =>
+      'サーバーに接続できません。ネットワークまたはサーバーの URL を確認してください。';
 
   @override
   String get registerTitle => 'アカウントを作成';
@@ -523,7 +528,8 @@ class AppL10nJa extends AppL10n {
   String get serverUrlMustHttps => 'https:// で始まる必要があります';
 
   @override
-  String get serverUrlHttpNotAllowed => 'https:// のみ使用できます（リモートサーバーでは http は使用できません）';
+  String get serverUrlHttpNotAllowed =>
+      'https:// のみ使用できます（リモートサーバーでは http は使用できません）';
 
   @override
   String get serverTesting => 'テスト中…';
@@ -692,7 +698,8 @@ class AppL10nJa extends AppL10n {
   String get chatVoiceRecordingSend => '送信';
 
   @override
-  String get chatRecordingPermissionDenied => '権限が拒否されました — システム設定でマイク／カメラのアクセスを許可してください';
+  String get chatRecordingPermissionDenied =>
+      '権限が拒否されました — システム設定でマイク／カメラのアクセスを許可してください';
 
   @override
   String chatDropOverlayTitle(String name) {
@@ -739,7 +746,8 @@ class AppL10nJa extends AppL10n {
   String get errorRequestFailed => 'リクエストに失敗しました';
 
   @override
-  String get authKickedFromOtherDevice => 'ログアウトしました：あなたのアカウントが別のデバイスでログインしました。';
+  String get authKickedFromOtherDevice =>
+      'ログアウトしました：あなたのアカウントが別のデバイスでログインしました。';
 
   @override
   String get authAccountDeleted => 'あなたのアカウントは削除されました。';
@@ -857,7 +865,8 @@ class AppL10nJa extends AppL10n {
   String get channelDeleteTitle => 'チャンネルを削除';
 
   @override
-  String get channelDeleteConfirmBody => 'この操作を行うと、全メンバーに対してチャンネルが永久に削除されます。この操作は取り消せません。';
+  String get channelDeleteConfirmBody =>
+      'この操作を行うと、全メンバーに対してチャンネルが永久に削除されます。この操作は取り消せません。';
 
   @override
   String get actionLeave => '退出';
