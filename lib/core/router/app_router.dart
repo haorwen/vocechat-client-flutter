@@ -52,15 +52,31 @@ class SplashScreen extends StatelessWidget {
 // Router provider with auth redirect
 // ---------------------------------------------------------------------------
 
+/// Notifies GoRouter's `redirect` to re-evaluate without recreating the
+/// `GoRouter` instance itself. Recreating the router (the old behavior of
+/// `ref.watch`ing auth/server state directly in the provider body) tears
+/// down and rebuilds the entire routed widget tree on every auth state
+/// transition — including the transient `loading` state a login attempt
+/// passes through. That destroyed `LoginScreen` (and its `ref.listen` that
+/// surfaces the login error SnackBar) before the login response ever
+/// arrived, so failures appeared to do nothing.
+class _RouterRefreshNotifier extends ChangeNotifier {
+  void refresh() => notifyListeners();
+}
+
 final goRouterProvider = Provider<GoRouter>((ref) {
-  // Rebuild router when auth or server state changes
-  final authAsync = ref.watch(authControllerProvider);
-  final serverAsync = ref.watch(serverStoreProvider);
+  final refreshNotifier = _RouterRefreshNotifier();
+  ref.listen(authControllerProvider, (_, __) => refreshNotifier.refresh());
+  ref.listen(serverStoreProvider, (_, __) => refreshNotifier.refresh());
+  ref.onDispose(refreshNotifier.dispose);
 
   return GoRouter(
     initialLocation: '/splash',
+    refreshListenable: refreshNotifier,
     redirect: (context, state) {
       final location = state.matchedLocation;
+      final authAsync = ref.read(authControllerProvider);
+      final serverAsync = ref.read(serverStoreProvider);
 
       // Server store must finish loading before any routing decision
       if (serverAsync.isLoading) {
@@ -79,8 +95,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         return '/server-picker';
       }
 
-      // Server is configured — now wait for auth bootstrap
-      if (authAsync.isLoading) {
+      // Server is configured — now wait for auth bootstrap. Only route to
+      // /splash for the *initial* bootstrap (no previous auth value yet).
+      // A login()/register() attempt from the login screen also sets a bare
+      // `AsyncLoading()` — that must NOT force a redirect away from /login,
+      // or the screen (and the `ref.listen` that shows the error SnackBar)
+      // gets torn down and rebuilt before the failure ever reaches it.
+      if (authAsync.isLoading && !authAsync.hasValue) {
         return location == '/splash' ? null : '/splash';
       }
 

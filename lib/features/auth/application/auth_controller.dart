@@ -174,7 +174,19 @@ class AuthController extends _$AuthController {
     String password, {
     bool rememberMe = false,
   }) async {
-    state = const AsyncLoading();
+    // Preserve the previous value (hasValue stays true) instead of a bare
+    // AsyncLoading(). The router's redirect uses `authAsync.hasValue` to
+    // distinguish this in-flight login from the app's initial auth
+    // bootstrap — a bare loading state would be indistinguishable from
+    // startup and force a /splash redirect mid-login, tearing down
+    // LoginScreen before the error/success ever reaches it.
+    // isRefresh: false is required — with the default `true`, copying over
+    // a previous AsyncError produces another AsyncError (just isLoading:
+    // true), not a real AsyncLoading. `ref.listen`'s `whenOrNull` would then
+    // treat that as `isRefreshing` and re-fire the *stale* error callback
+    // (e.g. re-showing "wrong password" from a prior attempt) a split
+    // second before the new, successful result lands.
+    state = AsyncLoading<AuthState>().copyWithPrevious(state, isRefresh: false);
 
     state = await AsyncValue.guard(() async {
       _suppressServerStoreReact = true;
@@ -274,7 +286,10 @@ class AuthController extends _$AuthController {
 
   /// Register a new account and auto-login on success.
   Future<void> register(String name, String email, String password) async {
-    state = const AsyncLoading();
+    // See login() — preserve hasValue so the router's redirect doesn't
+    // mistake this in-flight registration for the initial auth bootstrap.
+    // isRefresh: false — see login() for why the default true is wrong here.
+    state = AsyncLoading<AuthState>().copyWithPrevious(state, isRefresh: false);
 
     state = await AsyncValue.guard(() async {
       final response = await ref
@@ -322,7 +337,11 @@ class AuthController extends _$AuthController {
 
   /// Re-validate tokens and refresh user state.
   Future<void> bootstrap() async {
-    state = const AsyncLoading();
+    // See login() — preserve hasValue so a re-validation triggered while
+    // already authenticated/unauthenticated doesn't look like the app's
+    // initial auth bootstrap to the router's redirect logic.
+    // isRefresh: false — see login() for why the default true is wrong here.
+    state = AsyncLoading<AuthState>().copyWithPrevious(state, isRefresh: false);
     state = AsyncData(await _bootstrap());
   }
 
