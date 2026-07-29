@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fvp/fvp.dart' as fvp;
 import 'package:vocechat_client/core/i18n/locale_provider.dart';
 import 'package:vocechat_client/core/router/app_router.dart';
 import 'package:vocechat_client/core/theme/app_theme.dart';
@@ -7,6 +8,9 @@ import 'package:vocechat_client/core/theme/theme_provider.dart';
 import 'package:vocechat_client/l10n/generated/app_localizations.dart';
 
 void main() {
+  // video_player has no official Windows/Linux backend; fvp fills that gap
+  // and defers to the official implementation on platforms that have one.
+  fvp.registerWith(options: {'platforms': ['windows', 'linux']});
   runApp(const ProviderScope(child: VoceChatApp()));
 }
 

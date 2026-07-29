@@ -635,14 +635,43 @@ class _VideoBubble extends ConsumerStatefulWidget {
 
 class _VideoBubbleState extends ConsumerState<_VideoBubble> {
   Map<String, String>? _headers;
+  VideoPlayerController? _previewCtrl;
   bool _failed = false;
 
   @override
   void initState() {
     super.initState();
     _buildAuthHeaders(ref, widget.urls.baseUrl).then((h) {
-      if (mounted) setState(() => _headers = h);
+      if (!mounted) return;
+      setState(() => _headers = h);
+      _initPreview(h);
     });
+  }
+
+  // Decodes the first frame as an inline thumbnail — the server only
+  // generates thumbnails for images, so there is no cheaper source.
+  Future<void> _initPreview(Map<String, String> headers) async {
+    final ctrl = VideoPlayerController.networkUrl(
+      Uri.parse(widget.urls.origin),
+      httpHeaders: headers,
+    );
+    try {
+      await ctrl.initialize();
+      if (!mounted) {
+        ctrl.dispose();
+        return;
+      }
+      setState(() => _previewCtrl = ctrl);
+    } catch (_) {
+      ctrl.dispose();
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _previewCtrl?.dispose();
+    super.dispose();
   }
 
   @override
@@ -654,69 +683,81 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
         ? widget.meta.path.split('/').last
         : widget.meta.name;
     final sizeLabel = formatBytes(widget.meta.size);
+    final preview = _previewCtrl;
+    final previewReady = preview != null && preview.value.isInitialized;
     return GestureDetector(
       onTap: _headers == null ? null : () => _openPlayer(context, _headers!),
       child: Container(
-        width: 280,
-        height: 158,
         decoration: BoxDecoration(
-          color: Colors.black,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppTokens.gray300),
         ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Positioned(
-              top: 8,
-              left: 8,
-              right: 8,
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.movie_outlined,
-                    color: Colors.white70,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      safeText(label),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            width: 280,
+            height: 158,
+            child: Stack(
+              fit: StackFit.expand,
+              alignment: Alignment.center,
+              children: [
+                Container(color: Colors.black),
+                if (previewReady)
+                  FittedBox(
+                    fit: BoxFit.cover,
+                    child: SizedBox(
+                      width: preview.value.size.width,
+                      height: preview.value.size.height,
+                      child: VideoPlayer(preview),
                     ),
                   ),
-                  if (sizeLabel.isNotEmpty)
-                    Text(
-                      sizeLabel,
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 11,
+                Container(color: Colors.black.withValues(alpha: 0.25)),
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  right: 8,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.movie_outlined,
+                        color: Colors.white70,
+                        size: 18,
                       ),
-                    ),
-                ],
-              ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          safeText(label),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (sizeLabel.isNotEmpty)
+                        Text(
+                          sizeLabel,
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 11,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.play_arrow,
+                  color: Colors.white,
+                  size: 40,
+                  shadows: [
+                    Shadow(color: Colors.black54, blurRadius: 6),
+                  ],
+                ),
+              ],
             ),
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white70, width: 1.5),
-              ),
-              child: const Icon(
-                Icons.play_arrow,
-                color: Colors.white,
-                size: 32,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

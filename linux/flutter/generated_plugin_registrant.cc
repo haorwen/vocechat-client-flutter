@@ -9,6 +9,7 @@
 #include <desktop_drop/desktop_drop_plugin.h>
 #include <file_selector_linux/file_selector_plugin.h>
 #include <flutter_secure_storage_linux/flutter_secure_storage_linux_plugin.h>
+#include <fvp/fvp_plugin.h>
 #include <irondash_engine_context/irondash_engine_context_plugin.h>
 #include <record_linux/record_linux_plugin.h>
 #include <super_native_extensions/super_native_extensions_plugin.h>
@@ -24,6 +25,9 @@ void fl_register_plugins(FlPluginRegistry* registry) {
   g_autoptr(FlPluginRegistrar) flutter_secure_storage_linux_registrar =
       fl_plugin_registry_get_registrar_for_plugin(registry, "FlutterSecureStorageLinuxPlugin");
   flutter_secure_storage_linux_plugin_register_with_registrar(flutter_secure_storage_linux_registrar);
+  g_autoptr(FlPluginRegistrar) fvp_registrar =
+      fl_plugin_registry_get_registrar_for_plugin(registry, "FvpPlugin");
+  fvp_plugin_register_with_registrar(fvp_registrar);
   g_autoptr(FlPluginRegistrar) irondash_engine_context_registrar =
       fl_plugin_registry_get_registrar_for_plugin(registry, "IrondashEngineContextPlugin");
   irondash_engine_context_plugin_register_with_registrar(irondash_engine_context_registrar);

@@ -62,6 +62,10 @@ dependencies:
 
   # Media playback
   video_player: ^2.9.2
+  # video_player has no Windows/Linux backend upstream — fvp registers a
+  # hardware-decoded (D3D11/DXVA on Windows) implementation for those
+  # platforms while leaving Android/iOS/web on the official implementation.
+  fvp: ^0.37.3
   chewie: ^1.8.5
   just_audio: ^0.9.42
 
