@@ -9,7 +9,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../../../core/config/env.dart';
-import '../../../core/storage/server_store.dart';
+import '../../../core/storage/account_store.dart';
 import '../../../core/utils/app_log.dart';
 import '../domain/message_models.dart';
 
@@ -514,11 +514,12 @@ class MessageCache {
 // Database initialization
 // ---------------------------------------------------------------------------
 
-/// Opens the SQLite database for [serverId] and also returns its absolute
+/// Opens the SQLite database for [accountId] and also returns its absolute
 /// path, so callers that need to measure on-disk size don't have to re-derive
-/// the path. Each server gets its own DB file for full data isolation.
-Future<(Database, String)> _openDbWithPath(String serverId) async {
-  bootLog('10 _openDb: enter (server=$serverId)');
+/// the path. Each logged-in account gets its own DB file for full data
+/// isolation — including two different accounts on the same server.
+Future<(Database, String)> _openDbWithPath(String accountId) async {
+  bootLog('10 _openDb: enter (account=$accountId)');
   // sqflite uses platform-native sqlite on Android/iOS/macOS, but Linux/
   // Windows need the FFI implementation explicitly.
   if (!kIsWeb &&
@@ -547,9 +548,10 @@ Future<(Database, String)> _openDbWithPath(String serverId) async {
   if (!await dbDir.exists()) {
     await dbDir.create(recursive: true);
   }
-  // Sanitize serverId for filesystem safety: replace anything that isn't
-  // alphanumeric, dash, or underscore with an underscore.
-  final safeId = serverId.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
+  // Sanitize accountId for filesystem safety: replace anything that isn't
+  // alphanumeric, dash, or underscore with an underscore. accountId contains
+  // a literal "::" separator (serverId::uid), which this also strips.
+  final safeId = accountId.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
   final dbPath = '${dbDir.path}${sep}voce_messages_$safeId.db';
   bootLog('13 _openDb: openDatabase path=$dbPath');
   final db = await openDatabase(
@@ -588,22 +590,23 @@ Future<(Database, String)> _openDbWithPath(String serverId) async {
 Future<MessageCache> messageCache(Ref ref) async {
   bootLog('9 messageCacheProvider.build: enter');
 
-  // Watch only the currentServerId — rebuilds the cache when the user
-  // switches servers, exactly like dioClientProvider watches baseUrl.
-  final serverId = ref.watch(
-    serverStoreProvider.select((async) => async.valueOrNull?.currentServerId),
+  // Watch only the currentAccountId — rebuilds the cache when the user
+  // switches accounts (same or different server), exactly like
+  // dioClientProvider watches baseUrl.
+  final accountId = ref.watch(
+    accountStoreProvider.select((async) => async.valueOrNull?.currentAccountId),
   );
 
-  if (serverId == null || serverId.isEmpty) {
-    // No server selected yet. Consumers using `.future` will await;
+  if (accountId == null || accountId.isEmpty) {
+    // No account selected yet. Consumers using `.future` will await;
     // those using `.valueOrNull` will get null — both are safe.
-    throw StateError('No server selected — MessageCache unavailable');
+    throw StateError('No account selected — MessageCache unavailable');
   }
 
-  final (db, dbPath) = await _openDbWithPath(serverId);
-  bootLog('17 messageCacheProvider.build: db ready (server=$serverId)');
+  final (db, dbPath) = await _openDbWithPath(accountId);
+  bootLog('17 messageCacheProvider.build: db ready (account=$accountId)');
 
-  // Close the database when this provider is torn down (server switch or
+  // Close the database when this provider is torn down (account switch or
   // app shutdown). Pending in-memory writes are best-effort lost — acceptable
   // for a cache.
   ref.onDispose(() async {

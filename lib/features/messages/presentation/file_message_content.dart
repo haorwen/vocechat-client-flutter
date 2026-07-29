@@ -11,6 +11,7 @@ import 'package:photo_view/photo_view.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../../core/storage/account_store.dart';
 import '../../../core/storage/secure_token_store.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/theme/app_theme.dart';
@@ -194,9 +195,9 @@ Future<Map<String, String>> _buildAuthHeaders(
   String baseUrl,
 ) async {
   final headers = _refererOnlyHeaders(baseUrl);
-  final serverId = ref.read(serverStoreProvider).valueOrNull?.currentServerId;
-  if (serverId != null) {
-    final store = ref.read(secureTokenStoreProvider(serverId));
+  final accountId = ref.read(accountStoreProvider).valueOrNull?.currentAccountId;
+  if (accountId != null) {
+    final store = ref.read(secureTokenStoreProvider(accountId));
     final tokens = await store.readTokens();
     if (tokens != null) headers['X-API-Key'] = tokens.accessToken;
   }

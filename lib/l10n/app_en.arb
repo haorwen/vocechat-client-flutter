@@ -115,6 +115,16 @@
   "settingsLogout": "Log out",
   "settingsLogoutConfirmTitle": "Log out?",
   "settingsLogoutConfirmContent": "You will need to sign in again to access this server.",
+  "settingsSwitchAccount": "Switch account",
+
+  "accountSwitcherTitle": "Accounts",
+  "accountSwitcherAddAccount": "Add account",
+  "accountSwitcherLogoutAll": "Log out",
+  "accountSwitcherRemoveConfirmTitle": "Remove this account?",
+  "accountSwitcherRemoveConfirmBody": "This removes the saved sign-in and cached messages for this account on this device.",
+  "accountSwitcherRemove": "Remove",
+  "accountSwitcherSignedOut": "Signed out",
+  "accountSwitcherSwitchFailed": "Couldn't sign in to that account — please log in again.",
 
   "accountEmail": "Email",
   "accountUsername": "Username",

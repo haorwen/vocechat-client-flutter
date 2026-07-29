@@ -97,8 +97,16 @@ Future<void> _persistFallback() async {
   }
 }
 
+/// Keyed by an arbitrary string identifier. Callers use two different
+/// keyspaces depending on intent:
+///   - `serverId` for the pre-login "remembered credential" (email/password),
+///     since we don't know which account (uid) will result until login
+///     succeeds.
+///   - `accountId` (`AccountStore.makeId(serverId, uid)`) for the actual
+///     session tokens, so the same server can hold multiple logged-in
+///     accounts side by side without clobbering each other's tokens.
 class SecureTokenStore {
-  SecureTokenStore({required this.serverId})
+  SecureTokenStore({required this.id})
       : _storage = const FlutterSecureStorage(
           aOptions: AndroidOptions(encryptedSharedPreferences: true),
         ) {
@@ -109,10 +117,10 @@ class SecureTokenStore {
     }
   }
 
-  final String serverId;
+  final String id;
   final FlutterSecureStorage _storage;
 
-  String _key(String suffix) => 'voce_${serverId}_$suffix';
+  String _key(String suffix) => 'voce_${id}_$suffix';
 
   void _onKeyringFailure(Object e) {
     _useFileFallback = true;
@@ -181,7 +189,7 @@ class SecureTokenStore {
     AppLog.d(
       LogTag.token,
       () =>
-          '🔐 saveTokens: serverId=$serverId access.len=${access.length} refresh.len=${refresh.length} expires=$expiresAt',
+          '🔐 saveTokens: id=$id access.len=${access.length} refresh.len=${refresh.length} expires=$expiresAt',
     );
   }
 
@@ -193,7 +201,7 @@ class SecureTokenStore {
     AppLog.d(
       LogTag.token,
       () =>
-          '🔐 readTokens: serverId=$serverId access=${access != null} refresh=${refresh != null} expires=${expiresAtStr ?? "null"}',
+          '🔐 readTokens: id=$id access=${access != null} refresh=${refresh != null} expires=${expiresAtStr ?? "null"}',
     );
     if (access == null || refresh == null || expiresAtStr == null) return null;
     return TokenData(
@@ -231,6 +239,6 @@ class SecureTokenStore {
 }
 
 @riverpod
-SecureTokenStore secureTokenStore(Ref ref, String serverId) {
-  return SecureTokenStore(serverId: serverId);
+SecureTokenStore secureTokenStore(Ref ref, String id) {
+  return SecureTokenStore(id: id);
 }

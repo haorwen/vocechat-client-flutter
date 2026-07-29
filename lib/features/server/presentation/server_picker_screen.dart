@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../auth/application/auth_controller.dart';
+import '../../../core/storage/account_store.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
@@ -33,6 +34,13 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
     setState(() => _switching = true);
     final notifier = ref.read(serverStoreProvider.notifier);
     await notifier.selectServer(config.id);
+    // This flow always lands on /login regardless of any saved account on
+    // the target server (the account-switcher screen is the path for
+    // resuming a saved session without re-entering credentials) — clear the
+    // current-account pointer so AuthController's bootstrap doesn't try to
+    // resolve a stale account tied to the *previous* server and bounce
+    // serverStore back to it.
+    await ref.read(accountStoreProvider.notifier).clearCurrentAccount();
     // Wait for auth controller to re-bootstrap with new server
     await ref.read(authControllerProvider.future);
     if (mounted) context.go('/login');
@@ -51,6 +59,7 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
           final notifier = ref.read(serverStoreProvider.notifier);
           await notifier.addServer(config);
           await notifier.selectServer(config.id);
+          await ref.read(accountStoreProvider.notifier).clearCurrentAccount();
           // Wait for auth controller to re-bootstrap with new server
           await ref.read(authControllerProvider.future);
           if (mounted) context.go('/login');

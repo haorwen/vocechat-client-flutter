@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/storage/account_store.dart';
 import '../../../core/storage/secure_token_store.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/utils/app_log.dart';
@@ -28,56 +29,71 @@ sealed class AuthState with _$AuthState {
 
 @riverpod
 class AuthController extends _$AuthController {
-  /// Suppresses the serverStore listener's invalidateSelf while we are
-  /// driving server-id changes from inside login()/logout() ourselves.
-  /// Without this, mutating serverStore mid-login invalidates this very
-  /// provider before the async login flow finishes — triggering the
+  /// Suppresses the store listeners' invalidateSelf while we are driving
+  /// server/account-id changes from inside login()/logout()/switchAccount()
+  /// ourselves. Without this, mutating the stores mid-operation invalidates
+  /// this very provider before the async flow finishes — triggering the
   /// "Cannot use ref functions after the dependency of a provider changed"
   /// assertion.
-  bool _suppressServerStoreReact = false;
+  bool _suppressStoreReact = false;
 
   @override
   Future<AuthState> build() async {
     bootLog('5 AuthController.build: enter');
-    // Listen — instead of watch — so updates to serverStore (e.g. login
-    // replacing the local id with the server-issued one, or the user
-    // changing servers) trigger an explicit re-bootstrap rather than
-    // invalidating this provider mid-async-operation.
-    ref.listen<AsyncValue<ServerState>>(
-      serverStoreProvider,
+    // Listen — instead of watch — so updates to accountStore (e.g. login
+    // creating/selecting a new account, or the user switching accounts)
+    // trigger an explicit re-bootstrap rather than invalidating this
+    // provider mid-async-operation.
+    ref.listen<AsyncValue<AccountState>>(
+      accountStoreProvider,
       (prev, next) {
-        if (_suppressServerStoreReact) return;
-        // Re-run bootstrap when the *currentServerId* changes, since that's
-        // what determines whose tokens we read.
-        final prevId = prev?.valueOrNull?.currentServerId;
-        final nextId = next.valueOrNull?.currentServerId;
+        if (_suppressStoreReact) return;
+        final prevId = prev?.valueOrNull?.currentAccountId;
+        final nextId = next.valueOrNull?.currentAccountId;
         if (prevId != nextId) {
           ref.invalidateSelf();
         }
       },
     );
-    // Wait for ServerStore to finish loading before bootstrapping.
-    bootLog('6 AuthController.build: await serverStoreProvider.future');
+    // Wait for both stores to finish loading before bootstrapping.
+    bootLog('6 AuthController.build: await stores.future');
     await ref.read(serverStoreProvider.notifier).future;
-    bootLog('7 AuthController.build: serverStore ready, calling _bootstrap');
+    await ref.read(accountStoreProvider.notifier).future;
+    bootLog('7 AuthController.build: stores ready, calling _bootstrap');
     final result = await _bootstrap();
     bootLog('8 AuthController.build: _bootstrap returned ${result.runtimeType}');
     return result;
   }
 
-  /// Called at startup: reads stored tokens, refreshes if expired,
-  /// then validates via /api/user/me. Falls back to refresh on 401.
+  AccountConfig? _currentAccount() {
+    final accountState = ref.read(accountStoreProvider).valueOrNull;
+    final accountId = accountState?.currentAccountId;
+    if (accountId == null) return null;
+    return accountState?.accounts.where((a) => a.accountId == accountId).firstOrNull;
+  }
+
+  /// Called at startup: reads stored tokens for the current account, refreshes
+  /// if expired, then validates via /api/user/me. Falls back to refresh on
+  /// 401.
   Future<AuthState> _bootstrap() async {
-    final serverState = ref.read(serverStoreProvider).valueOrNull;
-    final serverId = serverState?.currentServerId;
+    final account = _currentAccount();
     AppLog.d(
       LogTag.auth,
-      () =>
-          '🟦 bootstrap: serverId=$serverId servers=${serverState?.servers.length ?? 0}',
+      () => '🟦 bootstrap: accountId=${account?.accountId}',
     );
-    if (serverId == null) return const AuthState.unauthenticated();
+    if (account == null) return const AuthState.unauthenticated();
 
-    final tokenStore = ref.read(secureTokenStoreProvider(serverId));
+    // Keep the server store's currentServerId in sync with the account we're
+    // bootstrapping against — both stores are always written together by
+    // login()/switchAccount(), but this guards against them drifting apart
+    // (e.g. a persisted-state edge case) since dio's baseUrl is resolved
+    // from serverStore, not accountStore.
+    final serverState = ref.read(serverStoreProvider).valueOrNull;
+    if (serverState?.currentServerId != account.serverId) {
+      await ref.read(serverStoreProvider.notifier).selectServer(account.serverId);
+    }
+
+    final tokenStore = ref.read(secureTokenStoreProvider(account.accountId));
     final tokens = await tokenStore.readTokens();
     AppLog.d(
       LogTag.auth,
@@ -104,6 +120,7 @@ class AuthController extends _$AuthController {
     try {
       final user = await api.me();
       AppLog.d(LogTag.auth, () => '🟦 bootstrap: me() ok uid=${user.uid}');
+      await _syncAccountProfile(account, user);
       return AuthState.authenticated(user: user);
     } catch (e) {
       AppLog.d(LogTag.auth, () => '🟦 bootstrap: me() failed: $e — trying refresh');
@@ -115,6 +132,7 @@ class AuthController extends _$AuthController {
           LogTag.auth,
           () => '🟦 bootstrap: me() ok after refresh uid=${user.uid}',
         );
+        await _syncAccountProfile(account, user);
         return AuthState.authenticated(user: user);
       } catch (e2) {
         AppLog.w(
@@ -124,6 +142,26 @@ class AuthController extends _$AuthController {
         return const AuthState.unauthenticated();
       }
     }
+  }
+
+  /// Keep the saved [AccountConfig]'s display fields (name/email/avatar) in
+  /// sync with the latest `/api/user/me`, so the account-switcher list
+  /// doesn't show stale info after a profile edit.
+  Future<void> _syncAccountProfile(AccountConfig account, VoceUser user) async {
+    if (account.name == user.name &&
+        account.email == user.email &&
+        account.isAdmin == user.isAdmin &&
+        account.avatarUpdatedAt == user.avatarUpdatedAt) {
+      return;
+    }
+    await ref.read(accountStoreProvider.notifier).upsertAccount(
+          account.copyWith(
+            name: user.name,
+            email: user.email,
+            isAdmin: user.isAdmin,
+            avatarUpdatedAt: user.avatarUpdatedAt,
+          ),
+        );
   }
 
   /// Exchange refresh token for a new access token; persist on success.
@@ -156,16 +194,49 @@ class AuthController extends _$AuthController {
   /// long-lived connection. Returns `true` if the token store now holds a
   /// fresh token, `false` if renewal failed (network error, refresh token
   /// rejected, etc.). Idempotent: returns `false` quietly when there is no
-  /// configured server or no stored refresh token.
+  /// current account or no stored refresh token.
   Future<bool> renewIfPossible() async {
-    final serverId =
-        ref.read(serverStoreProvider).valueOrNull?.currentServerId;
-    if (serverId == null) return false;
-    final tokenStore = ref.read(secureTokenStoreProvider(serverId));
+    final account = _currentAccount();
+    if (account == null) return false;
+    final tokenStore = ref.read(secureTokenStoreProvider(account.accountId));
     final tokens = await tokenStore.readTokens();
     if (tokens == null) return false;
     return _tryRefresh(
         ref.read(authApiProvider), tokenStore, tokens.refreshToken);
+  }
+
+  /// Align the local server entry with the server-issued id, so token
+  /// namespace and currentServerId stay in sync — and we never grow the
+  /// servers list with a duplicate on every login.
+  Future<void> _reconcileServerEntry(String responseServerId) async {
+    final serverStore = ref.read(serverStoreProvider.notifier);
+    final existing = ref.read(serverStoreProvider).valueOrNull;
+    final localCurrentId = existing?.currentServerId;
+    final hasServerEntry =
+        existing?.servers.any((s) => s.id == responseServerId) ?? false;
+
+    if (!hasServerEntry) {
+      if (localCurrentId != null &&
+          localCurrentId != responseServerId &&
+          (existing?.servers.any((s) => s.id == localCurrentId) ?? false)) {
+        // Replace the placeholder local id with the canonical server id.
+        await serverStore.replaceServerId(
+          oldId: localCurrentId,
+          newId: responseServerId,
+        );
+      } else {
+        // Cold path: no existing entry to rename — add one keyed by the
+        // server-issued id, using whatever baseUrl is configured.
+        await serverStore.addServer(ServerConfig(
+          id: responseServerId,
+          baseUrl: existing?.servers.firstOrNull?.baseUrl ?? '',
+          name: responseServerId,
+        ));
+        await serverStore.selectServer(responseServerId);
+      }
+    } else if (localCurrentId != responseServerId) {
+      await serverStore.selectServer(responseServerId);
+    }
   }
 
   /// Login with email + password (MD5-hashed internally).
@@ -189,7 +260,7 @@ class AuthController extends _$AuthController {
     state = AsyncLoading<AuthState>().copyWithPrevious(state, isRefresh: false);
 
     state = await AsyncValue.guard(() async {
-      _suppressServerStoreReact = true;
+      _suppressStoreReact = true;
       try {
         final request = LoginRequest(
           credential: Credential.password(
@@ -200,41 +271,13 @@ class AuthController extends _$AuthController {
         );
         final response = await ref.read(authApiProvider).login(request);
 
-        // Align the local server entry with the server-issued id, so token
-        // namespace and currentServerId stay in sync — and we never grow
-        // the servers list with a duplicate on every login.
-        final serverStore = ref.read(serverStoreProvider.notifier);
-        final existing = ref.read(serverStoreProvider).valueOrNull;
-        final localCurrentId = existing?.currentServerId;
-        final hasServerEntry =
-            existing?.servers.any((s) => s.id == response.serverId) ?? false;
+        await _reconcileServerEntry(response.serverId);
 
-        if (!hasServerEntry) {
-          if (localCurrentId != null &&
-              localCurrentId != response.serverId &&
-              (existing?.servers.any((s) => s.id == localCurrentId) ?? false)) {
-            // Replace the placeholder local id with the canonical server id.
-            await serverStore.replaceServerId(
-              oldId: localCurrentId,
-              newId: response.serverId,
-            );
-          } else {
-            // Cold path: no existing entry to rename — add one keyed by
-            // the server-issued id, using whatever baseUrl is configured.
-            await serverStore.addServer(ServerConfig(
-              id: response.serverId,
-              baseUrl: existing?.servers.firstOrNull?.baseUrl ?? '',
-              name: response.serverId,
-            ));
-            await serverStore.selectServer(response.serverId);
-          }
-        } else if (localCurrentId != response.serverId) {
-          await serverStore.selectServer(response.serverId);
-        }
-
-        // Save tokens
-        final tokenStore =
-            ref.read(secureTokenStoreProvider(response.serverId));
+        // Save tokens under an account-scoped key so the same server can
+        // hold multiple logged-in accounts side by side.
+        final accountId =
+            AccountStore.makeId(response.serverId, response.user.uid);
+        final tokenStore = ref.read(secureTokenStoreProvider(accountId));
         await tokenStore.saveTokens(
           access: response.token,
           refresh: response.refreshToken,
@@ -244,16 +287,34 @@ class AuthController extends _$AuthController {
         AppLog.d(
           LogTag.auth,
           () =>
-              '🟢 login: tokens saved for serverId=${response.serverId} expires=${DateTime.now().add(Duration(seconds: response.expiredIn))}',
+              '🟢 login: tokens saved for accountId=$accountId expires=${DateTime.now().add(Duration(seconds: response.expiredIn))}',
         );
 
+        await ref.read(accountStoreProvider.notifier).upsertAccount(
+              AccountConfig(
+                accountId: accountId,
+                serverId: response.serverId,
+                uid: response.user.uid,
+                name: response.user.name,
+                email: response.user.email,
+                isAdmin: response.user.isAdmin,
+                avatarUpdatedAt: response.user.avatarUpdatedAt,
+              ),
+            );
+        await ref.read(accountStoreProvider.notifier).selectAccount(accountId);
+
+        // Remembered credentials are pre-login convenience — keyed by
+        // serverId (not accountId) since we don't know the uid until after
+        // login succeeds.
+        final rememberStore =
+            ref.read(secureTokenStoreProvider(response.serverId));
         if (rememberMe) {
-          await tokenStore.saveRememberedCredential(
+          await rememberStore.saveRememberedCredential(
             email: email,
             password: password,
           );
         } else {
-          await tokenStore.clearRememberedCredential();
+          await rememberStore.clearRememberedCredential();
         }
 
         return AuthState.authenticated(user: response.user);
@@ -262,12 +323,15 @@ class AuthController extends _$AuthController {
             error: e, stackTrace: st);
         rethrow;
       } finally {
-        _suppressServerStoreReact = false;
+        _suppressStoreReact = false;
       }
     });
   }
 
-  /// Logout: clear tokens and reset state.
+  /// Logout the current account: clears its tokens and resets auth state.
+  /// The [AccountConfig] entry itself is kept (not removed) so it still
+  /// appears in the account switcher for a quick re-login — mirroring how a
+  /// signed-out browser tab still remembers "who" was signed in.
   Future<void> logout() async {
     try {
       await ref.read(authApiProvider).logout();
@@ -275,13 +339,65 @@ class AuthController extends _$AuthController {
       // Best-effort — always clear locally
     }
 
-    final serverId =
-        ref.read(serverStoreProvider).valueOrNull?.currentServerId;
-    if (serverId != null) {
-      await ref.read(secureTokenStoreProvider(serverId)).clear();
+    final account = _currentAccount();
+    if (account != null) {
+      await ref.read(secureTokenStoreProvider(account.accountId)).clear();
+    }
+
+    _suppressStoreReact = true;
+    try {
+      await ref.read(accountStoreProvider.notifier).clearCurrentAccount();
+    } finally {
+      _suppressStoreReact = false;
     }
 
     state = const AsyncData(AuthState.unauthenticated());
+  }
+
+  /// Remove a saved account entirely (clears its tokens and drops it from
+  /// the switcher list). If it was the current account, resulting state is
+  /// `unauthenticated`.
+  Future<void> removeAccount(String accountId) async {
+    await ref.read(secureTokenStoreProvider(accountId)).clear();
+    final wasCurrent =
+        ref.read(accountStoreProvider).valueOrNull?.currentAccountId ==
+            accountId;
+
+    _suppressStoreReact = true;
+    try {
+      await ref.read(accountStoreProvider.notifier).removeAccount(accountId);
+    } finally {
+      _suppressStoreReact = false;
+    }
+
+    if (wasCurrent) {
+      state = const AsyncData(AuthState.unauthenticated());
+    }
+  }
+
+  /// Switch to a different saved account (same or different server) without
+  /// requiring the user to log out first. Attempts a silent token
+  /// revalidation/refresh against the target account; if that fails (expired
+  /// refresh token, revoked session, etc.) the resulting state is
+  /// `unauthenticated` and the caller is expected to route to `/login`.
+  Future<void> switchAccount(String accountId) async {
+    final accountState = ref.read(accountStoreProvider).valueOrNull;
+    final target =
+        accountState?.accounts.where((a) => a.accountId == accountId).firstOrNull;
+    if (target == null) return;
+    if (accountState?.currentAccountId == accountId) return;
+
+    state = AsyncLoading<AuthState>().copyWithPrevious(state, isRefresh: false);
+
+    _suppressStoreReact = true;
+    try {
+      await ref.read(serverStoreProvider.notifier).selectServer(target.serverId);
+      await ref.read(accountStoreProvider.notifier).selectAccount(accountId);
+    } finally {
+      _suppressStoreReact = false;
+    }
+
+    state = AsyncData(await _bootstrap());
   }
 
   /// Register a new account and auto-login on success.
@@ -292,46 +408,41 @@ class AuthController extends _$AuthController {
     state = AsyncLoading<AuthState>().copyWithPrevious(state, isRefresh: false);
 
     state = await AsyncValue.guard(() async {
-      final response = await ref
-          .read(authApiProvider)
-          .register(email: email, password: password, name: name);
+      _suppressStoreReact = true;
+      try {
+        final response = await ref
+            .read(authApiProvider)
+            .register(email: email, password: password, name: name);
 
-      final serverStore = ref.read(serverStoreProvider.notifier);
-      final existing = ref.read(serverStoreProvider).valueOrNull;
-      final localCurrentId = existing?.currentServerId;
-      final hasServerEntry =
-          existing?.servers.any((s) => s.id == response.serverId) ?? false;
+        await _reconcileServerEntry(response.serverId);
 
-      if (!hasServerEntry) {
-        if (localCurrentId != null &&
-            localCurrentId != response.serverId &&
-            (existing?.servers.any((s) => s.id == localCurrentId) ?? false)) {
-          await serverStore.replaceServerId(
-            oldId: localCurrentId,
-            newId: response.serverId,
-          );
-        } else {
-          await serverStore.addServer(ServerConfig(
-            id: response.serverId,
-            baseUrl: existing?.servers.firstOrNull?.baseUrl ?? '',
-            name: response.serverId,
-          ));
-          await serverStore.selectServer(response.serverId);
-        }
-      } else if (localCurrentId != response.serverId) {
-        await serverStore.selectServer(response.serverId);
+        final accountId =
+            AccountStore.makeId(response.serverId, response.user.uid);
+        final tokenStore = ref.read(secureTokenStoreProvider(accountId));
+        await tokenStore.saveTokens(
+          access: response.token,
+          refresh: response.refreshToken,
+          expiresAt:
+              DateTime.now().add(Duration(seconds: response.expiredIn)),
+        );
+
+        await ref.read(accountStoreProvider.notifier).upsertAccount(
+              AccountConfig(
+                accountId: accountId,
+                serverId: response.serverId,
+                uid: response.user.uid,
+                name: response.user.name,
+                email: response.user.email,
+                isAdmin: response.user.isAdmin,
+                avatarUpdatedAt: response.user.avatarUpdatedAt,
+              ),
+            );
+        await ref.read(accountStoreProvider.notifier).selectAccount(accountId);
+
+        return AuthState.authenticated(user: response.user);
+      } finally {
+        _suppressStoreReact = false;
       }
-
-      final tokenStore =
-          ref.read(secureTokenStoreProvider(response.serverId));
-      await tokenStore.saveTokens(
-        access: response.token,
-        refresh: response.refreshToken,
-        expiresAt:
-            DateTime.now().add(Duration(seconds: response.expiredIn)),
-      );
-
-      return AuthState.authenticated(user: response.user);
     });
   }
 
@@ -355,6 +466,10 @@ class AuthController extends _$AuthController {
     if (current is! AuthStateAuthenticated) return;
     try {
       final user = await ref.read(authApiProvider).me();
+      final account = _currentAccount();
+      if (account != null) {
+        await _syncAccountProfile(account, user);
+      }
       state = AsyncData(AuthState.authenticated(user: user));
     } catch (e) {
       AppLog.w(LogTag.auth, () => '🟦 refreshUser: me() failed: $e');

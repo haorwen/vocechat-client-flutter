@@ -5,8 +5,8 @@ import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'sse_client.dart';
+import '../storage/account_store.dart';
 import '../storage/secure_token_store.dart';
-import '../storage/server_store.dart';
 import '../utils/app_log.dart';
 import '../../features/auth/application/auth_controller.dart';
 
@@ -49,26 +49,26 @@ class SseTokenWatcher extends _$SseTokenWatcher {
   void build() {
     ref.onDispose(_stop);
 
-    // React to login/logout and server switch by restarting the poll loop
+    // React to login/logout and account switch by restarting the poll loop
     // against the right token-store key.
     final authState = ref.watch(authControllerProvider).valueOrNull;
     if (authState is! AuthStateAuthenticated) {
       _stop();
       return;
     }
-    final serverState = ref.watch(serverStoreProvider).valueOrNull;
-    final serverId = serverState?.currentServerId;
-    if (serverId == null) {
+    final accountState = ref.watch(accountStoreProvider).valueOrNull;
+    final accountId = accountState?.currentAccountId;
+    if (accountId == null) {
       _stop();
       return;
     }
 
-    _start(serverId);
+    _start(accountId);
   }
 
-  void _start(String serverId) {
+  void _start(String accountId) {
     _stop();
-    final tokenStore = ref.read(secureTokenStoreProvider(serverId));
+    final tokenStore = ref.read(secureTokenStoreProvider(accountId));
     // Seed the baseline so we don't trip an invalidate on first tick.
     Future<void> seed() async {
       final t = await tokenStore.readTokens();

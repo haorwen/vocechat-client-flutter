@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../storage/account_store.dart';
 import '../storage/secure_token_store.dart';
 import '../storage/server_store.dart';
 import '../utils/app_log.dart';
@@ -309,18 +310,24 @@ Stream<ChatEvent> sseEvents(Ref ref) async* {
   final authState = await ref.watch(authControllerProvider.future);
   if (authState is! AuthStateAuthenticated) return;
 
-  // Watching serverStore makes the provider rebuild on server switch.
+  // Watching accountStore makes the provider rebuild on account switch (same
+  // or different server); watching serverStore makes it rebuild on server
+  // switch too, since that's what resolves currentServer's baseUrl.
+  final accountState = await ref.watch(accountStoreProvider.future);
+  final accountId = accountState.currentAccountId;
+  if (accountId == null) return;
   final serverState = await ref.watch(serverStoreProvider.future);
-  final serverId = serverState.currentServerId;
-  if (serverId == null) return;
+  final account =
+      accountState.accounts.where((a) => a.accountId == accountId).firstOrNull;
+  if (account == null) return;
   final currentServer =
-      serverState.servers.where((s) => s.id == serverId).firstOrNull;
+      serverState.servers.where((s) => s.id == account.serverId).firstOrNull;
   if (currentServer == null) return;
 
   // Token. We READ rather than WATCH here because the token store doesn't
   // expose a stream; instead we manually invalidate this provider when a
   // refresh happens (see SseTokenWatcher below).
-  final tokenStore = ref.read(secureTokenStoreProvider(serverId));
+  final tokenStore = ref.read(secureTokenStoreProvider(accountId));
   final tokens = await tokenStore.readTokens();
   if (tokens == null) return;
 
@@ -332,7 +339,7 @@ Stream<ChatEvent> sseEvents(Ref ref) async* {
   // web `useStreaming.ts`'s per-connect renew. Returning null tells the client
   // to keep its existing key and proceed (preserves backoff/retry behaviour).
   Future<String?> tokenRefreshCallback() async {
-    final store = ref.read(secureTokenStoreProvider(serverId));
+    final store = ref.read(secureTokenStoreProvider(accountId));
     final current = await store.readTokens();
     if (current == null) return null;
     final aboutToExpire =

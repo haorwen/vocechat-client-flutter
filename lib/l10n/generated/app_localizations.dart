@@ -607,6 +607,60 @@ abstract class AppL10n {
   /// **'You will need to sign in again to access this server.'**
   String get settingsLogoutConfirmContent;
 
+  /// No description provided for @settingsSwitchAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch account'**
+  String get settingsSwitchAccount;
+
+  /// No description provided for @accountSwitcherTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounts'**
+  String get accountSwitcherTitle;
+
+  /// No description provided for @accountSwitcherAddAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Add account'**
+  String get accountSwitcherAddAccount;
+
+  /// No description provided for @accountSwitcherLogoutAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out'**
+  String get accountSwitcherLogoutAll;
+
+  /// No description provided for @accountSwitcherRemoveConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this account?'**
+  String get accountSwitcherRemoveConfirmTitle;
+
+  /// No description provided for @accountSwitcherRemoveConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes the saved sign-in and cached messages for this account on this device.'**
+  String get accountSwitcherRemoveConfirmBody;
+
+  /// No description provided for @accountSwitcherRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get accountSwitcherRemove;
+
+  /// No description provided for @accountSwitcherSignedOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed out'**
+  String get accountSwitcherSignedOut;
+
+  /// No description provided for @accountSwitcherSwitchFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t sign in to that account — please log in again.'**
+  String get accountSwitcherSwitchFailed;
+
   /// No description provided for @accountEmail.
   ///
   /// In en, this message translates to:

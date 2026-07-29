@@ -16,6 +16,7 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../../../shared/widgets/voce_dialog.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../auth/presentation/account_switcher_sheet.dart';
 import '../../channels/application/conversation_providers.dart';
 import '../../messages/data/message_cache.dart';
 import '../application/app_info_provider.dart';
@@ -109,6 +110,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _SettingsRail(
               current: _nav,
               onSelect: (n) => setState(() => _nav = n),
+              onSwitchAccount: () => showAccountSwitcherSheet(context),
               onLogout: _confirmLogout,
             ),
             Expanded(
@@ -170,6 +172,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
           ],
           const Divider(height: 32),
+          ListTile(
+            title: Text(l.settingsSwitchAccount),
+            onTap: () => showAccountSwitcherSheet(context),
+          ),
           ListTile(
             title: Text(
               l.settingsLogout,
@@ -284,11 +290,13 @@ class _SettingsRail extends StatelessWidget {
   const _SettingsRail({
     required this.current,
     required this.onSelect,
+    required this.onSwitchAccount,
     required this.onLogout,
   });
 
   final _SettingsNav current;
   final ValueChanged<_SettingsNav> onSelect;
+  final VoidCallback onSwitchAccount;
   final VoidCallback onLogout;
 
   @override
@@ -339,6 +347,22 @@ class _SettingsRail extends StatelessWidget {
               const SizedBox(height: 28),
             ],
             const SizedBox(height: 4),
+            InkWell(
+              onTap: onSwitchAccount,
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: Text(
+                  l.settingsSwitchAccount,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTokens.gray700,
+                  ),
+                ),
+              ),
+            ),
             InkWell(
               onTap: onLogout,
               borderRadius: BorderRadius.circular(4),

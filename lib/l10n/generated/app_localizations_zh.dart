@@ -270,6 +270,33 @@ class AppL10nZh extends AppL10n {
   String get settingsLogoutConfirmContent => '再次访问该服务器需要重新登录。';
 
   @override
+  String get settingsSwitchAccount => '切换账户';
+
+  @override
+  String get accountSwitcherTitle => '账户';
+
+  @override
+  String get accountSwitcherAddAccount => '添加账户';
+
+  @override
+  String get accountSwitcherLogoutAll => '退出登录';
+
+  @override
+  String get accountSwitcherRemoveConfirmTitle => '移除该账户？';
+
+  @override
+  String get accountSwitcherRemoveConfirmBody => '将删除该账户在本设备上保存的登录信息和缓存消息。';
+
+  @override
+  String get accountSwitcherRemove => '移除';
+
+  @override
+  String get accountSwitcherSignedOut => '已退出登录';
+
+  @override
+  String get accountSwitcherSwitchFailed => '无法登录该账户，请重新登录。';
+
+  @override
   String get accountEmail => '邮箱';
 
   @override

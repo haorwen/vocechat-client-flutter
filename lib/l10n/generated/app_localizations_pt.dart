@@ -271,6 +271,35 @@ class AppL10nPt extends AppL10n {
       'Você precisará entrar novamente para acessar este servidor.';
 
   @override
+  String get settingsSwitchAccount => 'Switch account';
+
+  @override
+  String get accountSwitcherTitle => 'Accounts';
+
+  @override
+  String get accountSwitcherAddAccount => 'Add account';
+
+  @override
+  String get accountSwitcherLogoutAll => 'Log out';
+
+  @override
+  String get accountSwitcherRemoveConfirmTitle => 'Remove this account?';
+
+  @override
+  String get accountSwitcherRemoveConfirmBody =>
+      'This removes the saved sign-in and cached messages for this account on this device.';
+
+  @override
+  String get accountSwitcherRemove => 'Remove';
+
+  @override
+  String get accountSwitcherSignedOut => 'Signed out';
+
+  @override
+  String get accountSwitcherSwitchFailed =>
+      'Couldn\'t sign in to that account — please log in again.';
+
+  @override
   String get accountEmail => 'E-mail';
 
   @override

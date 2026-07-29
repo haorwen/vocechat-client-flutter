@@ -89,6 +89,16 @@
   "settingsLogout": "退出登录",
   "settingsLogoutConfirmTitle": "退出登录？",
   "settingsLogoutConfirmContent": "再次访问该服务器需要重新登录。",
+  "settingsSwitchAccount": "切换账户",
+
+  "accountSwitcherTitle": "账户",
+  "accountSwitcherAddAccount": "添加账户",
+  "accountSwitcherLogoutAll": "退出登录",
+  "accountSwitcherRemoveConfirmTitle": "移除该账户？",
+  "accountSwitcherRemoveConfirmBody": "将删除该账户在本设备上保存的登录信息和缓存消息。",
+  "accountSwitcherRemove": "移除",
+  "accountSwitcherSignedOut": "已退出登录",
+  "accountSwitcherSwitchFailed": "无法登录该账户，请重新登录。",
 
   "accountEmail": "邮箱",
   "accountUsername": "用户名",

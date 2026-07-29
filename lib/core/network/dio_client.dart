@@ -5,6 +5,7 @@ import 'package:dio_smart_retry/dio_smart_retry.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../storage/account_store.dart';
 import '../storage/secure_token_store.dart';
 import '../storage/server_store.dart';
 import '../utils/app_log.dart';
@@ -175,9 +176,10 @@ class _AuthInterceptor extends Interceptor {
       }
     }
 
-    final serverId = _ref.read(serverStoreProvider).valueOrNull?.currentServerId;
-    if (serverId != null) {
-      final store = _ref.read(secureTokenStoreProvider(serverId));
+    final accountId =
+        _ref.read(accountStoreProvider).valueOrNull?.currentAccountId;
+    if (accountId != null) {
+      final store = _ref.read(secureTokenStoreProvider(accountId));
       final tokens = await store.readTokens();
       if (tokens != null) {
         options.headers['X-API-Key'] = tokens.accessToken;
@@ -190,7 +192,7 @@ class _AuthInterceptor extends Interceptor {
     } else {
       AppLog.d(
         LogTag.network,
-        () => '🌐 ${options.method} ${options.path} NO_SERVER',
+        () => '🌐 ${options.method} ${options.path} NO_ACCOUNT',
       );
     }
     handler.next(options);
@@ -242,13 +244,13 @@ class _AuthInterceptor extends Interceptor {
         // e.g. wrong email/password on login — nothing to refresh, and
         // retrying would just resend the same bad credentials.
       } else {
-      final serverId =
-          _ref.read(serverStoreProvider).valueOrNull?.currentServerId;
-      if (serverId == null) {
+      final accountId =
+          _ref.read(accountStoreProvider).valueOrNull?.currentAccountId;
+      if (accountId == null) {
         handler.next(err);
         return;
       }
-      final store = _ref.read(secureTokenStoreProvider(serverId));
+      final store = _ref.read(secureTokenStoreProvider(accountId));
 
       // If a refresh is already in progress, await it then retry. Capture the
       // completer into a local first: the owning renew clears [_refreshing] in
