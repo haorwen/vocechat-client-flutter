@@ -194,7 +194,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                         await ref
                             .read(conversationsProvider.notifier)
                             .refresh()
-                            .timeout(const Duration(seconds: 5),
+                            .timeout(const Duration(seconds: 1),
                                 onTimeout: () {});
                       },
                       child: ListView.builder(
