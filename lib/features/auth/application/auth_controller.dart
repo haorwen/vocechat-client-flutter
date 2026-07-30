@@ -266,6 +266,15 @@ class AuthController extends _$AuthController {
     bool rememberMe = false,
     String? serverUrl,
   }) async {
+    // If we're already authenticated as some account, this call is the
+    // account-switcher's "add account" flow signing in a *second* identity
+    // alongside it (the router only allows /login while unauthenticated, so
+    // the primary sign-in screen never reaches this branch). On failure we
+    // must not let the currently-active account's session be replaced by a
+    // global AsyncError — see below.
+    final previousAuthenticated = state.valueOrNull;
+    final isAddingSecondAccount = previousAuthenticated is AuthStateAuthenticated;
+
     // Preserve the previous value (hasValue stays true) instead of a bare
     // AsyncLoading(). The router's redirect uses `authAsync.hasValue` to
     // distinguish this in-flight login from the app's initial auth
@@ -280,7 +289,7 @@ class AuthController extends _$AuthController {
     // second before the new, successful result lands.
     state = AsyncLoading<AuthState>().copyWithPrevious(state, isRefresh: false);
 
-    state = await AsyncValue.guard(() async {
+    final result = await AsyncValue.guard(() async {
       _suppressStoreReact = true;
       try {
         final currentServer = ref.read(serverStoreProvider).valueOrNull;
@@ -361,6 +370,21 @@ class AuthController extends _$AuthController {
         _suppressStoreReact = false;
       }
     });
+
+    if (result.hasError && isAddingSecondAccount) {
+      // Restore the still-active first account instead of surfacing this
+      // failure through the shared global state — otherwise the router's
+      // redirect sees "unauthenticated" and force-navigates the whole app to
+      // /login, tearing down the imperatively-pushed "add account" screen
+      // before it can show its own inline error. The add-account screen's
+      // own try/catch handles this rethrown error directly.
+      state = AsyncData(previousAuthenticated);
+      final error = result.error!;
+      final stackTrace = result.stackTrace!;
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+
+    state = result;
   }
 
   /// Logout the current account: clears its tokens and resets auth state.
