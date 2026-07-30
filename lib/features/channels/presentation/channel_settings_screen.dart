@@ -16,6 +16,7 @@ import '../../../shared/widgets/voce_avatar.dart';
 import '../../../shared/widgets/voce_dialog.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../contacts/application/user_directory_provider.dart';
+import '../../profile/presentation/user_profile_card.dart';
 import '../application/muted_chats_provider.dart';
 import '../data/group_api.dart';
 import '../data/session_actions_api.dart';
@@ -34,8 +35,7 @@ class ChannelSettingsScreen extends ConsumerStatefulWidget {
       _ChannelSettingsScreenState();
 }
 
-class _ChannelSettingsScreenState
-    extends ConsumerState<ChannelSettingsScreen> {
+class _ChannelSettingsScreenState extends ConsumerState<ChannelSettingsScreen> {
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   bool _dirty = false;
@@ -85,8 +85,8 @@ class _ChannelSettingsScreenState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(safeText(_friendlyError(e)))));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(safeText(_friendlyError(e)))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -108,8 +108,8 @@ class _ChannelSettingsScreenState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(safeText(_friendlyError(e)))));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(safeText(_friendlyError(e)))));
       }
     } finally {
       if (mounted) setState(() => _uploadingAvatar = false);
@@ -126,8 +126,8 @@ class _ChannelSettingsScreenState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(safeText(_friendlyError(e)))));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(safeText(_friendlyError(e)))));
       }
     }
   }
@@ -147,8 +147,8 @@ class _ChannelSettingsScreenState
       setState(() {});
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(safeText(_friendlyError(e)))));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(safeText(_friendlyError(e)))));
       }
     }
   }
@@ -163,8 +163,8 @@ class _ChannelSettingsScreenState
       if (mounted) setState(() => _inviteLink = link);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(safeText(_friendlyError(e)))));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(safeText(_friendlyError(e)))));
       }
     } finally {
       if (mounted) setState(() => _generatingLink = false);
@@ -186,8 +186,8 @@ class _ChannelSettingsScreenState
       await ref.read(groupDirectoryProvider.notifier).refresh();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(safeText(_friendlyError(e)))));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(safeText(_friendlyError(e)))));
       }
     }
   }
@@ -198,8 +198,8 @@ class _ChannelSettingsScreenState
       await ref.read(groupDirectoryProvider.notifier).refresh();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(safeText(_friendlyError(e)))));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(safeText(_friendlyError(e)))));
       }
     }
   }
@@ -221,8 +221,8 @@ class _ChannelSettingsScreenState
       if (mounted) context.go('/home');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(safeText(_friendlyError(e)))));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(safeText(_friendlyError(e)))));
       }
     }
   }
@@ -244,8 +244,8 @@ class _ChannelSettingsScreenState
       if (mounted) context.go('/home');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(safeText(_friendlyError(e)))));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(safeText(_friendlyError(e)))));
       }
     }
   }
@@ -354,8 +354,8 @@ class _ChannelSettingsScreenState
                   enabled: canManage,
                   maxLines: 3,
                   onChanged: (_) => setState(() => _dirty = true),
-                  decoration: InputDecoration(
-                      labelText: l.channelDescriptionLabel),
+                  decoration:
+                      InputDecoration(labelText: l.channelDescriptionLabel),
                 ),
                 if (canManage) ...[
                   const SizedBox(height: 12),
@@ -367,9 +367,7 @@ class _ChannelSettingsScreenState
                       ),
                       Switch.adaptive(
                         value: group.isPublic,
-                        onChanged: isAdmin
-                            ? (v) => _changeType(gid, v)
-                            : null,
+                        onChanged: isAdmin ? (v) => _changeType(gid, v) : null,
                       ),
                     ],
                   ),
@@ -395,13 +393,16 @@ class _ChannelSettingsScreenState
                     : group.members)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: VoceAvatar(
-                        name: safeText(userDir[uid]?.name ?? '?'), size: 36),
+                    leading: GestureDetector(
+                      onTap: () => showUserProfileOverlay(context, uid: uid),
+                      child: VoceAvatar(
+                          name: safeText(userDir[uid]?.name ?? '?'), size: 36),
+                    ),
                     title: Text(safeText(
                         userDir[uid]?.name ?? l.chatUserFallback(uid))),
-                    subtitle: uid == group.owner
-                        ? Text(l.memberRoleOwner)
-                        : null,
+                    subtitle:
+                        uid == group.owner ? Text(l.memberRoleOwner) : null,
+                    onTap: () => showUserProfileOverlay(context, uid: uid),
                     trailing: (!group.isPublic &&
                             canManage &&
                             uid != group.owner &&
@@ -448,8 +449,7 @@ class _ChannelSettingsScreenState
                   PrimaryButton(
                     label: l.channelGenerateInviteLink,
                     isLoading: _generatingLink,
-                    onPressed: () =>
-                        _generateInviteLink(gid, group.isPublic),
+                    onPressed: () => _generateInviteLink(gid, group.isPublic),
                   ),
                 ],
               ),
@@ -479,8 +479,7 @@ class _ChannelSettingsScreenState
                 if (canLeave)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading:
-                        Icon(Icons.logout, color: AppTokens.error),
+                    leading: Icon(Icons.logout, color: AppTokens.error),
                     title: Text(l.chatListLeave,
                         style: TextStyle(color: AppTokens.error)),
                     onTap: () => _confirmLeave(gid),
@@ -488,8 +487,7 @@ class _ChannelSettingsScreenState
                 if (canManage)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading:
-                        Icon(Icons.delete_outline, color: AppTokens.error),
+                    leading: Icon(Icons.delete_outline, color: AppTokens.error),
                     title: Text(l.channelDeleteTitle,
                         style: TextStyle(color: AppTokens.error)),
                     onTap: () => _confirmDelete(gid),
@@ -521,9 +519,8 @@ class _AddMemberRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final candidates = userDir.values
-        .where((u) => !existingMembers.contains(u.uid))
-        .toList();
+    final candidates =
+        userDir.values.where((u) => !existingMembers.contains(u.uid)).toList();
     if (candidates.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: 8),
@@ -531,8 +528,8 @@ class _AddMemberRow extends StatelessWidget {
         children: [
           Expanded(
             child: DropdownButtonFormField<int>(
-              decoration:
-                  InputDecoration(labelText: AppL10n.of(context).channelAddMember),
+              decoration: InputDecoration(
+                  labelText: AppL10n.of(context).channelAddMember),
               items: [
                 for (final u in candidates)
                   DropdownMenuItem(value: u.uid, child: Text(safeText(u.name))),

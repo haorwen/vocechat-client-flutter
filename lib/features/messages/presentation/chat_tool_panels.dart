@@ -8,6 +8,7 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../contacts/application/user_directory_provider.dart';
+import '../../profile/presentation/user_profile_card.dart';
 import '../application/burn_after_read_provider.dart';
 import '../application/chat_tools_provider.dart';
 import '../domain/message_models.dart';
@@ -179,8 +180,7 @@ class _ToolHeader extends StatelessWidget {
             const Spacer(),
             IconButton(
               tooltip: AppL10n.of(context).actionClose,
-              icon: Icon(Icons.close,
-                  size: 18, color: AppTokens.gray500),
+              icon: Icon(Icons.close, size: 18, color: AppTokens.gray500),
               onPressed: () => Navigator.of(context).pop(),
             ),
           ],
@@ -223,8 +223,7 @@ class _PinListPanel extends ConsumerWidget {
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: pins.length,
-      separatorBuilder: (_, __) =>
-          Divider(height: 1, color: AppTokens.gray200),
+      separatorBuilder: (_, __) => Divider(height: 1, color: AppTokens.gray200),
       itemBuilder: (ctx, i) {
         final p = pins[i];
         final user = userDir[p.createdBy];
@@ -236,16 +235,13 @@ class _PinListPanel extends ConsumerWidget {
           contentType: p.contentType,
           trailing: IconButton(
             tooltip: l.chatToolUnpin,
-            icon: Icon(Icons.close,
-                size: 16, color: AppTokens.gray500),
+            icon: Icon(Icons.close, size: 16, color: AppTokens.gray500),
             onPressed: () async {
-              final ok = await ref
-                  .read(chatToolsProvider)
-                  .unpin(gid: gid, mid: p.mid);
+              final ok =
+                  await ref.read(chatToolsProvider).unpin(gid: gid, mid: p.mid);
               if (!ctx.mounted) return;
               ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                content: Text(
-                    ok ? l.chatToolUnpinned : l.chatToolUnpinFail),
+                content: Text(ok ? l.chatToolUnpinned : l.chatToolUnpinFail),
               ));
             },
           ),
@@ -368,8 +364,7 @@ class _FavArchiveCard extends ConsumerWidget {
       return (body.content ?? '').trim();
     }
     if (ct == 'vocechat/file') {
-      final fileType =
-          (body.properties?['content_type'] as String?) ?? '';
+      final fileType = (body.properties?['content_type'] as String?) ?? '';
       final name = body.properties?['name'] as String?;
       if (fileType.startsWith('image/')) {
         return name == null ? l.previewImage : '${l.previewImage} $name';
@@ -553,8 +548,8 @@ class _FavArchiveCard extends ConsumerWidget {
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Text(
                         l.previewImage,
-                        style: TextStyle(
-                            fontSize: 13, color: AppTokens.gray600),
+                        style:
+                            TextStyle(fontSize: 13, color: AppTokens.gray600),
                       ),
                     ),
                   ),
@@ -607,9 +602,8 @@ class _MembersListPanel extends ConsumerWidget {
     }
 
     // Public channel → everyone is a member. Private → use group.members.
-    final uids = group.isPublic
-        ? userDir.keys.toList(growable: false)
-        : group.members;
+    final uids =
+        group.isPublic ? userDir.keys.toList(growable: false) : group.members;
     if (uids.isEmpty) {
       return _EmptyState(label: l.chatToolMembersEmpty);
     }
@@ -635,10 +629,13 @@ class _MembersListPanel extends ConsumerWidget {
         final isOwner = uid == group.owner;
         return ListTile(
           dense: true,
-          leading: VoceAvatar(
-            name: name,
-            imageUrl: _userAvatarUrl(ref, uid, user?.avatarUpdatedAt),
-            size: 36,
+          leading: GestureDetector(
+            onTap: () => showUserProfileOverlay(context, uid: uid),
+            child: VoceAvatar(
+              name: name,
+              imageUrl: _userAvatarUrl(ref, uid, user?.avatarUpdatedAt),
+              size: 36,
+            ),
           ),
           title: Text(
             safeText(name),
@@ -650,9 +647,9 @@ class _MembersListPanel extends ConsumerWidget {
           ),
           subtitle: isOwner
               ? Text(l.memberRoleOwner,
-                  style: TextStyle(
-                      fontSize: 12, color: AppTokens.gray500))
+                  style: TextStyle(fontSize: 12, color: AppTokens.gray500))
               : null,
+          onTap: () => showUserProfileOverlay(context, uid: uid),
         );
       },
     );
@@ -807,8 +804,8 @@ class _MessageListTile extends StatelessWidget {
 
   String _formatTime() {
     if (createdAt == 0) return '';
-    final dt = DateTime.fromMillisecondsSinceEpoch(createdAt, isUtc: true)
-        .toLocal();
+    final dt =
+        DateTime.fromMillisecondsSinceEpoch(createdAt, isUtc: true).toLocal();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final messageDay = DateTime(dt.year, dt.month, dt.day);
@@ -1055,8 +1052,8 @@ class _SearchPopoverState extends State<_SearchPopover> {
 
   String _formatTime(int createdAt) {
     if (createdAt == 0) return '';
-    final dt = DateTime.fromMillisecondsSinceEpoch(createdAt, isUtc: true)
-        .toLocal();
+    final dt =
+        DateTime.fromMillisecondsSinceEpoch(createdAt, isUtc: true).toLocal();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final messageDay = DateTime(dt.year, dt.month, dt.day);
@@ -1103,14 +1100,14 @@ class _SearchPopoverState extends State<_SearchPopover> {
                       autofocus: true,
                       onChanged: (v) => setState(() => _query = v),
                       textAlignVertical: TextAlignVertical.center,
-                      style: TextStyle(
-                          fontSize: 14, color: AppTokens.textHeading),
+                      style:
+                          TextStyle(fontSize: 14, color: AppTokens.textHeading),
                       decoration: InputDecoration(
                         isCollapsed: true,
                         border: InputBorder.none,
                         hintText: l.chatSearchHint,
-                        hintStyle: TextStyle(
-                            fontSize: 14, color: AppTokens.gray400),
+                        hintStyle:
+                            TextStyle(fontSize: 14, color: AppTokens.gray400),
                         contentPadding: const EdgeInsets.symmetric(
                             vertical: 8, horizontal: 12),
                       ),
@@ -1119,8 +1116,7 @@ class _SearchPopoverState extends State<_SearchPopover> {
                 ),
                 IconButton(
                   tooltip: l.actionClose,
-                  icon: Icon(Icons.close,
-                      size: 18, color: AppTokens.gray500),
+                  icon: Icon(Icons.close, size: 18, color: AppTokens.gray500),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -1137,8 +1133,8 @@ class _SearchPopoverState extends State<_SearchPopover> {
                         child: Text(
                           l.chatSearchEmpty,
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                              fontSize: 13, color: AppTokens.gray500),
+                          style:
+                              TextStyle(fontSize: 13, color: AppTokens.gray500),
                         ),
                       )
                     : ListView.separated(
@@ -1150,8 +1146,8 @@ class _SearchPopoverState extends State<_SearchPopover> {
                         itemBuilder: (ctx, i) {
                           final msg = results[i];
                           final user = widget.userDir[msg.fromUid];
-                          final name = user?.name ??
-                              l.chatUserFallback(msg.fromUid);
+                          final name =
+                              user?.name ?? l.chatUserFallback(msg.fromUid);
                           final content = switch (msg.detail) {
                             NormalMessageDetail() =>
                               (msg.detail as NormalMessageDetail).content,
@@ -1162,11 +1158,10 @@ class _SearchPopoverState extends State<_SearchPopover> {
                           return InkWell(
                             onTap: () => widget.onLocate(msg.mid),
                             child: Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                  12, 10, 12, 10),
+                              padding:
+                                  const EdgeInsets.fromLTRB(12, 10, 12, 10),
                               child: Row(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   VoceAvatar(
                                     name: name,
@@ -1186,12 +1181,10 @@ class _SearchPopoverState extends State<_SearchPopover> {
                                               child: Text(
                                                 safeText(name),
                                                 maxLines: 1,
-                                                overflow:
-                                                    TextOverflow.ellipsis,
+                                                overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(
                                                   fontSize: 13,
-                                                  fontWeight:
-                                                      FontWeight.w600,
+                                                  fontWeight: FontWeight.w600,
                                                   color: AppTokens.textHeading,
                                                 ),
                                               ),

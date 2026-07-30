@@ -9,6 +9,7 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/loading_capsule.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../../channels/application/pending_chat_selection.dart';
+import '../../profile/presentation/user_profile_card.dart';
 import '../application/contacts_provider.dart';
 import '../application/presence_provider.dart';
 import '../application/user_directory_provider.dart';
@@ -78,45 +79,41 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                           c.email.toLowerCase().contains('bot') ||
                           c.name.toLowerCase().contains('bot'))
                       .toList();
-                  final contacts = filtered
-                      .where((c) => !bots.contains(c))
-                      .toList();
+                  final contacts =
+                      filtered.where((c) => !bots.contains(c)).toList();
 
                   if (filtered.isEmpty) {
                     return Center(
                       child: Text(
                         l.contactsEmpty,
-                        style: TextStyle(
-                            color: AppTokens.gray500, fontSize: 13),
+                        style:
+                            TextStyle(color: AppTokens.gray500, fontSize: 13),
                       ),
                     );
                   }
 
                   return ListView(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     children: [
                       if (bots.isNotEmpty) ...[
                         _SectionLabel(l.contactsSectionBot(bots.length)),
                         ...bots.map((c) => _ContactTile(
                               contact: c,
                               isBot: true,
-                              isSelected:
-                                  isWide && _selectedUid == c.uid,
-                              onTap: () => _onContactTap(
-                                  context, c, isWide),
+                              isSelected: isWide && _selectedUid == c.uid,
+                              onTap: () => _onContactTap(context, c, isWide),
                             )),
                         const SizedBox(height: 4),
                       ],
                       if (contacts.isNotEmpty) ...[
-                        _SectionLabel(l.contactsSectionContact(contacts.length)),
+                        _SectionLabel(
+                            l.contactsSectionContact(contacts.length)),
                         ...contacts.map((c) => _ContactTile(
                               contact: c,
                               isBot: false,
-                              isSelected:
-                                  isWide && _selectedUid == c.uid,
-                              onTap: () => _onContactTap(
-                                  context, c, isWide),
+                              isSelected: isWide && _selectedUid == c.uid,
+                              onTap: () => _onContactTap(context, c, isWide),
                             )),
                       ],
                     ],
@@ -204,8 +201,8 @@ class _ContactsHeader extends StatelessWidget {
                     color: AppTokens.gray400,
                     fontSize: 14,
                   ),
-                  prefixIcon: Icon(Icons.search,
-                      size: 18, color: AppTokens.gray400),
+                  prefixIcon:
+                      Icon(Icons.search, size: 18, color: AppTokens.gray400),
                   prefixIconConstraints:
                       const BoxConstraints(minWidth: 36, minHeight: 0),
                   border: InputBorder.none,
@@ -314,53 +311,57 @@ class _ContactTile extends ConsumerWidget {
           padding: const EdgeInsets.all(8),
           child: Row(
             children: [
-              SizedBox(
-                width: 32,
-                height: 32,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    VoceAvatar(
-                      name: safeText(contact.name),
-                      imageUrl: avatarUrl,
-                      size: 32,
-                    ),
-                    Positioned(
-                      right: -2,
-                      bottom: -2,
-                      child: isBot
-                          ? Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color: AppTokens.gray100,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                    color: AppTokens.surface, width: 1.5),
-                              ),
-                              alignment: Alignment.center,
-                              child: Icon(
-                                Icons.smart_toy_outlined,
-                                size: 8,
-                                color: AppTokens.gray600,
-                              ),
-                            )
-                          : showStatus
-                              ? Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                    color: isOnline
-                                        ? AppTokens.successDot
-                                        : AppTokens.gray400,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: AppTokens.surface, width: 2),
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
-                    ),
-                  ],
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => showUserProfileOverlay(context, uid: contact.uid),
+                child: SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      VoceAvatar(
+                        name: safeText(contact.name),
+                        imageUrl: avatarUrl,
+                        size: 32,
+                      ),
+                      Positioned(
+                        right: -2,
+                        bottom: -2,
+                        child: isBot
+                            ? Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: AppTokens.gray100,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                      color: AppTokens.surface, width: 1.5),
+                                ),
+                                alignment: Alignment.center,
+                                child: Icon(
+                                  Icons.smart_toy_outlined,
+                                  size: 8,
+                                  color: AppTokens.gray600,
+                                ),
+                              )
+                            : showStatus
+                                ? Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: isOnline
+                                          ? AppTokens.successDot
+                                          : AppTokens.gray400,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: AppTokens.surface, width: 2),
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -372,9 +373,7 @@ class _ContactTile extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: isSelected
-                        ? AppTokens.gray600
-                        : AppTokens.gray700,
+                    color: isSelected ? AppTokens.gray600 : AppTokens.gray700,
                     height: 20 / 14,
                   ),
                 ),
@@ -530,8 +529,7 @@ class _ProfileAction extends StatelessWidget {
       hoverColor: AppTokens.hover,
       child: Container(
         constraints: const BoxConstraints(maxWidth: 128, minWidth: 88),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: isPrimary ? AppTokens.gray50 : AppTokens.gray100,
           borderRadius: BorderRadius.circular(8),

@@ -12,6 +12,7 @@ import '../../../shared/widgets/voce_context_menu.dart';
 import '../../../features/contacts/application/presence_provider.dart';
 import '../../../features/contacts/application/user_directory_provider.dart';
 import '../../../features/messages/presentation/chat_screen.dart';
+import '../../profile/presentation/user_profile_card.dart';
 import '../../../features/messages/application/read_index_provider.dart';
 import '../application/conversation_providers.dart';
 import '../application/muted_chats_provider.dart';
@@ -133,8 +134,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                   loading: () => Center(
                     child: LoadingCapsule(label: l.chatListLoading),
                   ),
-                  error: (e, _) =>
-                      Center(child: Text(safeText(l.errorPrefix(e.toString())))),
+                  error: (e, _) => Center(
+                      child: Text(safeText(l.errorPrefix(e.toString())))),
                   data: (conversations) {
                     // Hide DM contacts with no message history — mirrors the
                     // web client, whose session list is built from
@@ -158,12 +159,10 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                                 c.name.toLowerCase().contains(lowerQuery))
                             .toList();
                     if (visible.isEmpty) {
-                      return _EmptyState(
-                          message: l.chatListEmpty);
+                      return _EmptyState(message: l.chatListEmpty);
                     }
                     if (filtered.isEmpty) {
-                      return _EmptyState(
-                          message: l.chatListNoResults(_query));
+                      return _EmptyState(message: l.chatListNoResults(_query));
                     }
 
                     // Partition filtered conversations into pinned + normal
@@ -202,8 +201,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                             horizontal: 0, vertical: 4),
                         // One slot for the pinned-section container (if any)
                         // plus one slot per normal item.
-                        itemCount:
-                            (pinned.isNotEmpty ? 1 : 0) + normal.length,
+                        itemCount: (pinned.isNotEmpty ? 1 : 0) + normal.length,
                         itemBuilder: (context, i) {
                           if (pinned.isNotEmpty && i == 0) {
                             return _PinnedSection(
@@ -274,9 +272,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     required String baseUrl,
     required bool showStatus,
   }) {
-    final unreadInfo = ref
-            .watch(unreadInfoProvider(item.key))
-            .valueOrNull ??
+    final unreadInfo = ref.watch(unreadInfoProvider(item.key)).valueOrNull ??
         (count: 0, mention: false);
 
     String routeId;
@@ -358,8 +354,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
 
     // Build menu items matching the web reference order.
     final items = <VoceContextMenuItem>[
-      VoceContextMenuItem(
-          'pin', isPinned ? l.chatListUnpin : l.chatListPin),
+      VoceContextMenuItem('pin', isPinned ? l.chatListUnpin : l.chatListPin),
       VoceContextMenuItem('markRead', l.chatListMarkRead),
       VoceContextMenuItem('mute', isMuted ? l.chatListUnmute : l.chatListMute),
       if (item.isChannel)
@@ -391,9 +386,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                   ListTile(
                     title: Text(
                       mi.label,
-                      style: mi.danger
-                          ? TextStyle(color: AppTokens.error)
-                          : null,
+                      style:
+                          mi.danger ? TextStyle(color: AppTokens.error) : null,
                     ),
                     onTap: () => Navigator.of(ctx).pop(mi.value),
                   ),
@@ -436,8 +430,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
               readNotifier.setGroup(gid, mid);
           }
           if (mounted) {
-            messenger.showSnackBar(
-                SnackBar(content: Text(l.chatListMarkReadDone)));
+            messenger
+                .showSnackBar(SnackBar(content: Text(l.chatListMarkReadDone)));
           }
         case 'mute':
           final api = ref.read(sessionActionsApiProvider);
@@ -461,15 +455,14 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           }
           if (mounted) {
             messenger.showSnackBar(SnackBar(
-                content: Text(
-                    isMuted ? l.chatListUnmuteDone : l.chatListMuteDone)));
+                content:
+                    Text(isMuted ? l.chatListUnmuteDone : l.chatListMuteDone)));
           }
         case 'hide':
           // Local-only: remove the DM from the conversation list state.
           ref.read(conversationsProvider.notifier).hideConversation(item.key);
           if (mounted) {
-            messenger
-                .showSnackBar(SnackBar(content: Text(l.chatListHideDone)));
+            messenger.showSnackBar(SnackBar(content: Text(l.chatListHideDone)));
           }
         case 'settings':
           final gid = (item.key as GroupConversationKey).gid;
@@ -608,8 +601,8 @@ class _ChatListHeader extends StatelessWidget {
                     color: AppTokens.gray400,
                     fontSize: 14,
                   ),
-                  prefixIcon: Icon(Icons.search,
-                      size: 18, color: AppTokens.gray400),
+                  prefixIcon:
+                      Icon(Icons.search, size: 18, color: AppTokens.gray400),
                   prefixIconConstraints:
                       const BoxConstraints(minWidth: 36, minHeight: 0),
                   border: InputBorder.none,
@@ -702,202 +695,205 @@ class _ConversationTile extends ConsumerWidget {
         child: InkWell(
           onTap: onTap,
           onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(8),
-        hoverColor: AppTokens.hover,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 40,
-                height: 40,
-                child: Stack(
-                  children: [
-                    // Channels: prefer the actual group avatar if the server
-                    // has one, fall back to the # tag chip otherwise. DMs:
-                    // VoceAvatar handles network image with initials fallback.
-                    if (item.isChannel && (avatarUrl == null))
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: AppTokens.primary50,
-                          borderRadius: BorderRadius.circular(50),
-                        ),
-                        child: Icon(Icons.tag,
-                            size: 20, color: AppTokens.primary500),
-                      )
-                    else
-                      VoceAvatar(
-                        name: safeText(item.name),
-                        imageUrl: avatarUrl,
-                        size: 40,
-                      ),
-                    if (!item.isChannel && showStatus)
-                      Positioned(
-                        right: -1,
-                        bottom: -1,
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: isOnline
-                                ? AppTokens.successDot
-                                : AppTokens.gray400,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                                color: AppTokens.surface, width: 2),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+          borderRadius: BorderRadius.circular(8),
+          hoverColor: AppTokens.hover,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: dmUid != null
+                      ? () => showUserProfileOverlay(context, uid: dmUid!)
+                      : null,
+                  child: SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Stack(
                       children: [
-                        Expanded(
-                          child: Text(
-                            safeText(item.name),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppTokens.zinc600,
-                              height: 20 / 14,
+                        // Channels: prefer the actual group avatar if the server
+                        // has one, fall back to the # tag chip otherwise. DMs:
+                        // VoceAvatar handles network image with initials fallback.
+                        if (item.isChannel && (avatarUrl == null))
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppTokens.primary50,
+                              borderRadius: BorderRadius.circular(50),
                             ),
+                            child: Icon(Icons.tag,
+                                size: 20, color: AppTokens.primary500),
+                          )
+                        else
+                          VoceAvatar(
+                            name: safeText(item.name),
+                            imageUrl: avatarUrl,
+                            size: 40,
                           ),
-                        ),
-                        if (item.lastAt != null)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 4),
-                            child: Text(
-                              _formatRelativeTime(context, item.lastAt!),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppTokens.zinc500,
-                                fontWeight: FontWeight.w500,
-                                height: 18 / 12,
+                        if (!item.isChannel && showStatus)
+                          Positioned(
+                            right: -1,
+                            bottom: -1,
+                            child: Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: isOnline
+                                    ? AppTokens.successDot
+                                    : AppTokens.gray400,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: AppTokens.surface, width: 2),
                               ),
                             ),
                           ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            safeText(item.lastPreview ?? ''),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTokens.zinc500,
-                              height: 18 / 12,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              safeText(item.name),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppTokens.zinc600,
+                                height: 20 / 14,
+                              ),
                             ),
                           ),
-                        ),
-                        if (unread > 0)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 4),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (mention)
+                          if (item.lastAt != null)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Text(
+                                _formatRelativeTime(context, item.lastAt!),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTokens.zinc500,
+                                  fontWeight: FontWeight.w500,
+                                  height: 18 / 12,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              safeText(item.lastPreview ?? ''),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTokens.zinc500,
+                                height: 18 / 12,
+                              ),
+                            ),
+                          ),
+                          if (unread > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (mention)
+                                    Container(
+                                      margin: const EdgeInsets.only(right: 3),
+                                      constraints:
+                                          const BoxConstraints(minWidth: 16),
+                                      height: 16,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 5),
+                                      decoration: BoxDecoration(
+                                        // web: muted → faded gray badge.
+                                        color: muted
+                                            ? mutedTint
+                                            : AppTokens.primary500,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: const Text(
+                                        '@',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                          height: 1,
+                                          // iOS SF font puts extra leading above
+                                          // the baseline; even distribution keeps
+                                          // the glyph vertically centered.
+                                          leadingDistribution:
+                                              TextLeadingDistribution.even,
+                                        ),
+                                      ),
+                                    ),
                                   Container(
-                                    margin:
-                                        const EdgeInsets.only(right: 3),
-                                    constraints: const BoxConstraints(
-                                        minWidth: 16),
+                                    constraints:
+                                        const BoxConstraints(minWidth: 16),
                                     height: 16,
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 5),
+                                        horizontal: 6),
                                     decoration: BoxDecoration(
-                                      // web: muted → faded gray badge.
                                       color: muted
                                           ? mutedTint
                                           : AppTokens.primary500,
-                                      borderRadius:
-                                          BorderRadius.circular(10),
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
                                     alignment: Alignment.center,
-                                    child: const Text(
-                                      '@',
-                                      style: TextStyle(
+                                    child: Text(
+                                      unread > 99 ? '99+' : unread.toString(),
+                                      style: const TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w900,
                                         color: Colors.white,
+                                        // Tabular figures give the monospace
+                                        // digit width without relying on a
+                                        // 'monospace' family iOS doesn't ship.
+                                        fontFeatures: [
+                                          FontFeature.tabularFigures(),
+                                        ],
                                         height: 1,
                                         // iOS SF font puts extra leading above
                                         // the baseline; even distribution keeps
-                                        // the glyph vertically centered.
+                                        // the digits vertically centered.
                                         leadingDistribution:
                                             TextLeadingDistribution.even,
                                       ),
                                     ),
                                   ),
-                                Container(
-                                  constraints:
-                                      const BoxConstraints(minWidth: 16),
-                                  height: 16,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6),
-                                  decoration: BoxDecoration(
-                                    color: muted
-                                        ? mutedTint
-                                        : AppTokens.primary500,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    unread > 99 ? '99+' : unread.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                      // Tabular figures give the monospace
-                                      // digit width without relying on a
-                                      // 'monospace' family iOS doesn't ship.
-                                      fontFeatures: [
-                                        FontFeature.tabularFigures(),
-                                      ],
-                                      height: 1,
-                                      // iOS SF font puts extra leading above
-                                      // the baseline; even distribution keeps
-                                      // the digits vertically centered.
-                                      leadingDistribution:
-                                          TextLeadingDistribution.even,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
+                            )
+                          // web: no unreads but muted → show a bell-off icon
+                          // in place of the badge.
+                          else if (muted)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Icon(
+                                Icons.notifications_off,
+                                size: 12,
+                                color: mutedTint,
+                              ),
                             ),
-                          )
-                        // web: no unreads but muted → show a bell-off icon
-                        // in place of the badge.
-                        else if (muted)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 4),
-                            child: Icon(
-                              Icons.notifications_off,
-                              size: 12,
-                              color: mutedTint,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
         ),
       ),
     );
