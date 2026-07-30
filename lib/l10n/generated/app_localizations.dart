@@ -1471,6 +1471,30 @@ abstract class AppL10n {
   /// **'Permission denied — enable microphone/camera access in system settings'**
   String get chatRecordingPermissionDenied;
 
+  /// No description provided for @chatPhotoPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission denied — enable photo library access in system settings'**
+  String get chatPhotoPermissionDenied;
+
+  /// No description provided for @chatAttachOpenFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Files'**
+  String get chatAttachOpenFiles;
+
+  /// No description provided for @chatAttachCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera'**
+  String get chatAttachCamera;
+
+  /// No description provided for @chatAttachSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send ({count})'**
+  String chatAttachSend(int count);
+
   /// No description provided for @chatDropOverlayTitle.
   ///
   /// In en, this message translates to:

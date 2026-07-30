@@ -724,6 +724,20 @@ class AppL10nZh extends AppL10n {
   String get chatRecordingPermissionDenied => '权限被拒绝，请在系统设置中开启麦克风/摄像头权限';
 
   @override
+  String get chatPhotoPermissionDenied => '权限被拒绝，请在系统设置中开启相册访问权限';
+
+  @override
+  String get chatAttachOpenFiles => '文件';
+
+  @override
+  String get chatAttachCamera => '相机';
+
+  @override
+  String chatAttachSend(int count) {
+    return '发送（$count）';
+  }
+
+  @override
   String chatDropOverlayTitle(String name) {
     return '发送到 $name';
   }

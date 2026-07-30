@@ -49,6 +49,12 @@ dependencies:
   image_picker: ^1.1.2
   file_picker: ^8.1.4
   photo_view: ^0.15.0
+  # In-app photo-gallery grid for the mobile attachment sheet (image_picker
+  # has no gallery-browsing UI, only a single-shot native picker).
+  photo_manager: ^3.11.0
+  # AssetEntityImage/AssetEntityImageProvider live in a separate package
+  # since photo_manager v3.0.0.
+  photo_manager_image_provider: ^2.2.0
 
   # Clipboard (cross-platform image/file paste — text-only Clipboard from
   # flutter/services cannot read image bytes)

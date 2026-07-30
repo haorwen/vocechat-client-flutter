@@ -305,6 +305,13 @@
   "chatVoiceRecordingCancel": "Cancel",
   "chatVoiceRecordingSend": "Send",
   "chatRecordingPermissionDenied": "Permission denied — enable microphone/camera access in system settings",
+  "chatPhotoPermissionDenied": "Permission denied — enable photo library access in system settings",
+  "chatAttachOpenFiles": "Files",
+  "chatAttachCamera": "Camera",
+  "chatAttachSend": "Send ({count})",
+  "@chatAttachSend": {
+    "placeholders": {"count": {"type": "int"}}
+  },
   "chatDropOverlayTitle": "Send to {name}",
   "@chatDropOverlayTitle": {
     "placeholders": {"name": {"type": "String"}}

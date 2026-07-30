@@ -744,6 +744,21 @@ class AppL10nRu extends AppL10n {
       'Доступ запрещён — включите доступ к микрофону/камере в настройках системы';
 
   @override
+  String get chatPhotoPermissionDenied =>
+      'Permission denied — enable photo library access in system settings';
+
+  @override
+  String get chatAttachOpenFiles => 'Files';
+
+  @override
+  String get chatAttachCamera => 'Camera';
+
+  @override
+  String chatAttachSend(int count) {
+    return 'Send ($count)';
+  }
+
+  @override
   String chatDropOverlayTitle(String name) {
     return 'Отправить $name';
   }

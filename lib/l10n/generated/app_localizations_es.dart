@@ -743,6 +743,21 @@ class AppL10nEs extends AppL10n {
       'Permiso denegado: habilita el acceso al micrófono o la cámara en la configuración del sistema';
 
   @override
+  String get chatPhotoPermissionDenied =>
+      'Permission denied — enable photo library access in system settings';
+
+  @override
+  String get chatAttachOpenFiles => 'Files';
+
+  @override
+  String get chatAttachCamera => 'Camera';
+
+  @override
+  String chatAttachSend(int count) {
+    return 'Send ($count)';
+  }
+
+  @override
   String chatDropOverlayTitle(String name) {
     return 'Enviar a $name';
   }

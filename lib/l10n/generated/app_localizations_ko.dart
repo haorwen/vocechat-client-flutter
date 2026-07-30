@@ -730,6 +730,21 @@ class AppL10nKo extends AppL10n {
       '권한이 거부되었습니다 — 시스템 설정에서 마이크/카메라 접근을 허용해 주세요';
 
   @override
+  String get chatPhotoPermissionDenied =>
+      'Permission denied — enable photo library access in system settings';
+
+  @override
+  String get chatAttachOpenFiles => 'Files';
+
+  @override
+  String get chatAttachCamera => 'Camera';
+
+  @override
+  String chatAttachSend(int count) {
+    return 'Send ($count)';
+  }
+
+  @override
   String chatDropOverlayTitle(String name) {
     return '$name에게 보내기';
   }
