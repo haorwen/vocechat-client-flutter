@@ -25,6 +25,20 @@ sealed class AuthState with _$AuthState {
 }
 
 // ---------------------------------------------------------------------------
+// InviteRequiresEmailConfirmationException
+// ---------------------------------------------------------------------------
+
+/// Thrown by [AuthController.register] when the target server has SMTP
+/// confirmation enabled for invited signups (`send_reg_magic_link` returned
+/// `mail_is_sent: true`). That flow requires the user to click a link
+/// emailed to them before a usable magic token exists, which this client
+/// doesn't implement — surfaced as a distinct error so the UI can show a
+/// specific message instead of a generic failure.
+class InviteRequiresEmailConfirmationException implements Exception {
+  const InviteRequiresEmailConfirmationException();
+}
+
+// ---------------------------------------------------------------------------
 // AuthController
 // ---------------------------------------------------------------------------
 
@@ -460,7 +474,19 @@ class AuthController extends _$AuthController {
   }
 
   /// Register a new account and auto-login on success.
-  Future<void> register(String name, String email, String password) async {
+  ///
+  /// [magicToken], when provided, is an invitation token obtained from an
+  /// invite link (see `parseInviteLink`). It is re-minted via
+  /// `send_reg_magic_link` first — servers with SMTP confirmation enabled
+  /// withhold a usable token there (`mailIsSent: true`), a flow this client
+  /// doesn't support yet, so that case throws [InviteRequiresEmailConfirmationException]
+  /// instead of silently failing the subsequent register call.
+  Future<void> register(
+    String name,
+    String email,
+    String password, {
+    String? magicToken,
+  }) async {
     // See login() — preserve hasValue so the router's redirect doesn't
     // mistake this in-flight registration for the initial auth bootstrap.
     // isRefresh: false — see login() for why the default true is wrong here.
@@ -469,9 +495,27 @@ class AuthController extends _$AuthController {
     state = await AsyncValue.guard(() async {
       _suppressStoreReact = true;
       try {
-        final response = await ref
-            .read(authApiProvider)
-            .register(email: email, password: password, name: name);
+        final api = ref.read(authApiProvider);
+
+        String? effectiveMagicToken = magicToken;
+        if (magicToken != null) {
+          final sendResult = await api.sendRegMagicLink(
+            magicToken: magicToken,
+            email: email,
+            password: password,
+          );
+          if (sendResult.mailIsSent) {
+            throw const InviteRequiresEmailConfirmationException();
+          }
+          effectiveMagicToken = sendResult.newMagicToken;
+        }
+
+        final response = await api.register(
+          email: email,
+          password: password,
+          name: name,
+          magicToken: effectiveMagicToken,
+        );
 
         final currentServer = ref.read(serverStoreProvider).valueOrNull;
         final currentBaseUrl = currentServer?.servers

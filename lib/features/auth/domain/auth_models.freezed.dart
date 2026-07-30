@@ -1371,3 +1371,194 @@ abstract class _RenewResponse implements RenewResponse {
   _$$RenewResponseImplCopyWith<_$RenewResponseImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
+
+SendRegMagicTokenResponse _$SendRegMagicTokenResponseFromJson(
+    Map<String, dynamic> json) {
+  return _SendRegMagicTokenResponse.fromJson(json);
+}
+
+/// @nodoc
+mixin _$SendRegMagicTokenResponse {
+  @JsonKey(name: 'new_magic_token')
+  String get newMagicToken => throw _privateConstructorUsedError;
+  @JsonKey(name: 'mail_is_sent')
+  bool get mailIsSent => throw _privateConstructorUsedError;
+
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of SendRegMagicTokenResponse
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $SendRegMagicTokenResponseCopyWith<SendRegMagicTokenResponse> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $SendRegMagicTokenResponseCopyWith<$Res> {
+  factory $SendRegMagicTokenResponseCopyWith(SendRegMagicTokenResponse value,
+          $Res Function(SendRegMagicTokenResponse) then) =
+      _$SendRegMagicTokenResponseCopyWithImpl<$Res,
+          SendRegMagicTokenResponse>;
+  @useResult
+  $Res call(
+      {@JsonKey(name: 'new_magic_token') String newMagicToken,
+      @JsonKey(name: 'mail_is_sent') bool mailIsSent});
+}
+
+/// @nodoc
+class _$SendRegMagicTokenResponseCopyWithImpl<$Res,
+        $Val extends SendRegMagicTokenResponse>
+    implements $SendRegMagicTokenResponseCopyWith<$Res> {
+  _$SendRegMagicTokenResponseCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of SendRegMagicTokenResponse
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? newMagicToken = null,
+    Object? mailIsSent = null,
+  }) {
+    return _then(_value.copyWith(
+      newMagicToken: null == newMagicToken
+          ? _value.newMagicToken
+          : newMagicToken // ignore: cast_nullable_to_non_nullable
+              as String,
+      mailIsSent: null == mailIsSent
+          ? _value.mailIsSent
+          : mailIsSent // ignore: cast_nullable_to_non_nullable
+              as bool,
+    ) as $Val);
+  }
+}
+
+/// @nodoc
+abstract class _$$SendRegMagicTokenResponseImplCopyWith<$Res>
+    implements $SendRegMagicTokenResponseCopyWith<$Res> {
+  factory _$$SendRegMagicTokenResponseImplCopyWith(
+          _$SendRegMagicTokenResponseImpl value,
+          $Res Function(_$SendRegMagicTokenResponseImpl) then) =
+      __$$SendRegMagicTokenResponseImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call(
+      {@JsonKey(name: 'new_magic_token') String newMagicToken,
+      @JsonKey(name: 'mail_is_sent') bool mailIsSent});
+}
+
+/// @nodoc
+class __$$SendRegMagicTokenResponseImplCopyWithImpl<$Res>
+    extends _$SendRegMagicTokenResponseCopyWithImpl<$Res,
+        _$SendRegMagicTokenResponseImpl>
+    implements _$$SendRegMagicTokenResponseImplCopyWith<$Res> {
+  __$$SendRegMagicTokenResponseImplCopyWithImpl(
+      _$SendRegMagicTokenResponseImpl _value,
+      $Res Function(_$SendRegMagicTokenResponseImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of SendRegMagicTokenResponse
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? newMagicToken = null,
+    Object? mailIsSent = null,
+  }) {
+    return _then(_$SendRegMagicTokenResponseImpl(
+      newMagicToken: null == newMagicToken
+          ? _value.newMagicToken
+          : newMagicToken // ignore: cast_nullable_to_non_nullable
+              as String,
+      mailIsSent: null == mailIsSent
+          ? _value.mailIsSent
+          : mailIsSent // ignore: cast_nullable_to_non_nullable
+              as bool,
+    ));
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$SendRegMagicTokenResponseImpl implements _SendRegMagicTokenResponse {
+  const _$SendRegMagicTokenResponseImpl(
+      {@JsonKey(name: 'new_magic_token') required this.newMagicToken,
+      @JsonKey(name: 'mail_is_sent') required this.mailIsSent});
+
+  factory _$SendRegMagicTokenResponseImpl.fromJson(
+          Map<String, dynamic> json) =>
+      _$$SendRegMagicTokenResponseImplFromJson(json);
+
+  @override
+  @JsonKey(name: 'new_magic_token')
+  final String newMagicToken;
+  @override
+  @JsonKey(name: 'mail_is_sent')
+  final bool mailIsSent;
+
+  @override
+  String toString() {
+    return 'SendRegMagicTokenResponse(newMagicToken: $newMagicToken, mailIsSent: $mailIsSent)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$SendRegMagicTokenResponseImpl &&
+            (identical(other.newMagicToken, newMagicToken) ||
+                other.newMagicToken == newMagicToken) &&
+            (identical(other.mailIsSent, mailIsSent) ||
+                other.mailIsSent == mailIsSent));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(runtimeType, newMagicToken, mailIsSent);
+
+  /// Create a copy of SendRegMagicTokenResponse
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$SendRegMagicTokenResponseImplCopyWith<_$SendRegMagicTokenResponseImpl>
+      get copyWith => __$$SendRegMagicTokenResponseImplCopyWithImpl<
+          _$SendRegMagicTokenResponseImpl>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$SendRegMagicTokenResponseImplToJson(
+      this,
+    );
+  }
+}
+
+abstract class _SendRegMagicTokenResponse
+    implements SendRegMagicTokenResponse {
+  const factory _SendRegMagicTokenResponse(
+      {@JsonKey(name: 'new_magic_token')
+      required final String newMagicToken,
+      @JsonKey(name: 'mail_is_sent')
+      required final bool mailIsSent}) = _$SendRegMagicTokenResponseImpl;
+
+  factory _SendRegMagicTokenResponse.fromJson(Map<String, dynamic> json) =
+      _$SendRegMagicTokenResponseImpl.fromJson;
+
+  @override
+  @JsonKey(name: 'new_magic_token')
+  String get newMagicToken;
+  @override
+  @JsonKey(name: 'mail_is_sent')
+  bool get mailIsSent;
+
+  /// Create a copy of SendRegMagicTokenResponse
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$SendRegMagicTokenResponseImplCopyWith<_$SendRegMagicTokenResponseImpl>
+      get copyWith => throw _privateConstructorUsedError;
+}

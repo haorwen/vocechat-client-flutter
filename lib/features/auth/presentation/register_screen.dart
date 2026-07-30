@@ -10,7 +10,13 @@ import '../../../shared/widgets/primary_button.dart';
 import '../application/auth_controller.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
-  const RegisterScreen({super.key});
+  const RegisterScreen({super.key, this.magicToken});
+
+  /// Invitation token carried from an invite-link flow (server-picker's
+  /// "use invitation link" sheet, or a `vocechat://` deep link). When
+  /// present, submitting the form registers via the invite instead of an
+  /// open sign-up.
+  final String? magicToken;
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
@@ -45,6 +51,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           _nameCtrl.text.trim(),
           _emailCtrl.text.trim(),
           _passwordCtrl.text,
+          magicToken: widget.magicToken,
         );
   }
 
@@ -80,9 +87,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         },
         error: (e, _) {
           if (!mounted) return;
-          final msg = e is DioException && e.error is ApiException
-              ? (e.error as ApiException).message
-              : e.toString();
+          final msg = _registerErrorMessage(
+              context, e, isInvite: widget.magicToken != null);
           ScaffoldMessenger.of(context)
               .showSnackBar(SnackBar(content: Text(safeText(msg))));
         },
@@ -245,17 +251,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   isLoading: isLoading,
                   onPressed: isLoading ? null : _createAccount,
                 ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _sendMagicLink,
-                  icon: const Icon(Icons.auto_awesome_outlined,
-                      size: 18),
-                  label:
-                      Text(l.registerMagicLink),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 44),
+                // "Send invitation link instead" only makes sense for an
+                // open sign-up — if we're already here via an invite link,
+                // offering to send another one is a dead end.
+                if (widget.magicToken == null) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _sendMagicLink,
+                    icon: const Icon(Icons.auto_awesome_outlined,
+                        size: 18),
+                    label:
+                        Text(l.registerMagicLink),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 44),
+                    ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -278,4 +289,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ),
     );
   }
+}
+
+/// Maps a registration failure to a specific, localized reason. Status codes
+/// follow the server's `RegisterUserResponse`
+/// (`vocechat-server/src/api/user.rs`). [isInvite] disambiguates a 403: for
+/// an invite-link registration it means the token's server has SMTP
+/// confirmation enabled (unsupported here); for an open sign-up it means
+/// `who_can_sign_up` rejected registration entirely.
+String _registerErrorMessage(BuildContext context, Object error,
+    {required bool isInvite}) {
+  final l = AppL10n.of(context);
+  if (error is InviteRequiresEmailConfirmationException) {
+    return l.registerInviteRequiresEmailConfirmation;
+  }
+  if (error is DioException && error.error is ApiException) {
+    final status = (error.error as ApiException).status;
+    return switch (status) {
+      412 => l.inviteLinkExpired,
+      403 when isInvite => l.registerInviteRequiresEmailConfirmation,
+      0 => l.loginErrorCannotReachServer,
+      _ => (error.error as ApiException).message,
+    };
+  }
+  return error.toString();
 }

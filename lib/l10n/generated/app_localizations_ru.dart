@@ -534,6 +534,10 @@ class AppL10nRu extends AppL10n {
   String get registerHaveAccount => 'Уже есть аккаунт? ';
 
   @override
+  String get registerInviteRequiresEmailConfirmation =>
+      'This server requires email confirmation for invited signups, which isn\'t supported yet. Please ask your admin for help.';
+
+  @override
   String get serverPickerTitle => 'Выбор сервера';
 
   @override
@@ -551,6 +555,9 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get serverPickerContinue => 'Продолжить';
+
+  @override
+  String get serverPickerUseInviteLink => 'Use invitation link';
 
   @override
   String get serverAddTitle => 'Добавить сервер';
@@ -585,6 +592,33 @@ class AppL10nRu extends AppL10n {
 
   @override
   String get serverSave => 'Сохранить и продолжить';
+
+  @override
+  String get inviteLinkSheetTitle => 'Join with invitation link';
+
+  @override
+  String get inviteLinkHint => 'Paste your invitation link here';
+
+  @override
+  String get inviteLinkRequired => 'Please paste an invitation link';
+
+  @override
+  String get inviteLinkPasteFromClipboard => 'Paste from clipboard';
+
+  @override
+  String get inviteLinkInvalid =>
+      'This doesn\'t look like a valid invitation link';
+
+  @override
+  String get inviteLinkExpired =>
+      'This invitation link has expired or already been used';
+
+  @override
+  String get inviteLinkCheckFailed =>
+      'Couldn\'t verify the invitation link. Check your network and try again.';
+
+  @override
+  String get inviteLinkContinue => 'Continue';
 
   @override
   String get chatListSearch => 'Поиск...';

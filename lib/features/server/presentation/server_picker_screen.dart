@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,6 +12,8 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/utils/server_url_validator.dart';
 import '../../../shared/widgets/empty_state_view.dart';
 import '../../../shared/widgets/primary_button.dart';
+import '../data/invite_link_api.dart';
+import '../domain/invite_link.dart';
 
 class ServerPickerScreen extends ConsumerStatefulWidget {
   const ServerPickerScreen({super.key});
@@ -69,6 +72,34 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
     );
   }
 
+  void _showInviteLinkSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _InviteLinkSheet(
+        onResolved: (serverBaseUrl, magicToken) async {
+          final name = Uri.tryParse(serverBaseUrl)?.host ?? serverBaseUrl;
+          final config = ServerConfig(
+            id: '${Uri.parse(serverBaseUrl).host.replaceAll('.', '_')}_${DateTime.now().millisecondsSinceEpoch}',
+            baseUrl: serverBaseUrl,
+            name: name,
+          );
+          final notifier = ref.read(serverStoreProvider.notifier);
+          await notifier.addServer(config);
+          await notifier.selectServer(config.id);
+          await ref.read(accountStoreProvider.notifier).clearCurrentAccount();
+          // Wait for auth controller to re-bootstrap with new server
+          await ref.read(authControllerProvider.future);
+          if (mounted) context.go('/register', extra: magicToken);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -93,12 +124,34 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
             centerTitle: false,
           ),
           body: servers.isEmpty
-              ? EmptyStateView(
-                  icon: Icons.dns_outlined,
-                  title: l.serverPickerEmptyTitle,
-                  subtitle: l.serverPickerEmptySubtitle,
-                  actionLabel: l.serverPickerAddFirst,
-                  onAction: _showAddSheet,
+              ? Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        EmptyStateView(
+                          icon: Icons.dns_outlined,
+                          title: l.serverPickerEmptyTitle,
+                          subtitle: l.serverPickerEmptySubtitle,
+                        ),
+                        const SizedBox(height: 8),
+                        PrimaryButton(
+                          label: l.serverPickerAddFirst,
+                          onPressed: _showAddSheet,
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: _showInviteLinkSheet,
+                          icon: const Icon(Icons.link, size: 18),
+                          label: Text(l.serverPickerUseInviteLink),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 44),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 )
               : RadioGroup<int>(
                   groupValue: effectiveIndex,
@@ -200,13 +253,23 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
               ? null
               : SafeArea(
                   minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  child: PrimaryButton(
-                    label: l.serverPickerContinue,
-                    isLoading: _switching,
-                    onPressed: _switching
-                        ? null
-                        : () => _continueWithSelected(
-                            servers, state.currentServerId),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      PrimaryButton(
+                        label: l.serverPickerContinue,
+                        isLoading: _switching,
+                        onPressed: _switching
+                            ? null
+                            : () => _continueWithSelected(
+                                servers, state.currentServerId),
+                      ),
+                      TextButton.icon(
+                        onPressed: _showInviteLinkSheet,
+                        icon: const Icon(Icons.link, size: 18),
+                        label: Text(l.serverPickerUseInviteLink),
+                      ),
+                    ],
                   ),
                 ),
         );
@@ -397,6 +460,135 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
               label: l.serverSave,
               isLoading: _saving,
               onPressed: _saving ? null : _save,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InviteLinkSheet extends ConsumerStatefulWidget {
+  final Future<void> Function(String serverBaseUrl, String magicToken)
+      onResolved;
+  const _InviteLinkSheet({required this.onResolved});
+
+  @override
+  ConsumerState<_InviteLinkSheet> createState() => _InviteLinkSheetState();
+}
+
+class _InviteLinkSheetState extends ConsumerState<_InviteLinkSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _linkCtrl = TextEditingController();
+  bool _checking = false;
+
+  @override
+  void dispose() {
+    _linkCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pasteFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text;
+    if (text == null || text.isEmpty || !mounted) return;
+    setState(() => _linkCtrl.text = text);
+  }
+
+  Future<void> _submit() async {
+    final l = AppL10n.of(context);
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    final parsed = parseInviteLink(_linkCtrl.text);
+    if (parsed is! InviteLinkParseValid) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l.inviteLinkInvalid)));
+      return;
+    }
+
+    setState(() => _checking = true);
+    try {
+      final valid = await InviteLinkApi(parsed.serverBaseUrl)
+          .checkMagicToken(parsed.magicToken);
+      if (!valid) {
+        if (!mounted) return;
+        setState(() => _checking = false);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(l.inviteLinkExpired)));
+        return;
+      }
+      await widget.onResolved(parsed.serverBaseUrl, parsed.magicToken);
+      if (mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _checking = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l.inviteLinkCheckFailed)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l = AppL10n.of(context);
+    return SingleChildScrollView(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(l.inviteLinkSheetTitle,
+                style: theme.textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 20),
+            TextFormField(
+              controller: _linkCtrl,
+              decoration: InputDecoration(
+                labelText: l.inviteLinkHint,
+                prefixIcon: const Icon(Icons.link),
+                border: const OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                ),
+              ),
+              keyboardType: TextInputType.url,
+              autofocus: true,
+              minLines: 1,
+              maxLines: 3,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? l.inviteLinkRequired : null,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _checking ? null : _pasteFromClipboard,
+              icon: const Icon(Icons.content_paste, size: 18),
+              label: Text(l.inviteLinkPasteFromClipboard),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 44),
+              ),
+            ),
+            const SizedBox(height: 12),
+            PrimaryButton(
+              label: l.inviteLinkContinue,
+              isLoading: _checking,
+              onPressed: _checking ? null : _submit,
             ),
           ],
         ),

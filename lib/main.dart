@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fvp/fvp.dart' as fvp;
 import 'package:vocechat_client/core/i18n/locale_provider.dart';
 import 'package:vocechat_client/core/router/app_router.dart';
+import 'package:vocechat_client/core/router/deep_link_listener.dart';
 import 'package:vocechat_client/core/theme/app_theme.dart';
 import 'package:vocechat_client/core/theme/theme_provider.dart';
 import 'package:vocechat_client/l10n/generated/app_localizations.dart';
@@ -22,6 +23,10 @@ class VoceChatApp extends ConsumerWidget {
     final router = ref.watch(goRouterProvider);
     final themeMode = ref.watch(themeModeNotifierProvider);
     final locale = ref.watch(localeNotifierProvider);
+    // Mounts the app_links subscription for the app's lifetime (Android/iOS
+    // vocechat:// custom scheme). keepAlive on the provider means this watch
+    // just needs to fire once to start it — see deep_link_listener.dart.
+    ref.watch(deepLinkListenerProvider);
 
     // AppTokens.* getters resolve through a global brightness flag. Sync it
     // from the brightness MaterialApp actually picked (which depends on

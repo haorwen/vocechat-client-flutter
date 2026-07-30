@@ -519,6 +519,10 @@ class AppL10nZh extends AppL10n {
   String get registerHaveAccount => '已有账户？ ';
 
   @override
+  String get registerInviteRequiresEmailConfirmation =>
+      '该服务器要求邀请注册时进行邮箱确认，目前暂不支持此流程，请联系管理员协助。';
+
+  @override
   String get serverPickerTitle => '选择服务器';
 
   @override
@@ -535,6 +539,9 @@ class AppL10nZh extends AppL10n {
 
   @override
   String get serverPickerContinue => '下一步';
+
+  @override
+  String get serverPickerUseInviteLink => '使用邀请链接';
 
   @override
   String get serverAddTitle => '添加服务器';
@@ -568,6 +575,30 @@ class AppL10nZh extends AppL10n {
 
   @override
   String get serverSave => '保存并继续';
+
+  @override
+  String get inviteLinkSheetTitle => '使用邀请链接加入';
+
+  @override
+  String get inviteLinkHint => '粘贴你的邀请链接';
+
+  @override
+  String get inviteLinkRequired => '请粘贴邀请链接';
+
+  @override
+  String get inviteLinkPasteFromClipboard => '从剪贴板粘贴';
+
+  @override
+  String get inviteLinkInvalid => '这看起来不是有效的邀请链接';
+
+  @override
+  String get inviteLinkExpired => '该邀请链接已过期或已被使用';
+
+  @override
+  String get inviteLinkCheckFailed => '无法验证邀请链接，请检查网络后重试';
+
+  @override
+  String get inviteLinkContinue => '继续';
 
   @override
   String get chatListSearch => '搜索...';

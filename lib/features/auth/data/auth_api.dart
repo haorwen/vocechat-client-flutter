@@ -37,6 +37,7 @@ class AuthApi {
     required String email,
     required String password,
     required String name,
+    String? magicToken,
   }) async {
     final resp = await _dio.post(
       '/api/user/register',
@@ -44,9 +45,39 @@ class AuthApi {
         'email': email,
         'password': hashPassword(password),
         'name': name,
+        if (magicToken != null) 'magic_token': magicToken,
       },
     );
     return AuthResponse.fromJson(resp.data as Map<String, dynamic>);
+  }
+
+  /// Re-mints a registration magic token bound to [email]/[password]. On a
+  /// server with SMTP confirmation disabled this returns a fresh,
+  /// already-confirmed token usable immediately with [register]; with SMTP
+  /// enabled it instead emails a confirmation link and withholds the token
+  /// (`mailIsSent: true, newMagicToken: ""`) — that flow isn't implemented by
+  /// this client yet.
+  ///
+  /// [password] is hashed the same way as [register]'s — the server embeds
+  /// it verbatim as `extra_password` and later feeds it through the exact
+  /// same hashing path `register` uses for its own `password` field, so the
+  /// two must be in the same (MD5-hex) format or the account ends up with a
+  /// password that doesn't match what the user typed.
+  Future<SendRegMagicTokenResponse> sendRegMagicLink({
+    required String magicToken,
+    required String email,
+    required String password,
+  }) async {
+    final resp = await _dio.post(
+      '/api/user/send_reg_magic_link',
+      data: {
+        'magic_token': magicToken,
+        'email': email,
+        'password': hashPassword(password),
+      },
+    );
+    return SendRegMagicTokenResponse.fromJson(
+        resp.data as Map<String, dynamic>);
   }
 
   Future<RenewResponse> renew(String refreshToken) async {

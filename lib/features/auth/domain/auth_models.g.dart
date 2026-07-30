@@ -100,3 +100,17 @@ Map<String, dynamic> _$$RenewResponseImplToJson(_$RenewResponseImpl instance) =>
       'refresh_token': instance.refreshToken,
       'expired_in': instance.expiredIn,
     };
+
+_$SendRegMagicTokenResponseImpl _$$SendRegMagicTokenResponseImplFromJson(
+        Map<String, dynamic> json) =>
+    _$SendRegMagicTokenResponseImpl(
+      newMagicToken: json['new_magic_token'] as String,
+      mailIsSent: json['mail_is_sent'] as bool,
+    );
+
+Map<String, dynamic> _$$SendRegMagicTokenResponseImplToJson(
+        _$SendRegMagicTokenResponseImpl instance) =>
+    <String, dynamic>{
+      'new_magic_token': instance.newMagicToken,
+      'mail_is_sent': instance.mailIsSent,
+    };

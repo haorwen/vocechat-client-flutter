@@ -55,5 +55,18 @@
 	<string>VoceChat 本身不会主动收集你的位置信息。此权限说明仅因所用系统组件（如相册/文件选择器）可能读取照片中的位置元数据而按 App Store 要求提供。</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>chat.voce.client</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>vocechat</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

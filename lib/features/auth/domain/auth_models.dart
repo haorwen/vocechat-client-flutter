@@ -94,3 +94,24 @@ class RenewResponse with _$RenewResponse {
   factory RenewResponse.fromJson(Map<String, dynamic> json) =>
       _$RenewResponseFromJson(json);
 }
+
+// ---------------------------------------------------------------------------
+// SendRegMagicTokenResponse
+// ---------------------------------------------------------------------------
+
+/// Response of `POST /api/user/send_reg_magic_link`. When the server has
+/// SMTP confirmation enabled, [mailIsSent] is true and [newMagicToken] is
+/// withheld (empty) — the client must wait for the user to click the
+/// confirmation link emailed to them (not supported by this client yet).
+/// When SMTP is disabled, [mailIsSent] is false and [newMagicToken] is a
+/// fresh, already-confirmed token usable immediately with `register()`.
+@freezed
+class SendRegMagicTokenResponse with _$SendRegMagicTokenResponse {
+  const factory SendRegMagicTokenResponse({
+    @JsonKey(name: 'new_magic_token') required String newMagicToken,
+    @JsonKey(name: 'mail_is_sent') required bool mailIsSent,
+  }) = _SendRegMagicTokenResponse;
+
+  factory SendRegMagicTokenResponse.fromJson(Map<String, dynamic> json) =>
+      _$SendRegMagicTokenResponseFromJson(json);
+}

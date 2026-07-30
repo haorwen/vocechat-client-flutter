@@ -23,6 +23,9 @@ dependencies:
   # Routing
   go_router: ^14.6.2
 
+  # Deep linking (Android/iOS custom URL scheme for invitation links)
+  app_links: ^6.3.2
+
   # Networking
   dio: ^5.7.0
   dio_smart_retry: ^7.0.1

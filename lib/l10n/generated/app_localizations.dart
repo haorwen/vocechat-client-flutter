@@ -1105,6 +1105,12 @@ abstract class AppL10n {
   /// **'Already have an account? '**
   String get registerHaveAccount;
 
+  /// No description provided for @registerInviteRequiresEmailConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'This server requires email confirmation for invited signups, which isn\'t supported yet. Please ask your admin for help.'**
+  String get registerInviteRequiresEmailConfirmation;
+
   /// No description provided for @serverPickerTitle.
   ///
   /// In en, this message translates to:
@@ -1140,6 +1146,12 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Continue'**
   String get serverPickerContinue;
+
+  /// No description provided for @serverPickerUseInviteLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Use invitation link'**
+  String get serverPickerUseInviteLink;
 
   /// No description provided for @serverAddTitle.
   ///
@@ -1206,6 +1218,54 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Save & Continue'**
   String get serverSave;
+
+  /// No description provided for @inviteLinkSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join with invitation link'**
+  String get inviteLinkSheetTitle;
+
+  /// No description provided for @inviteLinkHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste your invitation link here'**
+  String get inviteLinkHint;
+
+  /// No description provided for @inviteLinkRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please paste an invitation link'**
+  String get inviteLinkRequired;
+
+  /// No description provided for @inviteLinkPasteFromClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste from clipboard'**
+  String get inviteLinkPasteFromClipboard;
+
+  /// No description provided for @inviteLinkInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'This doesn\'t look like a valid invitation link'**
+  String get inviteLinkInvalid;
+
+  /// No description provided for @inviteLinkExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'This invitation link has expired or already been used'**
+  String get inviteLinkExpired;
+
+  /// No description provided for @inviteLinkCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t verify the invitation link. Check your network and try again.'**
+  String get inviteLinkCheckFailed;
+
+  /// No description provided for @inviteLinkContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get inviteLinkContinue;
 
   /// No description provided for @chatListSearch.
   ///

@@ -152,7 +152,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/register',
-        builder: (context, state) => const RegisterScreen(),
+        builder: (context, state) =>
+            RegisterScreen(magicToken: state.extra as String?),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>

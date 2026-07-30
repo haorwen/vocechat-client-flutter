@@ -206,6 +206,7 @@
   "registerEmailFirst": "Please enter your email first",
   "registerInvitationSent": "Invitation link sent",
   "registerHaveAccount": "Already have an account? ",
+  "registerInviteRequiresEmailConfirmation": "This server requires email confirmation for invited signups, which isn't supported yet. Please ask your admin for help.",
 
   "serverPickerTitle": "Select Server",
   "serverPickerEmptyTitle": "Connect to a VoceChat server",
@@ -213,6 +214,7 @@
   "serverPickerAddFirst": "Add your first server",
   "serverPickerAdd": "Add server",
   "serverPickerContinue": "Continue",
+  "serverPickerUseInviteLink": "Use invitation link",
   "serverAddTitle": "Add Server",
   "serverUrl": "Server URL",
   "serverUrlHint": "https://chat.example.com",
@@ -224,6 +226,15 @@
   "serverTestSuccess": "Connection successful",
   "serverTestFailed": "Could not connect to server",
   "serverSave": "Save & Continue",
+
+  "inviteLinkSheetTitle": "Join with invitation link",
+  "inviteLinkHint": "Paste your invitation link here",
+  "inviteLinkRequired": "Please paste an invitation link",
+  "inviteLinkPasteFromClipboard": "Paste from clipboard",
+  "inviteLinkInvalid": "This doesn't look like a valid invitation link",
+  "inviteLinkExpired": "This invitation link has expired or already been used",
+  "inviteLinkCheckFailed": "Couldn't verify the invitation link. Check your network and try again.",
+  "inviteLinkContinue": "Continue",
 
   "chatListSearch": "Search...",
   "chatListNewChat": "New chat",

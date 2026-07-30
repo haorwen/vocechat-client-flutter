@@ -180,6 +180,7 @@
   "registerEmailFirst": "请先输入你的邮箱",
   "registerInvitationSent": "邀请链接已发送",
   "registerHaveAccount": "已有账户？ ",
+  "registerInviteRequiresEmailConfirmation": "该服务器要求邀请注册时进行邮箱确认，目前暂不支持此流程，请联系管理员协助。",
 
   "serverPickerTitle": "选择服务器",
   "serverPickerEmptyTitle": "连接到 VoceChat 服务器",
@@ -187,6 +188,7 @@
   "serverPickerAddFirst": "添加第一台服务器",
   "serverPickerAdd": "添加服务器",
   "serverPickerContinue": "下一步",
+  "serverPickerUseInviteLink": "使用邀请链接",
   "serverAddTitle": "添加服务器",
   "serverUrl": "服务器地址",
   "serverUrlHint": "https://chat.example.com",
@@ -198,6 +200,15 @@
   "serverTestSuccess": "连接成功",
   "serverTestFailed": "无法连接到服务器",
   "serverSave": "保存并继续",
+
+  "inviteLinkSheetTitle": "使用邀请链接加入",
+  "inviteLinkHint": "粘贴你的邀请链接",
+  "inviteLinkRequired": "请粘贴邀请链接",
+  "inviteLinkPasteFromClipboard": "从剪贴板粘贴",
+  "inviteLinkInvalid": "这看起来不是有效的邀请链接",
+  "inviteLinkExpired": "该邀请链接已过期或已被使用",
+  "inviteLinkCheckFailed": "无法验证邀请链接，请检查网络后重试",
+  "inviteLinkContinue": "继续",
 
   "chatListSearch": "搜索...",
   "chatListNewChat": "新建聊天",
