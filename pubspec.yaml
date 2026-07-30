@@ -88,6 +88,9 @@ dependencies:
   # Markdown
   flutter_markdown: ^0.7.4+3
 
+  # Swipe-to-reveal actions on chat list rows
+  flutter_slidable: ^3.1.0
+
   # Date
   intl: any
 

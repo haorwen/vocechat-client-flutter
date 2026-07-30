@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/storage/server_store.dart';
@@ -196,38 +197,42 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                             .timeout(const Duration(seconds: 1),
                                 onTimeout: () {});
                       },
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 0, vertical: 4),
-                        // One slot for the pinned-section container (if any)
-                        // plus one slot per normal item.
-                        itemCount: (pinned.isNotEmpty ? 1 : 0) + normal.length,
-                        itemBuilder: (context, i) {
-                          if (pinned.isNotEmpty && i == 0) {
-                            return _PinnedSection(
-                              items: pinned,
-                              isWide: isWide,
-                              userDir: userDir,
-                              groupDir: groupDir,
-                              baseUrl: baseUrl,
-                              showStatus: showStatus,
-                              buildTile: _buildTile,
+                      child: SlidableAutoCloseBehavior(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 0, vertical: 4),
+                          // One slot for the pinned-section container (if any)
+                          // plus one slot per normal item.
+                          itemCount:
+                              (pinned.isNotEmpty ? 1 : 0) + normal.length,
+                          itemBuilder: (context, i) {
+                            if (pinned.isNotEmpty && i == 0) {
+                              return _PinnedSection(
+                                items: pinned,
+                                isWide: isWide,
+                                userDir: userDir,
+                                groupDir: groupDir,
+                                baseUrl: baseUrl,
+                                showStatus: showStatus,
+                                buildTile: _buildTile,
+                              );
+                            }
+                            final idx = pinned.isNotEmpty ? i - 1 : i;
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              child: _buildTile(
+                                context,
+                                normal[idx],
+                                isWide: isWide,
+                                userDir: userDir,
+                                groupDir: groupDir,
+                                baseUrl: baseUrl,
+                                showStatus: showStatus,
+                              ),
                             );
-                          }
-                          final idx = pinned.isNotEmpty ? i - 1 : i;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: _buildTile(
-                              context,
-                              normal[idx],
-                              isWide: isWide,
-                              userDir: userDir,
-                              groupDir: groupDir,
-                              baseUrl: baseUrl,
-                              showStatus: showStatus,
-                            ),
-                          );
-                        },
+                          },
+                        ),
                       ),
                     );
                   },
@@ -305,7 +310,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
 
     // RepaintBoundary isolates each tile in its own layer so a hover state
     // or unread-count update doesn't repaint the whole list.
-    return RepaintBoundary(
+    final tile = RepaintBoundary(
       child: _ConversationTile(
         item: item,
         unread: unreadInfo.count,
@@ -324,6 +329,71 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         onSecondaryTapDown: (pos) =>
             _showSessionMenu(context, item, globalPos: pos),
       ),
+    );
+
+    // Swipe-to-reveal actions only make sense on the narrow (phone) layout —
+    // the wide desktop layout already exposes the same actions via
+    // right-click, and a swipe gesture there would fight mouse drag/selection.
+    if (isWide) return tile;
+
+    return _buildSlidableTile(context, item, tile: tile);
+  }
+
+  /// Wraps [tile] in a `Slidable` with an end (swipe-left) action pane
+  /// mirroring the old reference app's iOS swipe actions: Pin/Unpin,
+  /// Mute/Unmute, and Hide (DM) / Leave (channel) as the danger action.
+  Widget _buildSlidableTile(
+    BuildContext context,
+    ConversationItem item, {
+    required Widget tile,
+  }) {
+    final l = AppL10n.of(context);
+    final pinned = ref.watch(pinnedChatsProvider.notifier);
+    final pinTarget = switch (item.key) {
+      UserConversationKey(uid: final uid) => PinChatTargetUser(uid),
+      GroupConversationKey(gid: final gid) => PinChatTargetGroup(gid),
+    };
+    final isPinned = pinned.isPinned(pinTarget);
+    final isMuted = ref.watch(mutedChatsProvider.select((s) {
+      return switch (item.key) {
+        UserConversationKey(uid: final uid) => s.isUserMuted(uid),
+        GroupConversationKey(gid: final gid) => s.isGroupMuted(gid),
+      };
+    }));
+
+    return Slidable(
+      key: ValueKey(item.key),
+      endActionPane: ActionPane(
+        motion: const DrawerMotion(),
+        extentRatio: 0.6,
+        children: [
+          SlidableAction(
+            autoClose: true,
+            onPressed: (_) => _togglePin(item),
+            backgroundColor: AppTokens.primary500,
+            foregroundColor: Colors.white,
+            icon: isPinned ? Icons.push_pin_outlined : Icons.push_pin,
+            label: isPinned ? l.chatListUnpin : l.chatListPin,
+          ),
+          SlidableAction(
+            autoClose: true,
+            onPressed: (_) => _toggleMute(item),
+            backgroundColor: AppTokens.gray600,
+            foregroundColor: Colors.white,
+            icon: isMuted ? Icons.notifications_active : Icons.notifications_off,
+            label: isMuted ? l.chatListUnmute : l.chatListMute,
+          ),
+          SlidableAction(
+            autoClose: true,
+            onPressed: (_) => _hideOrLeave(item),
+            backgroundColor: AppTokens.error,
+            foregroundColor: Colors.white,
+            icon: item.isChannel ? Icons.logout : Icons.visibility_off,
+            label: item.isChannel ? l.chatListLeave : l.chatListHide,
+          ),
+        ],
+      ),
+      child: tile,
     );
   }
 
@@ -399,16 +469,11 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     }
     if (!mounted || selection == null) return;
 
-    try {
-      switch (selection) {
-        case 'pin':
-          final api = ref.read(pinChatApiProvider);
-          if (isPinned) {
-            await api.unpin(pinTarget);
-          } else {
-            await api.pin(pinTarget);
-          }
-        case 'markRead':
+    switch (selection) {
+      case 'pin':
+        await _togglePin(item);
+      case 'markRead':
+        try {
           final api = ref.read(sessionActionsApiProvider);
           final mid = item.lastMid;
           if (mid == null || mid <= 0) {
@@ -433,63 +498,118 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
             messenger
                 .showSnackBar(SnackBar(content: Text(l.chatListMarkReadDone)));
           }
-        case 'mute':
-          final api = ref.read(sessionActionsApiProvider);
-          switch (item.key) {
-            case UserConversationKey(uid: final uid):
-              if (isMuted) {
-                await api.unmuteUser(uid);
-                muteNotifier.unmuteUser(uid);
-              } else {
-                await api.muteUser(uid);
-                muteNotifier.muteUser(uid);
-              }
-            case GroupConversationKey(gid: final gid):
-              if (isMuted) {
-                await api.unmuteGroup(gid);
-                muteNotifier.unmuteGroup(gid);
-              } else {
-                await api.muteGroup(gid);
-                muteNotifier.muteGroup(gid);
-              }
-          }
-          if (mounted) {
-            messenger.showSnackBar(SnackBar(
-                content:
-                    Text(isMuted ? l.chatListUnmuteDone : l.chatListMuteDone)));
-          }
-        case 'hide':
-          // Local-only: remove the DM from the conversation list state.
-          ref.read(conversationsProvider.notifier).hideConversation(item.key);
-          if (mounted) {
-            messenger.showSnackBar(SnackBar(content: Text(l.chatListHideDone)));
-          }
-        case 'settings':
-          final gid = (item.key as GroupConversationKey).gid;
-          if (mounted) context.go('/home/chat/g-$gid/settings');
-        case 'leave':
-          final gid = (item.key as GroupConversationKey).gid;
-          final api = ref.read(sessionActionsApiProvider);
-          await api.leaveGroup(gid);
-          // Remove from local list; SSE echo will also clean up.
-          ref.read(conversationsProvider.notifier).hideConversation(item.key);
-          if (mounted) {
-            messenger
-                .showSnackBar(SnackBar(content: Text(l.chatListLeaveDone)));
-          }
+        } catch (e) {
+          if (!mounted) return;
+          messenger.showSnackBar(
+              SnackBar(content: Text(safeText(l.chatListMarkReadFailed))));
+        }
+      case 'mute':
+        await _toggleMute(item);
+      case 'hide':
+      case 'leave':
+        await _hideOrLeave(item);
+      case 'settings':
+        final gid = (item.key as GroupConversationKey).gid;
+        if (mounted) context.go('/home/chat/g-$gid/settings');
+    }
+  }
+
+  /// Toggle pin state for [item]. Shared by the long-press/right-click menu
+  /// and the swipe-action pane so both paths hit the same code.
+  Future<void> _togglePin(ConversationItem item) async {
+    final l = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final pinned = ref.read(pinnedChatsProvider.notifier);
+    final pinTarget = switch (item.key) {
+      UserConversationKey(uid: final uid) => PinChatTargetUser(uid),
+      GroupConversationKey(gid: final gid) => PinChatTargetGroup(gid),
+    };
+    final isPinned = pinned.isPinned(pinTarget);
+    try {
+      final api = ref.read(pinChatApiProvider);
+      if (isPinned) {
+        await api.unpin(pinTarget);
+      } else {
+        await api.pin(pinTarget);
       }
     } catch (e) {
       if (!mounted) return;
-      final msg = switch (selection) {
-        'pin' => isPinned
-            ? l.chatListUnpinFailed(e.toString())
-            : l.chatListPinFailed(e.toString()),
-        'mute' => l.chatListMuteFailed(e.toString()),
-        'leave' => l.chatListLeaveFailed(e.toString()),
-        'markRead' => l.chatListMarkReadFailed,
-        _ => e.toString(),
-      };
+      final msg = isPinned
+          ? l.chatListUnpinFailed(e.toString())
+          : l.chatListPinFailed(e.toString());
       messenger.showSnackBar(SnackBar(content: Text(safeText(msg))));
+    }
+  }
+
+  /// Toggle mute state for [item]. Shared by the long-press/right-click menu
+  /// and the swipe-action pane so both paths hit the same code.
+  Future<void> _toggleMute(ConversationItem item) async {
+    final l = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final muteNotifier = ref.read(mutedChatsProvider.notifier);
+    final isMuted = switch (item.key) {
+      UserConversationKey(uid: final uid) => muteNotifier.isUserMuted(uid),
+      GroupConversationKey(gid: final gid) => muteNotifier.isGroupMuted(gid),
+    };
+    try {
+      final api = ref.read(sessionActionsApiProvider);
+      switch (item.key) {
+        case UserConversationKey(uid: final uid):
+          if (isMuted) {
+            await api.unmuteUser(uid);
+            muteNotifier.unmuteUser(uid);
+          } else {
+            await api.muteUser(uid);
+            muteNotifier.muteUser(uid);
+          }
+        case GroupConversationKey(gid: final gid):
+          if (isMuted) {
+            await api.unmuteGroup(gid);
+            muteNotifier.unmuteGroup(gid);
+          } else {
+            await api.muteGroup(gid);
+            muteNotifier.muteGroup(gid);
+          }
+      }
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+            content:
+                Text(isMuted ? l.chatListUnmuteDone : l.chatListMuteDone)));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+          content: Text(safeText(l.chatListMuteFailed(e.toString())))));
+    }
+  }
+
+  /// Hide a DM (local-only) or leave a channel for [item]. Shared by the
+  /// long-press/right-click menu and the swipe-action pane so both paths hit
+  /// the same code.
+  Future<void> _hideOrLeave(ConversationItem item) async {
+    final l = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    if (item.isChannel) {
+      final gid = (item.key as GroupConversationKey).gid;
+      try {
+        final api = ref.read(sessionActionsApiProvider);
+        await api.leaveGroup(gid);
+        // Remove from local list; SSE echo will also clean up.
+        ref.read(conversationsProvider.notifier).hideConversation(item.key);
+        if (mounted) {
+          messenger.showSnackBar(SnackBar(content: Text(l.chatListLeaveDone)));
+        }
+      } catch (e) {
+        if (!mounted) return;
+        messenger.showSnackBar(SnackBar(
+            content: Text(safeText(l.chatListLeaveFailed(e.toString())))));
+      }
+    } else {
+      // Local-only: remove the DM from the conversation list state.
+      ref.read(conversationsProvider.notifier).hideConversation(item.key);
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(l.chatListHideDone)));
+      }
     }
   }
 }
