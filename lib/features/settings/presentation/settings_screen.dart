@@ -124,11 +124,67 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Widget _buildNarrow(BuildContext context) {
     final l = AppL10n.of(context);
+    final authState = ref.watch(authControllerProvider);
+    final user = authState.valueOrNull;
+    final serverState = ref.watch(serverStoreProvider).valueOrNull;
+    String? avatarUrl;
+    if (user is AuthStateAuthenticated) {
+      final baseUrl = serverState?.servers
+              .where((s) => s.id == serverState.currentServerId)
+              .firstOrNull
+              ?.baseUrl ??
+          '';
+      final avatarUpdatedAt = user.user.avatarUpdatedAt;
+      if ((avatarUpdatedAt ?? 0) > 0 && baseUrl.isNotEmpty) {
+        avatarUrl =
+            '$baseUrl/api/resource/avatar?uid=${user.user.uid}&t=$avatarUpdatedAt';
+      }
+    }
     return Container(
       color: AppTokens.surface,
       child: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
+          if (user is AuthStateAuthenticated)
+            ListTile(
+              leading: VoceAvatar(
+                name: safeText(user.user.name),
+                imageUrl: avatarUrl,
+                size: 44,
+              ),
+              title: Text(
+                safeText(user.user.name),
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppTokens.gray800,
+                ),
+              ),
+              subtitle: Text('#${user.user.uid}'),
+              onTap: () {
+                setState(() => _nav = _SettingsNav.myAccount);
+                showDialog<void>(
+                  context: context,
+                  builder: (ctx) => Dialog.fullscreen(
+                    backgroundColor: AppTokens.surface,
+                    child: Scaffold(
+                      backgroundColor: AppTokens.surface,
+                      appBar: AppBar(
+                        title: Text(_SettingsNav.myAccount.title(l)),
+                        leading: IconButton(
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ),
+                      body: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: _buildBody(showHeader: false),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          const Divider(height: 1),
           for (final group in _groups()) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
@@ -142,7 +198,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ),
-            for (final n in _SettingsNav.values.where((x) => x.group == group))
+            // My Account is already surfaced as the avatar/name header row
+            // above — don't list it a second time.
+            for (final n in _SettingsNav.values.where((x) =>
+                x.group == group && x != _SettingsNav.myAccount))
               ListTile(
                 title: Text(n.title(l)),
                 trailing: const Icon(Icons.chevron_right, size: 18),
@@ -172,9 +231,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
           ],
           const Divider(height: 32),
-          ListTile(
+          ExpansionTile(
             title: Text(l.settingsSwitchAccount),
-            onTap: () => showAccountSwitcherSheet(context),
+            tilePadding: const EdgeInsets.symmetric(horizontal: 20),
+            childrenPadding: EdgeInsets.zero,
+            // Inline (not a modal sheet) so the checkmark's move to the new
+            // current account stays visible right after switching, instead
+            // of switching being confirmed only by the sheet disappearing.
+            children: const [AccountSwitcherList()],
           ),
           ListTile(
             title: Text(

@@ -18,6 +18,11 @@ import '../application/auth_controller.dart';
 /// needed while the stored session is still valid), a trailing action to
 /// remove a saved account, and an "Add account" row that signs in a second
 /// identity on the current server without disturbing the active session.
+///
+/// Used on wide layouts, reached from the settings rail. On narrow layouts
+/// the same list is embedded directly in the settings screen instead (see
+/// [AccountSwitcherList]) so switching stays visible rather than vanishing
+/// with the sheet.
 Future<void> showAccountSwitcherSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
@@ -30,15 +35,61 @@ Future<void> showAccountSwitcherSheet(BuildContext context) {
   );
 }
 
-class _AccountSwitcherSheet extends ConsumerStatefulWidget {
+class _AccountSwitcherSheet extends StatelessWidget {
   const _AccountSwitcherSheet();
 
   @override
-  ConsumerState<_AccountSwitcherSheet> createState() =>
-      _AccountSwitcherSheetState();
+  Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
+    return SafeArea(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                child: Text(
+                  l.accountSwitcherTitle,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppTokens.gray800,
+                  ),
+                ),
+              ),
+              const AccountSwitcherList(dismissOnSwitch: true),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _AccountSwitcherSheetState extends ConsumerState<_AccountSwitcherSheet> {
+/// Renders the saved-account rows (avatar, name, server, current-account
+/// checkmark / remove action) plus an "Add account" row.
+///
+/// Shared between the modal sheet above (wide layouts) and an inline
+/// embedding directly in the narrow settings screen: showing this list in
+/// place, instead of behind a sheet that pops itself immediately after a
+/// switch, keeps the checkmark's move to the new current account visible as
+/// feedback rather than getting dismissed along with the sheet.
+class AccountSwitcherList extends ConsumerStatefulWidget {
+  const AccountSwitcherList({super.key, this.dismissOnSwitch = false});
+
+  /// Pop the nearest route after a switch — appropriate when embedded in a
+  /// dismissible overlay (the modal sheet), not when embedded inline.
+  final bool dismissOnSwitch;
+
+  @override
+  ConsumerState<AccountSwitcherList> createState() =>
+      _AccountSwitcherListState();
+}
+
+class _AccountSwitcherListState extends ConsumerState<AccountSwitcherList> {
   String? _switchingId;
 
   Future<void> _switchTo(AccountConfig account, String? currentAccountId) async {
@@ -50,16 +101,15 @@ class _AccountSwitcherSheetState extends ConsumerState<_AccountSwitcherSheet> {
           .read(authControllerProvider.notifier)
           .switchAccount(account.accountId);
       final authState = ref.read(authControllerProvider).valueOrNull;
+      if (!mounted) return;
       if (authState is! AuthStateAuthenticated) {
         // Stored session is no longer valid — surface it and let the app's
         // normal auth-redirect send the user to /login for this account.
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l.accountSwitcherSwitchFailed)),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.accountSwitcherSwitchFailed)),
+        );
       }
-      if (mounted) Navigator.of(context).pop();
+      if (widget.dismissOnSwitch) Navigator.of(context).pop();
     } finally {
       if (mounted) setState(() => _switchingId = null);
     }
@@ -88,6 +138,70 @@ class _AccountSwitcherSheetState extends ConsumerState<_AccountSwitcherSheet> {
     );
   }
 
+  Widget _accountTile(
+    AppL10n l,
+    AccountConfig account,
+    String? currentAccountId,
+    ServerState? serverState,
+    String Function(String) serverNameFor,
+  ) {
+    final isCurrent = account.accountId == currentAccountId;
+    final isSwitching = _switchingId == account.accountId;
+    final serverBaseUrl = serverState?.servers
+        .where((s) => s.id == account.serverId)
+        .firstOrNull
+        ?.baseUrl;
+    final avatarUrl = (account.avatarUpdatedAt ?? 0) > 0 &&
+            serverBaseUrl != null &&
+            serverBaseUrl.isNotEmpty
+        ? '$serverBaseUrl/api/resource/avatar?uid=${account.uid}&t=${account.avatarUpdatedAt}'
+        : null;
+    return ListTile(
+      onTap: _switchingId == null
+          ? () => _switchTo(account, currentAccountId)
+          : null,
+      leading: VoceAvatar(
+        name: account.name,
+        imageUrl: avatarUrl,
+        size: 40,
+      ),
+      title: Text(
+        safeText(account.name),
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(
+        safeText(serverNameFor(account.serverId)),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      // Fixed-size trailing slot so the checkmark (a bare 24px Icon) and the
+      // close button (an IconButton, which imposes a 48x48 min tap target by
+      // default) center on the same box instead of two different-sized ones
+      // — otherwise the two icons visibly don't line up row to row.
+      trailing: SizedBox(
+        width: 40,
+        height: 40,
+        child: Center(
+          child: isSwitching
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : isCurrent
+                  ? Icon(Icons.check_circle, color: AppTokens.primary500)
+                  : IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      icon: const Icon(Icons.close, size: 18),
+                      tooltip: l.accountSwitcherRemove,
+                      onPressed: () => _removeAccount(account),
+                    ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
@@ -102,92 +216,24 @@ class _AccountSwitcherSheetState extends ConsumerState<_AccountSwitcherSheet> {
       return server?.name ?? server?.baseUrl ?? serverId;
     }
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-              child: Text(
-                l.accountSwitcherTitle,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppTokens.gray800,
-                ),
-              ),
-            ),
-            Flexible(
-              child: ListView.separated(
-                shrinkWrap: true,
-                padding: EdgeInsets.zero,
-                itemCount: accounts.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, i) {
-                  final account = accounts[i];
-                  final isCurrent = account.accountId == currentAccountId;
-                  final isSwitching = _switchingId == account.accountId;
-                  final serverBaseUrl = serverState?.servers
-                      .where((s) => s.id == account.serverId)
-                      .firstOrNull
-                      ?.baseUrl;
-                  final avatarUrl =
-                      (account.avatarUpdatedAt ?? 0) > 0 &&
-                              serverBaseUrl != null &&
-                              serverBaseUrl.isNotEmpty
-                          ? '$serverBaseUrl/api/resource/avatar?uid=${account.uid}&t=${account.avatarUpdatedAt}'
-                          : null;
-                  return ListTile(
-                    onTap: _switchingId == null
-                        ? () => _switchTo(account, currentAccountId)
-                        : null,
-                    leading: VoceAvatar(
-                      name: account.name,
-                      imageUrl: avatarUrl,
-                      size: 40,
-                    ),
-                    title: Text(
-                      safeText(account.name),
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Text(
-                      safeText(serverNameFor(account.serverId)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: isSwitching
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : isCurrent
-                            ? Icon(Icons.check_circle,
-                                color: AppTokens.primary500)
-                            : IconButton(
-                                icon: const Icon(Icons.close, size: 18),
-                                tooltip: l.accountSwitcherRemove,
-                                onPressed: () => _removeAccount(account),
-                              ),
-                  );
-                },
-              ),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: CircleAvatar(
-                backgroundColor: AppTokens.gray200,
-                child: Icon(Icons.add, color: AppTokens.gray700),
-              ),
-              title: Text(l.accountSwitcherAddAccount),
-              onTap: _addAccount,
-            ),
-          ],
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < accounts.length; i++) ...[
+          if (i > 0) const Divider(height: 1),
+          _accountTile(
+              l, accounts[i], currentAccountId, serverState, serverNameFor),
+        ],
+        const Divider(height: 1),
+        ListTile(
+          leading: CircleAvatar(
+            backgroundColor: AppTokens.gray200,
+            child: Icon(Icons.add, color: AppTokens.gray700),
+          ),
+          title: Text(l.accountSwitcherAddAccount),
+          onTap: _addAccount,
         ),
-      ),
+      ],
     );
   }
 }
