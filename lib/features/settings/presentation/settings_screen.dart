@@ -233,7 +233,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const Divider(height: 32),
           ExpansionTile(
             title: Text(l.settingsSwitchAccount),
-            tilePadding: const EdgeInsets.symmetric(horizontal: 20),
+            tilePadding: const EdgeInsets.symmetric(horizontal: 16),
             childrenPadding: EdgeInsets.zero,
             // Inline (not a modal sheet) so the checkmark's move to the new
             // current account stays visible right after switching, instead
