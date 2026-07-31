@@ -51,9 +51,17 @@ class VoceChatApp extends ConsumerWidget {
         // Key the subtree by brightness so every descendant rebuilds (and
         // re-reads AppTokens.*) the instant the resolved theme flips —
         // otherwise widgets that don't watch themeMode keep cached colors.
-        return KeyedSubtree(
-          key: ValueKey(brightness),
-          child: child ?? const SizedBox.shrink(),
+        return GestureDetector(
+          // Tapping blank space anywhere dismisses the keyboard — mirrors
+          // native mobile behavior. deferToChild would only fire when a
+          // descendant already claims the hit, so opaque is required to
+          // catch taps on plain, non-interactive areas.
+          behavior: HitTestBehavior.opaque,
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: KeyedSubtree(
+            key: ValueKey(brightness),
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
     );
