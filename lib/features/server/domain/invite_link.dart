@@ -28,10 +28,15 @@ sealed class InviteLinkParseResult with _$InviteLinkParseResult {
 /// `create_reg_magic_link`) look like:
 ///   `https://<host>[:port]/?magic_token=<hex>#/register`
 /// with `magic_token` living in the query string *before* the `#` hash-route
-/// fragment. [Uri.parse] handles that fine on its own, but some sources (a
-/// copy-pasted link with the hash already stripped, or one where the token
-/// ended up after `#`) don't — so `#/...` is stripped first, mirroring the
-/// old reference client's `SharedFuncs.parseInvitationUri` normalization.
+/// fragment.
+///
+/// Some sources instead produce hash-route-style links where the token is
+/// *inside* the fragment's own query string, e.g.
+///   `https://<host>[:port]/#/register?magic_token=<hex>`
+/// (the shape a `HashRouter`-based web app naturally emits from
+/// `location.href`). Both shapes are accepted: `magic_token` is looked up in
+/// the query string before `#` first, then in the query string inside the
+/// fragment.
 ///
 /// Only http/https links carry a resolvable server address on their own —
 /// a bare custom-scheme link (`vocechat://...`) has no host that maps to a
@@ -41,12 +46,12 @@ InviteLinkParseResult parseInviteLink(String rawLink) {
   final trimmed = rawLink.trim();
   if (trimmed.isEmpty) return const InviteLinkParseResult.invalid();
 
-  final normalized = trimmed.replaceFirst('/#', '#').replaceFirst(
-        RegExp(r'#.*$'),
-        '',
-      );
+  final hashIndex = trimmed.indexOf('#');
+  final beforeHash =
+      hashIndex == -1 ? trimmed : trimmed.substring(0, hashIndex);
+  final afterHash = hashIndex == -1 ? '' : trimmed.substring(hashIndex + 1);
 
-  final uri = Uri.tryParse(normalized);
+  final uri = Uri.tryParse(beforeHash);
   if (uri == null || uri.host.isEmpty) {
     return const InviteLinkParseResult.invalid();
   }
@@ -54,7 +59,16 @@ InviteLinkParseResult parseInviteLink(String rawLink) {
     return const InviteLinkParseResult.invalid();
   }
 
-  final magicToken = uri.queryParameters['magic_token'];
+  var magicToken = uri.queryParameters['magic_token'];
+
+  if (magicToken == null || magicToken.isEmpty) {
+    final fragmentQueryIndex = afterHash.indexOf('?');
+    if (fragmentQueryIndex != -1) {
+      final fragmentQuery = afterHash.substring(fragmentQueryIndex + 1);
+      magicToken = Uri.splitQueryString(fragmentQuery)['magic_token'];
+    }
+  }
+
   if (magicToken == null || magicToken.isEmpty) {
     return const InviteLinkParseResult.invalid();
   }

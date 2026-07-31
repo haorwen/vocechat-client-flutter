@@ -474,13 +474,13 @@ class AppL10nZh extends AppL10n {
   String get registerSubtitle => '填写你的信息以开始使用。';
 
   @override
-  String get registerName => '姓名';
+  String get registerName => '昵称';
 
   @override
-  String get registerNameRequired => '请输入姓名';
+  String get registerNameRequired => '请输入昵称';
 
   @override
-  String get registerNameTooShort => '姓名至少需要 2 个字符';
+  String get registerNameTooShort => '昵称至少需要 2 个字符';
 
   @override
   String get registerEmailRequired => '请输入邮箱';
