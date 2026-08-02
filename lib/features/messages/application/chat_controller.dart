@@ -493,6 +493,7 @@ class ChatController extends _$ChatController {
     _seenMids.remove(targetMid);
     _statuses.remove(targetMid);
     _persist(updated);
+    _cache?.deleteMid(target, targetMid);
   }
 
   List<ChatMessage> _drainPending(List<ChatMessage> base) {

@@ -368,6 +368,25 @@ class MessageCache {
     }
   }
 
+  /// Delete a single message row immediately. Unlike [scheduleWrite]/[_flush]
+  /// (which only upsert the current snapshot and rank-trim), this is the only
+  /// path that removes a specific `mid` from disk — needed because a deleted
+  /// message's `mid` almost always stays within the most-recent
+  /// [_maxPerConversation] window, so the rank-trim `DELETE` never touches it
+  /// and the row would otherwise resurface on the next cache read.
+  Future<void> deleteMid(MessageTarget target, int mid) async {
+    final key = _keyFor(target);
+    try {
+      await _db.delete(
+        'messages',
+        where: 'target_key = ? AND mid = ?',
+        whereArgs: [key, mid],
+      );
+    } catch (e) {
+      AppLog.w(LogTag.chat, () => '⚠️ cache.deleteMid failed: $e');
+    }
+  }
+
   /// Delete rows for [key] beyond the most-recent [_maxPerConversation] mids.
   /// Idempotent; cheap as a no-op when already trimmed.
   Future<void> _trimTarget(String key) async {
