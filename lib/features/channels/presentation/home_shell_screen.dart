@@ -263,9 +263,10 @@ class _RailItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = isSelected ? AppTokens.primary400 : Colors.transparent;
-    final fg = isSelected
-        ? Theme.of(context).colorScheme.onPrimary
-        : AppTokens.gray500;
+    // Selected background is a fixed cyan in both themes (matches the web's
+    // `bg-primary-400`), so the icon must stay white regardless of the
+    // theme's `onPrimary` (which flips to black in dark mode).
+    final fg = isSelected ? Colors.white : AppTokens.gray500;
 
     return Tooltip(
       message: tooltip,
