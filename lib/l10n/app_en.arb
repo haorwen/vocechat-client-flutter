@@ -102,6 +102,8 @@
   "expiredAudioBody": "Audio expired or deleted",
   "expiredFileTitle": "File not found",
   "expiredFileBody": "File expired or deleted",
+  "mediaLoadFailedRetry": "Failed to load — tap to retry",
+  "mediaLikelyIncompatible": "This device can't play this video format. Try downloading it instead.",
   "featureUnavailable": "This feature is not available yet",
 
   "settingsTitle": "Settings",

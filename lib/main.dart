@@ -11,7 +11,12 @@ import 'package:vocechat_client/l10n/generated/app_localizations.dart';
 void main() {
   // video_player has no official Windows/Linux backend; fvp fills that gap
   // and defers to the official implementation on platforms that have one.
-  fvp.registerWith(options: {'platforms': ['windows', 'linux']});
+  // Android is also opted in (even though video_player_android exists)
+  // because it falls back to an FFmpeg software decoder when the device's
+  // hardware MediaCodec doesn't recognize a stream's codec/profile — the
+  // stock plugin has no such fallback and its channel just dies, so some
+  // servers' HEVC uploads simply won't play at all on affected devices.
+  fvp.registerWith(options: {'platforms': ['windows', 'linux', 'android']});
   runApp(const ProviderScope(child: VoceChatApp()));
 }
 

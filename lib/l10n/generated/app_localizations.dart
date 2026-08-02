@@ -535,6 +535,18 @@ abstract class AppL10n {
   /// **'File expired or deleted'**
   String get expiredFileBody;
 
+  /// No description provided for @mediaLoadFailedRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load — tap to retry'**
+  String get mediaLoadFailedRetry;
+
+  /// No description provided for @mediaLikelyIncompatible.
+  ///
+  /// In en, this message translates to:
+  /// **'This device can\'t play this video format. Try downloading it instead.'**
+  String get mediaLikelyIncompatible;
+
   /// No description provided for @featureUnavailable.
   ///
   /// In en, this message translates to:

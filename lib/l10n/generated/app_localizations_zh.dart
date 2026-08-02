@@ -234,6 +234,12 @@ class AppL10nZh extends AppL10n {
   String get expiredFileBody => '文件已过期或被删除';
 
   @override
+  String get mediaLoadFailedRetry => '加载失败，点击重试';
+
+  @override
+  String get mediaLikelyIncompatible => '该设备可能不支持此视频格式，试试下载后播放';
+
+  @override
   String get featureUnavailable => '该功能暂未开放';
 
   @override

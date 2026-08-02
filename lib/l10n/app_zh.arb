@@ -76,6 +76,8 @@
   "expiredAudioBody": "音频已过期或被删除",
   "expiredFileTitle": "文件不存在",
   "expiredFileBody": "文件已过期或被删除",
+  "mediaLoadFailedRetry": "加载失败，点击重试",
+  "mediaLikelyIncompatible": "该设备可能不支持此视频格式，试试下载后播放",
   "featureUnavailable": "该功能暂未开放",
 
   "settingsTitle": "设置",

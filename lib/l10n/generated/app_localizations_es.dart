@@ -234,6 +234,13 @@ class AppL10nEs extends AppL10n {
   String get expiredFileBody => 'El archivo expiró o fue eliminado';
 
   @override
+  String get mediaLoadFailedRetry => 'Failed to load — tap to retry';
+
+  @override
+  String get mediaLikelyIncompatible =>
+      'This device can\'t play this video format. Try downloading it instead.';
+
+  @override
   String get featureUnavailable => 'Esta función no está disponible todavía';
 
   @override

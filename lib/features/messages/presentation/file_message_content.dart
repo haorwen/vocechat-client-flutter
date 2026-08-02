@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chewie/chewie.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +12,7 @@ import 'package:photo_view/photo_view.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../../core/network/dio_client.dart';
 import '../../../core/storage/account_store.dart';
 import '../../../core/storage/secure_token_store.dart';
 import '../../../core/storage/server_store.dart';
@@ -202,6 +204,27 @@ Future<Map<String, String>> _buildAuthHeaders(
     if (tokens != null) headers['X-API-Key'] = tokens.accessToken;
   }
   return headers;
+}
+
+/// Whether the server has confirmed the resource is truly gone (HTTP 404),
+/// as opposed to a transient failure (timeout, connection error, codec
+/// issue on the player's side, etc). A cheap `HEAD` probe — the server's
+/// `/api/resource/file` route auto-answers HEAD without streaming the
+/// file body — lets bubbles distinguish "really deleted" from "failed to
+/// load, worth retrying" instead of collapsing every player exception into
+/// the same "not found" state.
+Future<bool> _resourceConfirmedMissing(WidgetRef ref, String url) async {
+  try {
+    final dio = ref.read(dioProvider);
+    await dio.headUri<void>(Uri.parse(url));
+    return false;
+  } on DioException catch (e) {
+    final error = e.error;
+    if (error is ApiException) return error.status == 404;
+    return e.response?.statusCode == 404;
+  } catch (_) {
+    return false;
+  }
 }
 
 bool _isImage(String contentType, int size) {
@@ -633,10 +656,21 @@ class _VideoBubble extends ConsumerStatefulWidget {
   ConsumerState<_VideoBubble> createState() => _VideoBubbleState();
 }
 
+enum _MediaLoadStatus { loading, ready, loadError, likelyIncompatible, missing }
+
+/// After this many failed init attempts (initial load + retries) that the
+/// server didn't confirm as a 404, further retries are unlikely to help —
+/// this is typically a hardware decoder that doesn't recognize the stream's
+/// codec/profile (observed: HEVC profiles some Android MediaCodec builds
+/// don't enumerate) rather than a transient network hiccup, so we stop
+/// implying "just retry" and point at downloading instead.
+const int _kMaxLoadAttemptsBeforeIncompatibleHint = 2;
+
 class _VideoBubbleState extends ConsumerState<_VideoBubble> {
   Map<String, String>? _headers;
   VideoPlayerController? _previewCtrl;
-  bool _failed = false;
+  _MediaLoadStatus _status = _MediaLoadStatus.loading;
+  int _failedAttempts = 0;
 
   @override
   void initState() {
@@ -661,11 +695,35 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
         ctrl.dispose();
         return;
       }
-      setState(() => _previewCtrl = ctrl);
+      setState(() {
+        _previewCtrl = ctrl;
+        _status = _MediaLoadStatus.ready;
+      });
     } catch (_) {
       ctrl.dispose();
-      if (mounted) setState(() => _failed = true);
+      if (!mounted) return;
+      // The player failing to initialize doesn't tell us whether the file is
+      // actually gone — timeouts, flaky connections, and unsupported codecs
+      // all throw the same way. Ask the server directly before showing the
+      // permanent "video not found" card.
+      final missing = await _resourceConfirmedMissing(ref, widget.urls.origin);
+      if (!mounted) return;
+      _failedAttempts++;
+      setState(() {
+        _status = missing
+            ? _MediaLoadStatus.missing
+            : (_failedAttempts >= _kMaxLoadAttemptsBeforeIncompatibleHint
+                ? _MediaLoadStatus.likelyIncompatible
+                : _MediaLoadStatus.loadError);
+      });
     }
+  }
+
+  void _retry() {
+    final headers = _headers;
+    if (headers == null) return;
+    setState(() => _status = _MediaLoadStatus.loading);
+    _initPreview(headers);
   }
 
   @override
@@ -676,7 +734,7 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
 
   @override
   Widget build(BuildContext context) {
-    if (_failed) {
+    if (_status == _MediaLoadStatus.missing) {
       return _ExpiredCard(kind: _ExpiredKind.video, name: widget.meta.name);
     }
     final label = widget.meta.name.isEmpty
@@ -685,8 +743,15 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
     final sizeLabel = formatBytes(widget.meta.size);
     final preview = _previewCtrl;
     final previewReady = preview != null && preview.value.isInitialized;
+    final loadError = _status == _MediaLoadStatus.loadError;
+    final likelyIncompatible = _status == _MediaLoadStatus.likelyIncompatible;
+    final l = AppL10n.of(context);
     return GestureDetector(
-      onTap: _headers == null ? null : () => _openPlayer(context, _headers!),
+      onTap: loadError
+          ? _retry
+          : likelyIncompatible
+              ? () => _launchExternal(widget.urls.download)
+              : (_headers == null ? null : () => _openPlayer(context, _headers!)),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
@@ -747,14 +812,63 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
                     ],
                   ),
                 ),
-                const Icon(
-                  Icons.play_arrow,
-                  color: Colors.white,
-                  size: 40,
-                  shadows: [
-                    Shadow(color: Colors.black54, blurRadius: 6),
-                  ],
-                ),
+                if (loadError)
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.refresh,
+                        color: Colors.white,
+                        size: 32,
+                        shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        l.mediaLoadFailedRetry,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+                        ),
+                      ),
+                    ],
+                  )
+                else if (likelyIncompatible)
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.download_outlined,
+                        color: Colors.white,
+                        size: 32,
+                        shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+                      ),
+                      const SizedBox(height: 4),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          l.mediaLikelyIncompatible,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  const Icon(
+                    Icons.play_arrow,
+                    color: Colors.white,
+                    size: 40,
+                    shadows: [
+                      Shadow(color: Colors.black54, blurRadius: 6),
+                    ],
+                  ),
               ],
             ),
           ),
@@ -772,8 +886,9 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
           headers: headers,
           title: widget.meta.name,
           downloadUrl: widget.urls.download,
-          onFail: () {
-            if (mounted) setState(() => _failed = true);
+          checkMissing: () => _resourceConfirmedMissing(ref, widget.urls.origin),
+          onMissing: () {
+            if (mounted) setState(() => _status = _MediaLoadStatus.missing);
           },
         ),
       ),
@@ -787,14 +902,19 @@ class _VideoPlayerScreen extends StatefulWidget {
     required this.headers,
     required this.title,
     required this.downloadUrl,
-    required this.onFail,
+    required this.checkMissing,
+    required this.onMissing,
   });
 
   final String url;
   final Map<String, String> headers;
   final String title;
   final String downloadUrl;
-  final VoidCallback onFail;
+
+  /// Probes the server to tell a confirmed-deleted file apart from a
+  /// transient playback failure. See [_resourceConfirmedMissing].
+  final Future<bool> Function() checkMissing;
+  final VoidCallback onMissing;
 
   @override
   State<_VideoPlayerScreen> createState() => _VideoPlayerScreenState();
@@ -803,7 +923,8 @@ class _VideoPlayerScreen extends StatefulWidget {
 class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
   VideoPlayerController? _videoCtrl;
   ChewieController? _chewieCtrl;
-  bool _initFailed = false;
+  _MediaLoadStatus _status = _MediaLoadStatus.loading;
+  int _failedAttempts = 0;
 
   @override
   void initState() {
@@ -812,6 +933,7 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
   }
 
   Future<void> _init() async {
+    setState(() => _status = _MediaLoadStatus.loading);
     try {
       final ctrl = VideoPlayerController.networkUrl(
         Uri.parse(widget.url),
@@ -830,12 +952,23 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
           bufferedColor: Colors.white38,
         ),
       );
-      setState(() => _videoCtrl = ctrl);
+      setState(() {
+        _videoCtrl = ctrl;
+        _status = _MediaLoadStatus.ready;
+      });
     } catch (_) {
-      if (mounted) {
-        setState(() => _initFailed = true);
-        widget.onFail();
-      }
+      if (!mounted) return;
+      final missing = await widget.checkMissing();
+      if (!mounted) return;
+      if (missing) widget.onMissing();
+      _failedAttempts++;
+      setState(() {
+        _status = missing
+            ? _MediaLoadStatus.missing
+            : (_failedAttempts >= _kMaxLoadAttemptsBeforeIncompatibleHint
+                ? _MediaLoadStatus.likelyIncompatible
+                : _MediaLoadStatus.loadError);
+      });
     }
   }
 
@@ -848,6 +981,7 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -861,22 +995,67 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
         ),
         actions: [
           IconButton(
-            tooltip: AppL10n.of(context).tooltipDownload,
+            tooltip: l.tooltipDownload,
             icon: const Icon(Icons.download_outlined),
             onPressed: () => _launchExternal(widget.downloadUrl),
           ),
         ],
       ),
       body: Center(
-        child: _initFailed
-            ? const Icon(
-                Icons.error_outline,
-                color: Colors.white54,
-                size: 48,
-              )
-            : _chewieCtrl == null
-                ? const CircularProgressIndicator(color: Colors.white)
-                : Chewie(controller: _chewieCtrl!),
+        child: switch (_status) {
+          _MediaLoadStatus.missing => Icon(
+              Icons.error_outline,
+              color: Colors.white54,
+              size: 48,
+            ),
+          _MediaLoadStatus.loadError => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white54, size: 48),
+                const SizedBox(height: 12),
+                Text(
+                  l.mediaLoadFailedRetry,
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _init,
+                  icon: const Icon(Icons.refresh, color: Colors.white),
+                  label: Text(l.actionRetry, style: const TextStyle(color: Colors.white)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white54),
+                  ),
+                ),
+              ],
+            ),
+          _MediaLoadStatus.likelyIncompatible => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white54, size: 48),
+                  const SizedBox(height: 12),
+                  Text(
+                    l.mediaLikelyIncompatible,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () => _launchExternal(widget.downloadUrl),
+                    icon: const Icon(Icons.download_outlined, color: Colors.white),
+                    label:
+                        Text(l.tooltipDownload, style: const TextStyle(color: Colors.white)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.white54),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          _MediaLoadStatus.loading => const CircularProgressIndicator(color: Colors.white),
+          _MediaLoadStatus.ready => Chewie(controller: _chewieCtrl!),
+        },
       ),
     );
   }

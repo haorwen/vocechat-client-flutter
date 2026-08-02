@@ -234,6 +234,13 @@ class AppL10nKo extends AppL10n {
   String get expiredFileBody => '파일이 만료되었거나 삭제되었습니다';
 
   @override
+  String get mediaLoadFailedRetry => 'Failed to load — tap to retry';
+
+  @override
+  String get mediaLikelyIncompatible =>
+      'This device can\'t play this video format. Try downloading it instead.';
+
+  @override
   String get featureUnavailable => '아직 사용할 수 없는 기능입니다';
 
   @override

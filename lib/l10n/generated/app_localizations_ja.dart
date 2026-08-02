@@ -234,6 +234,13 @@ class AppL10nJa extends AppL10n {
   String get expiredFileBody => 'ファイルの有効期限が切れたか削除されました';
 
   @override
+  String get mediaLoadFailedRetry => 'Failed to load — tap to retry';
+
+  @override
+  String get mediaLikelyIncompatible =>
+      'This device can\'t play this video format. Try downloading it instead.';
+
+  @override
   String get featureUnavailable => 'この機能はまだご利用いただけません';
 
   @override
