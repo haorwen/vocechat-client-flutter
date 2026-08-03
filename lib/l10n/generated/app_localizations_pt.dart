@@ -577,11 +577,7 @@ class AppL10nPt extends AppL10n {
   String get serverUrlRequired => 'A URL é obrigatória';
 
   @override
-  String get serverUrlMustHttps => 'Deve começar com https://';
-
-  @override
-  String get serverUrlHttpNotAllowed =>
-      'Somente https:// é permitido (http não é permitido para servidores remotos)';
+  String get serverUrlMustHttps => 'Deve começar com http:// ou https://';
 
   @override
   String get serverTesting => 'Testando…';

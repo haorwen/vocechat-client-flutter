@@ -573,11 +573,7 @@ class AppL10nEn extends AppL10n {
   String get serverUrlRequired => 'URL is required';
 
   @override
-  String get serverUrlMustHttps => 'Must start with https://';
-
-  @override
-  String get serverUrlHttpNotAllowed =>
-      'Only https:// is allowed (http not permitted for remote servers)';
+  String get serverUrlMustHttps => 'Must start with http:// or https://';
 
   @override
   String get serverTesting => 'Testing…';

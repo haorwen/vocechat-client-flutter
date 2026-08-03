@@ -1192,14 +1192,8 @@ abstract class AppL10n {
   /// No description provided for @serverUrlMustHttps.
   ///
   /// In en, this message translates to:
-  /// **'Must start with https://'**
+  /// **'Must start with http:// or https://'**
   String get serverUrlMustHttps;
-
-  /// No description provided for @serverUrlHttpNotAllowed.
-  ///
-  /// In en, this message translates to:
-  /// **'Only https:// is allowed (http not permitted for remote servers)'**
-  String get serverUrlHttpNotAllowed;
 
   /// No description provided for @serverTesting.
   ///

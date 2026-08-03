@@ -292,23 +292,6 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
   bool _testing = false;
   bool _tested = false;
   bool _saving = false;
-  bool _showHttpLocalhostWarning = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _urlCtrl.addListener(_onUrlChanged);
-  }
-
-  void _onUrlChanged() {
-    final uri = Uri.tryParse(_urlCtrl.text.trim());
-    final isHttpLocalhost = uri != null &&
-        uri.scheme == 'http' &&
-        (uri.host == 'localhost' || uri.host == '127.0.0.1');
-    if (isHttpLocalhost != _showHttpLocalhostWarning) {
-      setState(() => _showHttpLocalhostWarning = isHttpLocalhost);
-    }
-  }
 
   Future<void> _testConnection() async {
     final l = AppL10n.of(context);
@@ -411,33 +394,6 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
               autofocus: true,
               validator: (v) => validateServerUrl(v, l),
             ),
-            if (_showHttpLocalhostWarning) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.errorContainer
-                      .withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.warning_amber_rounded,
-                        size: 18, color: theme.colorScheme.error),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        l.serverUrlHttpNotAllowed,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
             const SizedBox(height: 20),
             OutlinedButton.icon(
               onPressed: _testing ? null : _testConnection,

@@ -562,10 +562,7 @@ class AppL10nZh extends AppL10n {
   String get serverUrlRequired => '请输入服务器地址';
 
   @override
-  String get serverUrlMustHttps => '地址必须以 https:// 开头';
-
-  @override
-  String get serverUrlHttpNotAllowed => '仅允许 https://（远程服务器不允许使用 http）';
+  String get serverUrlMustHttps => '地址必须以 http:// 或 https:// 开头';
 
   @override
   String get serverTesting => '测试中…';

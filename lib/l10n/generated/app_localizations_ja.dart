@@ -568,11 +568,7 @@ class AppL10nJa extends AppL10n {
   String get serverUrlRequired => 'URL を入力してください';
 
   @override
-  String get serverUrlMustHttps => 'https:// で始まる必要があります';
-
-  @override
-  String get serverUrlHttpNotAllowed =>
-      'https:// のみ使用できます（リモートサーバーでは http は使用できません）';
+  String get serverUrlMustHttps => 'http:// または https:// で始まる必要があります';
 
   @override
   String get serverTesting => 'テスト中…';

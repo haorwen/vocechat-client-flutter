@@ -579,11 +579,8 @@ class AppL10nRu extends AppL10n {
   String get serverUrlRequired => 'Введите адрес';
 
   @override
-  String get serverUrlMustHttps => 'Адрес должен начинаться с https://';
-
-  @override
-  String get serverUrlHttpNotAllowed =>
-      'Разрешён только https:// (http не поддерживается для удалённых серверов)';
+  String get serverUrlMustHttps =>
+      'Адрес должен начинаться с http:// или https://';
 
   @override
   String get serverTesting => 'Проверка…';

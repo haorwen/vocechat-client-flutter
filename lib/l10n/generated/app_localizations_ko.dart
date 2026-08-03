@@ -567,11 +567,7 @@ class AppL10nKo extends AppL10n {
   String get serverUrlRequired => 'URL을 입력해 주세요';
 
   @override
-  String get serverUrlMustHttps => 'https://로 시작해야 합니다';
-
-  @override
-  String get serverUrlHttpNotAllowed =>
-      'https://만 허용됩니다 (원격 서버에는 http를 사용할 수 없습니다)';
+  String get serverUrlMustHttps => 'http:// 또는 https://로 시작해야 합니다';
 
   @override
   String get serverTesting => '테스트 중…';
