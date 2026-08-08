@@ -210,8 +210,16 @@ class _AuthInterceptor extends Interceptor {
     );
     // Sanitize any String anywhere in the JSON body to be valid UTF-16, so
     // TextPainter doesn't throw on user-generated content with broken
-    // surrogate pairs (broken emoji, control chars, etc).
-    response.data = _sanitize(response.data);
+    // surrogate pairs (broken emoji, control chars, etc). Skip binary
+    // responses (file downloads) — _sanitize's recursive List.map turns a
+    // `List<int>` payload into `List<Object?>`, which then fails the
+    // `response.data as T` cast dio does internally for typed requests
+    // like `dio.get<List<int>>(..., responseType: ResponseType.bytes)`.
+    final responseType = response.requestOptions.responseType;
+    if (responseType != ResponseType.bytes &&
+        responseType != ResponseType.stream) {
+      response.data = _sanitize(response.data);
+    }
     handler.next(response);
   }
 

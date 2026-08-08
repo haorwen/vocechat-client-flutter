@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/dio_client.dart';
+import '../../../core/utils/app_log.dart';
 import '../../../l10n/generated/app_localizations.dart';
 
 /// Shared helpers for displaying files — used by both the pre-send staging
@@ -73,7 +74,8 @@ Future<void> downloadAndSave(
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(l.downloadSaved)));
     }
-  } catch (_) {
+  } catch (e, st) {
+    AppLog.e(LogTag.general, () => 'download failed url=$url', error: e, stackTrace: st);
     if (context.mounted) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(l.downloadFailed)));
