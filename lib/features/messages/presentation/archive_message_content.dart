@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/storage/server_store.dart';
 import '../../../core/theme/app_theme.dart';
@@ -571,12 +570,12 @@ class _ArchiveAttachment extends ConsumerWidget {
                 color: AppTokens.gray500,
                 size: 22,
               ),
-              onPressed: () async {
-                final uri = Uri.tryParse(downloadUrl);
-                if (uri != null) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
+              onPressed: () => downloadAndSave(
+                context,
+                ProviderScope.containerOf(context, listen: false),
+                downloadUrl,
+                name.isEmpty ? '[file]' : name,
+              ),
             ),
         ],
       ),

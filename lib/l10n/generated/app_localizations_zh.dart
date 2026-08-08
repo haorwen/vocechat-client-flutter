@@ -179,6 +179,12 @@ class AppL10nZh extends AppL10n {
   String get tooltipDownload => '下载';
 
   @override
+  String get downloadSaved => '已保存';
+
+  @override
+  String get downloadFailed => '下载失败';
+
+  @override
   String get tooltipZoomIn => '放大';
 
   @override

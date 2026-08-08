@@ -179,6 +179,12 @@ class AppL10nPt extends AppL10n {
   String get tooltipDownload => 'Baixar';
 
   @override
+  String get downloadSaved => 'Saved';
+
+  @override
+  String get downloadFailed => 'Download failed';
+
+  @override
   String get tooltipZoomIn => 'Aumentar zoom';
 
   @override

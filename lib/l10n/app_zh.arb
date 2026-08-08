@@ -59,6 +59,8 @@
   "actionClose": "关闭",
   "memberRoleOwner": "群主",
   "tooltipDownload": "下载",
+  "downloadSaved": "已保存",
+  "downloadFailed": "下载失败",
   "tooltipZoomIn": "放大",
   "tooltipZoomOut": "缩小",
   "tooltipFullscreen": "全屏",

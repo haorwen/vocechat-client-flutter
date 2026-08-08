@@ -72,6 +72,8 @@
   "actionClose": "Close",
   "memberRoleOwner": "Owner",
   "tooltipDownload": "Download",
+  "downloadSaved": "Saved",
+  "downloadFailed": "Download failed",
   "tooltipZoomIn": "Zoom in",
   "tooltipZoomOut": "Zoom out",
   "tooltipFullscreen": "Fullscreen",

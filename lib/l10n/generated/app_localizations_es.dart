@@ -179,6 +179,12 @@ class AppL10nEs extends AppL10n {
   String get tooltipDownload => 'Descargar';
 
   @override
+  String get downloadSaved => 'Saved';
+
+  @override
+  String get downloadFailed => 'Download failed';
+
+  @override
   String get tooltipZoomIn => 'Acercar';
 
   @override

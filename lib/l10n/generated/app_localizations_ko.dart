@@ -179,6 +179,12 @@ class AppL10nKo extends AppL10n {
   String get tooltipDownload => '다운로드';
 
   @override
+  String get downloadSaved => 'Saved';
+
+  @override
+  String get downloadFailed => 'Download failed';
+
+  @override
   String get tooltipZoomIn => '확대';
 
   @override

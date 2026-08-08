@@ -9,7 +9,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:photo_view/photo_view.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../core/network/dio_client.dart';
@@ -241,12 +240,6 @@ String _formatDuration(Duration d) {
   final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
   if (d.inHours > 0) return '${d.inHours}:$m:$s';
   return '$m:$s';
-}
-
-Future<void> _launchExternal(String url) async {
-  final uri = Uri.tryParse(url);
-  if (uri == null) return;
-  await launchUrl(uri, mode: LaunchMode.externalApplication);
 }
 
 // ---------------------------------------------------------------------------
@@ -573,7 +566,12 @@ class _ImagePreviewScreenState extends State<ImagePreviewScreen> {
                       _ToolbarBtn(
                         icon: Icons.download_outlined,
                         tooltip: AppL10n.of(context).tooltipDownload,
-                        onTap: () => _launchExternal(widget.downloadUrl),
+                        onTap: () => downloadAndSave(
+                          context,
+                          ProviderScope.containerOf(context, listen: false),
+                          widget.downloadUrl,
+                          widget.title,
+                        ),
                       ),
                       _ToolbarBtn(
                         icon: Icons.zoom_in_outlined,
@@ -750,7 +748,12 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
       onTap: loadError
           ? _retry
           : likelyIncompatible
-              ? () => _launchExternal(widget.urls.download)
+              ? () => downloadAndSave(
+                  context,
+                  ProviderScope.containerOf(context, listen: false),
+                  widget.urls.download,
+                  widget.meta.name,
+                )
               : (_headers == null ? null : () => _openPlayer(context, _headers!)),
       child: Container(
         decoration: BoxDecoration(
@@ -997,7 +1000,12 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
           IconButton(
             tooltip: l.tooltipDownload,
             icon: const Icon(Icons.download_outlined),
-            onPressed: () => _launchExternal(widget.downloadUrl),
+            onPressed: () => downloadAndSave(
+              context,
+              ProviderScope.containerOf(context, listen: false),
+              widget.downloadUrl,
+              widget.title,
+            ),
           ),
         ],
       ),
@@ -1042,7 +1050,12 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
-                    onPressed: () => _launchExternal(widget.downloadUrl),
+                    onPressed: () => downloadAndSave(
+                      context,
+                      ProviderScope.containerOf(context, listen: false),
+                      widget.downloadUrl,
+                      widget.title,
+                    ),
                     icon: const Icon(Icons.download_outlined, color: Colors.white),
                     label:
                         Text(l.tooltipDownload, style: const TextStyle(color: Colors.white)),
@@ -1183,6 +1196,22 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> {
                     color: AppTokens.gray500,
                   ),
                 ),
+              IconButton(
+                tooltip: AppL10n.of(context).tooltipDownload,
+                icon: Icon(
+                  Icons.download_outlined,
+                  color: AppTokens.gray500,
+                  size: 18,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () => downloadAndSave(
+                  context,
+                  ProviderScope.containerOf(context, listen: false),
+                  widget.urls.download,
+                  widget.meta.name,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 6),
@@ -1311,7 +1340,12 @@ class _FileCard extends StatelessWidget {
                 color: AppTokens.gray500,
                 size: 22,
               ),
-              onPressed: () => _launchExternal(urls!.download),
+              onPressed: () => downloadAndSave(
+                context,
+                ProviderScope.containerOf(context, listen: false),
+                urls!.download,
+                meta.name.isEmpty ? meta.path.split('/').last : meta.name,
+              ),
             ),
         ],
       ),

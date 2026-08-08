@@ -179,6 +179,12 @@ class AppL10nJa extends AppL10n {
   String get tooltipDownload => 'ダウンロード';
 
   @override
+  String get downloadSaved => 'Saved';
+
+  @override
+  String get downloadFailed => 'Download failed';
+
+  @override
   String get tooltipZoomIn => '拡大';
 
   @override

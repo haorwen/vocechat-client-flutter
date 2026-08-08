@@ -179,6 +179,12 @@ class AppL10nRu extends AppL10n {
   String get tooltipDownload => 'Скачать';
 
   @override
+  String get downloadSaved => 'Saved';
+
+  @override
+  String get downloadFailed => 'Download failed';
+
+  @override
   String get tooltipZoomIn => 'Увеличить';
 
   @override

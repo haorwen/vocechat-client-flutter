@@ -433,6 +433,18 @@ abstract class AppL10n {
   /// **'Download'**
   String get tooltipDownload;
 
+  /// No description provided for @downloadSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get downloadSaved;
+
+  /// No description provided for @downloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed'**
+  String get downloadFailed;
+
   /// No description provided for @tooltipZoomIn.
   ///
   /// In en, this message translates to:
