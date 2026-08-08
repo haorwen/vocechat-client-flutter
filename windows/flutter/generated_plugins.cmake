@@ -3,12 +3,15 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  agora_rtc_engine
   app_links
   connectivity_plus
   desktop_drop
   file_selector_windows
+  firebase_core
   flutter_secure_storage_windows
   fvp
+  iris_method_channel
   irondash_engine_context
   record_windows
   super_native_extensions

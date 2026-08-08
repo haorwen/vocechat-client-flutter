@@ -68,8 +68,7 @@ import 'app_localizations_zh.dart';
 /// be consistent with the languages listed in the AppL10n.supportedLocales
 /// property.
 abstract class AppL10n {
-  AppL10n(String locale)
-      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppL10n(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -89,8 +88,7 @@ abstract class AppL10n {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
-      <LocalizationsDelegate<dynamic>>[
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
     delegate,
     GlobalMaterialLocalizations.delegate,
     GlobalCupertinoLocalizations.delegate,
@@ -2070,6 +2068,90 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'View all {count} messages'**
   String archiveViewAll(int count);
+
+  /// No description provided for @voiceStartCall.
+  ///
+  /// In en, this message translates to:
+  /// **'Start voice call'**
+  String get voiceStartCall;
+
+  /// No description provided for @voiceIncomingCall.
+  ///
+  /// In en, this message translates to:
+  /// **'Incoming call'**
+  String get voiceIncomingCall;
+
+  /// No description provided for @voiceCallingOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Calling...'**
+  String get voiceCallingOut;
+
+  /// No description provided for @voiceMute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get voiceMute;
+
+  /// No description provided for @voiceUnmute.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute'**
+  String get voiceUnmute;
+
+  /// No description provided for @voiceDeafen.
+  ///
+  /// In en, this message translates to:
+  /// **'Deafen'**
+  String get voiceDeafen;
+
+  /// No description provided for @voiceUndeafen.
+  ///
+  /// In en, this message translates to:
+  /// **'Undeafen'**
+  String get voiceUndeafen;
+
+  /// No description provided for @voiceCameraOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on camera'**
+  String get voiceCameraOn;
+
+  /// No description provided for @voiceCameraOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off camera'**
+  String get voiceCameraOff;
+
+  /// No description provided for @voiceShareScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Share screen'**
+  String get voiceShareScreen;
+
+  /// No description provided for @voiceFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Fullscreen'**
+  String get voiceFullscreen;
+
+  /// No description provided for @voiceLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave call'**
+  String get voiceLeave;
+
+  /// No description provided for @voiceConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice connected'**
+  String get voiceConnected;
+
+  /// No description provided for @voiceReconnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnecting...'**
+  String get voiceReconnecting;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
@@ -2081,45 +2163,31 @@ class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
   }
 
   @override
-  bool isSupported(Locale locale) => <String>[
-        'en',
-        'es',
-        'fr',
-        'ja',
-        'ko',
-        'pt',
-        'ru',
-        'zh'
-      ].contains(locale.languageCode);
+  bool isSupported(Locale locale) => <String>['en', 'es', 'fr', 'ja', 'ko', 'pt', 'ru', 'zh'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppL10nDelegate old) => false;
 }
 
 AppL10n lookupAppL10n(Locale locale) {
+
+
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
-    case 'en':
-      return AppL10nEn();
-    case 'es':
-      return AppL10nEs();
-    case 'fr':
-      return AppL10nFr();
-    case 'ja':
-      return AppL10nJa();
-    case 'ko':
-      return AppL10nKo();
-    case 'pt':
-      return AppL10nPt();
-    case 'ru':
-      return AppL10nRu();
-    case 'zh':
-      return AppL10nZh();
+    case 'en': return AppL10nEn();
+    case 'es': return AppL10nEs();
+    case 'fr': return AppL10nFr();
+    case 'ja': return AppL10nJa();
+    case 'ko': return AppL10nKo();
+    case 'pt': return AppL10nPt();
+    case 'ru': return AppL10nRu();
+    case 'zh': return AppL10nZh();
   }
 
   throw FlutterError(
-      'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.'
+  );
 }

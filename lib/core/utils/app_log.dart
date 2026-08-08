@@ -40,9 +40,10 @@ class LogTag {
   static const network = LogTag._('network');
   static const chat = LogTag._('chat');
   static const sse = LogTag._('sse');
+  static const voice = LogTag._('voice');
   static const general = LogTag._('general');
 
-  static const all = <LogTag>[auth, token, network, chat, sse, general];
+  static const all = <LogTag>[auth, token, network, chat, sse, voice, general];
 }
 
 class AppLog {

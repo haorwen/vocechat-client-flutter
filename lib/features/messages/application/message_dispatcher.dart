@@ -12,6 +12,7 @@ import '../../channels/domain/pin_chat_models.dart';
 import '../../contacts/application/presence_provider.dart';
 import '../data/message_cache.dart';
 import '../domain/message_models.dart';
+import '../../voice/application/incoming_call_provider.dart';
 import 'burn_after_read_provider.dart';
 import 'chat_controller.dart';
 import 'reactions_provider.dart';
@@ -117,6 +118,14 @@ class MessageDispatcher extends _$MessageDispatcher {
         }
         if (event is ChatEventKick) {
           _handleKick(event.reason);
+          return;
+        }
+        if (event is ChatEventUserCalling) {
+          ref.read(incomingCallProvider.notifier).set(
+                fromUid: event.uid,
+                toUid: event.target,
+                calling: true,
+              );
           return;
         }
         if (event is ChatEventUnknown) {

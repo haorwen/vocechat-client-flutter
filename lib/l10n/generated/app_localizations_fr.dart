@@ -1,5 +1,3 @@
-// ignore: unused_import
-import 'package:intl/intl.dart' as intl;
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -243,12 +241,10 @@ class AppL10nFr extends AppL10n {
   String get mediaLoadFailedRetry => 'Failed to load — tap to retry';
 
   @override
-  String get mediaLikelyIncompatible =>
-      'This device can\'t play this video format. Try downloading it instead.';
+  String get mediaLikelyIncompatible => 'This device can\'t play this video format. Try downloading it instead.';
 
   @override
-  String get featureUnavailable =>
-      'Cette fonctionnalité n\'est pas encore disponible';
+  String get featureUnavailable => 'Cette fonctionnalité n\'est pas encore disponible';
 
   @override
   String get settingsTitle => 'Paramètres';
@@ -281,8 +277,7 @@ class AppL10nFr extends AppL10n {
   String get settingsLogoutConfirmTitle => 'Se déconnecter ?';
 
   @override
-  String get settingsLogoutConfirmContent =>
-      'Vous devrez vous reconnecter pour accéder à ce serveur.';
+  String get settingsLogoutConfirmContent => 'Vous devrez vous reconnecter pour accéder à ce serveur.';
 
   @override
   String get settingsSwitchAccount => 'Switch account';
@@ -300,8 +295,7 @@ class AppL10nFr extends AppL10n {
   String get accountSwitcherRemoveConfirmTitle => 'Remove this account?';
 
   @override
-  String get accountSwitcherRemoveConfirmBody =>
-      'This removes the saved sign-in and cached messages for this account on this device.';
+  String get accountSwitcherRemoveConfirmBody => 'This removes the saved sign-in and cached messages for this account on this device.';
 
   @override
   String get accountSwitcherRemove => 'Remove';
@@ -310,8 +304,7 @@ class AppL10nFr extends AppL10n {
   String get accountSwitcherSignedOut => 'Signed out';
 
   @override
-  String get accountSwitcherSwitchFailed =>
-      'Couldn\'t sign in to that account — please log in again.';
+  String get accountSwitcherSwitchFailed => 'Couldn\'t sign in to that account — please log in again.';
 
   @override
   String get accountEmail => 'Email';
@@ -329,22 +322,19 @@ class AppL10nFr extends AppL10n {
   String get notificationsPush => 'Notifications push';
 
   @override
-  String get notificationsPushSubtitle =>
-      'Soyez informé des nouveaux messages et des mentions.';
+  String get notificationsPushSubtitle => 'Soyez informé des nouveaux messages et des mentions.';
 
   @override
   String get notificationsSound => 'Sons de notification';
 
   @override
-  String get notificationsSoundSubtitle =>
-      'Jouer un son à la réception d\'un message.';
+  String get notificationsSoundSubtitle => 'Jouer un son à la réception d\'un message.';
 
   @override
   String get notificationsMentionsOnly => 'Mentions uniquement';
 
   @override
-  String get notificationsMentionsOnlySubtitle =>
-      'Ne notifier que pour les @mentions.';
+  String get notificationsMentionsOnlySubtitle => 'Ne notifier que pour les @mentions.';
 
   @override
   String get appearanceTheme => 'THÈME';
@@ -404,8 +394,7 @@ class AppL10nFr extends AppL10n {
   String get storageClearCacheConfirmTitle => 'Vider le cache ?';
 
   @override
-  String get storageClearCacheConfirmBody =>
-      'Cela supprime les messages et images mis en cache localement. Ils seront retéléchargés si nécessaire.';
+  String get storageClearCacheConfirmBody => 'Cela supprime les messages et images mis en cache localement. Ils seront retéléchargés si nécessaire.';
 
   @override
   String get storageClearCacheConfirm => 'Vider';
@@ -444,8 +433,7 @@ class AppL10nFr extends AppL10n {
   String get loginPasswordRequired => 'Le mot de passe est requis';
 
   @override
-  String get loginPasswordTooShort =>
-      'Le mot de passe doit contenir au moins 6 caractères';
+  String get loginPasswordTooShort => 'Le mot de passe doit contenir au moins 6 caractères';
 
   @override
   String get loginForgotPassword => 'Mot de passe oublié ?';
@@ -475,20 +463,16 @@ class AppL10nFr extends AppL10n {
   String get loginErrorInvalidCredentials => 'Email ou mot de passe incorrect';
 
   @override
-  String get loginErrorAccountFrozen =>
-      'Ce compte a été gelé. Contactez votre administrateur.';
+  String get loginErrorAccountFrozen => 'Ce compte a été gelé. Contactez votre administrateur.';
 
   @override
-  String get loginErrorNotInvited =>
-      'Aucun compte associé trouvé. Demandez un lien d\'invitation à un administrateur.';
+  String get loginErrorNotInvited => 'Aucun compte associé trouvé. Demandez un lien d\'invitation à un administrateur.';
 
   @override
-  String get loginErrorMethodNotSupported =>
-      'Cette méthode de connexion n\'est pas prise en charge par le serveur.';
+  String get loginErrorMethodNotSupported => 'Cette méthode de connexion n\'est pas prise en charge par le serveur.';
 
   @override
-  String get loginErrorCannotReachServer =>
-      'Impossible d\'atteindre le serveur. Vérifiez votre réseau ou l\'URL du serveur.';
+  String get loginErrorCannotReachServer => 'Impossible d\'atteindre le serveur. Vérifiez votre réseau ou l\'URL du serveur.';
 
   @override
   String get registerTitle => 'Créer un compte';
@@ -506,8 +490,7 @@ class AppL10nFr extends AppL10n {
   String get registerNameRequired => 'Le nom est requis';
 
   @override
-  String get registerNameTooShort =>
-      'Le nom doit contenir au moins 2 caractères';
+  String get registerNameTooShort => 'Le nom doit contenir au moins 2 caractères';
 
   @override
   String get registerEmailRequired => 'L\'email est requis';
@@ -528,8 +511,7 @@ class AppL10nFr extends AppL10n {
   String get registerConfirmRequired => 'Veuillez confirmer votre mot de passe';
 
   @override
-  String get registerConfirmMismatch =>
-      'Les mots de passe ne correspondent pas';
+  String get registerConfirmMismatch => 'Les mots de passe ne correspondent pas';
 
   @override
   String get registerCreate => 'Créer un compte';
@@ -547,8 +529,7 @@ class AppL10nFr extends AppL10n {
   String get registerHaveAccount => 'Vous avez déjà un compte ? ';
 
   @override
-  String get registerInviteRequiresEmailConfirmation =>
-      'This server requires email confirmation for invited signups, which isn\'t supported yet. Please ask your admin for help.';
+  String get registerInviteRequiresEmailConfirmation => 'This server requires email confirmation for invited signups, which isn\'t supported yet. Please ask your admin for help.';
 
   @override
   String get serverPickerTitle => 'Sélectionner un serveur';
@@ -557,8 +538,7 @@ class AppL10nFr extends AppL10n {
   String get serverPickerEmptyTitle => 'Connectez-vous à un serveur VoceChat';
 
   @override
-  String get serverPickerEmptySubtitle =>
-      'Ajoutez un serveur pour commencer à discuter avec votre équipe.';
+  String get serverPickerEmptySubtitle => 'Ajoutez un serveur pour commencer à discuter avec votre équipe.';
 
   @override
   String get serverPickerAddFirst => 'Ajouter votre premier serveur';
@@ -615,16 +595,13 @@ class AppL10nFr extends AppL10n {
   String get inviteLinkPasteFromClipboard => 'Paste from clipboard';
 
   @override
-  String get inviteLinkInvalid =>
-      'This doesn\'t look like a valid invitation link';
+  String get inviteLinkInvalid => 'This doesn\'t look like a valid invitation link';
 
   @override
-  String get inviteLinkExpired =>
-      'This invitation link has expired or already been used';
+  String get inviteLinkExpired => 'This invitation link has expired or already been used';
 
   @override
-  String get inviteLinkCheckFailed =>
-      'Couldn\'t verify the invitation link. Check your network and try again.';
+  String get inviteLinkCheckFailed => 'Couldn\'t verify the invitation link. Check your network and try again.';
 
   @override
   String get inviteLinkContinue => 'Continue';
@@ -653,8 +630,7 @@ class AppL10nFr extends AppL10n {
   String get chatListSelectTitle => 'Sélectionnez une conversation';
 
   @override
-  String get chatListSelectSubtitle =>
-      'Choisissez une discussion dans le panneau de gauche pour envoyer un message';
+  String get chatListSelectSubtitle => 'Choisissez une discussion dans le panneau de gauche pour envoyer un message';
 
   @override
   String get chatListPin => 'Épingler en haut';
@@ -716,8 +692,7 @@ class AppL10nFr extends AppL10n {
   String get contactsSelectTitle => 'Sélectionnez un contact';
 
   @override
-  String get contactsSelectSubtitle =>
-      'Choisissez une personne dans la liste pour voir son profil';
+  String get contactsSelectSubtitle => 'Choisissez une personne dans la liste pour voir son profil';
 
   @override
   String get contactsMessage => 'Message';
@@ -783,12 +758,10 @@ class AppL10nFr extends AppL10n {
   String get chatVoiceRecordingSend => 'Envoyer';
 
   @override
-  String get chatRecordingPermissionDenied =>
-      'Permission refusée — activez l\'accès au micro/caméra dans les paramètres système';
+  String get chatRecordingPermissionDenied => 'Permission refusée — activez l\'accès au micro/caméra dans les paramètres système';
 
   @override
-  String get chatPhotoPermissionDenied =>
-      'Permission denied — enable photo library access in system settings';
+  String get chatPhotoPermissionDenied => 'Permission denied — enable photo library access in system settings';
 
   @override
   String get chatAttachOpenFiles => 'Files';
@@ -846,15 +819,13 @@ class AppL10nFr extends AppL10n {
   String get errorRequestFailed => 'La requête a échoué';
 
   @override
-  String get authKickedFromOtherDevice =>
-      'Déconnecté : votre compte vient de se connecter sur un autre appareil.';
+  String get authKickedFromOtherDevice => 'Déconnecté : votre compte vient de se connecter sur un autre appareil.';
 
   @override
   String get authAccountDeleted => 'Votre compte a été supprimé.';
 
   @override
-  String get authSessionEnded =>
-      'Votre session a expiré. Veuillez vous reconnecter.';
+  String get authSessionEnded => 'Votre session a expiré. Veuillez vous reconnecter.';
 
   @override
   String get chatListMarkRead => 'Marquer comme lu';
@@ -909,8 +880,7 @@ class AppL10nFr extends AppL10n {
   String get channelPublicLabel => 'Canal public';
 
   @override
-  String get createChannelPublicAdminOnly =>
-      'Seuls les administrateurs peuvent créer des canaux publics';
+  String get createChannelPublicAdminOnly => 'Seuls les administrateurs peuvent créer des canaux publics';
 
   @override
   String get createChannelSubmit => 'Créer';
@@ -961,15 +931,13 @@ class AppL10nFr extends AppL10n {
   String get channelMuteLabel => 'Rendre le canal muet';
 
   @override
-  String get channelLeaveConfirmBody =>
-      'Voulez-vous vraiment quitter ce canal ?';
+  String get channelLeaveConfirmBody => 'Voulez-vous vraiment quitter ce canal ?';
 
   @override
   String get channelDeleteTitle => 'Supprimer le canal';
 
   @override
-  String get channelDeleteConfirmBody =>
-      'Cela supprimera définitivement le canal pour tous les membres. Cette action est irréversible.';
+  String get channelDeleteConfirmBody => 'Cela supprimera définitivement le canal pour tous les membres. Cette action est irréversible.';
 
   @override
   String get actionLeave => 'Quitter';
@@ -1074,4 +1042,46 @@ class AppL10nFr extends AppL10n {
   String archiveViewAll(int count) {
     return 'Voir les $count messages';
   }
+
+  @override
+  String get voiceStartCall => 'Start voice call';
+
+  @override
+  String get voiceIncomingCall => 'Incoming call';
+
+  @override
+  String get voiceCallingOut => 'Calling...';
+
+  @override
+  String get voiceMute => 'Mute';
+
+  @override
+  String get voiceUnmute => 'Unmute';
+
+  @override
+  String get voiceDeafen => 'Deafen';
+
+  @override
+  String get voiceUndeafen => 'Undeafen';
+
+  @override
+  String get voiceCameraOn => 'Turn on camera';
+
+  @override
+  String get voiceCameraOff => 'Turn off camera';
+
+  @override
+  String get voiceShareScreen => 'Share screen';
+
+  @override
+  String get voiceFullscreen => 'Fullscreen';
+
+  @override
+  String get voiceLeave => 'Leave call';
+
+  @override
+  String get voiceConnected => 'Voice connected';
+
+  @override
+  String get voiceReconnecting => 'Reconnecting...';
 }

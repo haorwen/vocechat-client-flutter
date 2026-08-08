@@ -9,6 +9,8 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../../messages/application/message_dispatcher.dart';
 import '../../messages/presentation/chat_tool_panels.dart';
+import '../../voice/application/incoming_call_provider.dart';
+import '../../voice/presentation/incoming_call_banner.dart';
 
 /// Width threshold above which the desktop left rail layout is used.
 const double _kWideBreakpoint = 900;
@@ -74,6 +76,9 @@ class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
     ref.watch(sseTokenWatcherProvider);
     ref.watch(sseConnectivityWatcherProvider);
     ref.watch(sseLifecycleWatcherProvider);
+    // Polls for incoming DM voice calls app-wide (see incoming_call_provider.dart
+    // for why polling, not a push event, is the primary discovery path).
+    ref.watch(incomingCallProvider);
 
     // Use MediaQuery instead of LayoutBuilder for the breakpoint: on desktop
     // (Windows/macOS/Linux) resizing the window must flip the layout reliably,
@@ -96,29 +101,41 @@ class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
     final isChatting =
         !isWide && RegExp(r'^/home/chat/').hasMatch(location);
 
+    // Suppress the floating incoming-call banner while the matching DM is
+    // already open — the chat screen's own VoiceOperationsBar/entry button
+    // handles ringing there instead of stacking a duplicate card on top.
+    final chatMatch = RegExp(r'^/home/chat/u-(\d+)').firstMatch(location);
+    final currentChatPeerUid =
+        chatMatch != null ? int.tryParse(chatMatch.group(1)!) : null;
+
     if (isWide) {
       return Scaffold(
         backgroundColor: AppTokens.canvas,
         body: SafeArea(
-          child: Row(
+          child: Stack(
             children: [
-              _DesktopLeftRail(
-                currentIndex: navigationShell.currentIndex,
-                onDestinationSelected: _onDestinationSelected,
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      color: AppTokens.surface,
-                      child: navigationShell,
+              Row(
+                children: [
+                  _DesktopLeftRail(
+                    currentIndex: navigationShell.currentIndex,
+                    onDestinationSelected: _onDestinationSelected,
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          color: AppTokens.surface,
+                          child: navigationShell,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                ],
               ),
-              const SizedBox(width: 12),
+              IncomingCallBanner(currentChatPeerUid: currentChatPeerUid),
             ],
           ),
         ),
@@ -128,7 +145,12 @@ class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: navigationShell,
+        child: Stack(
+          children: [
+            navigationShell,
+            IncomingCallBanner(currentChatPeerUid: currentChatPeerUid),
+          ],
+        ),
       ),
       bottomNavigationBar: isChatting
           ? null

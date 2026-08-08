@@ -6,7 +6,7 @@ part of 'deep_link_listener.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$deepLinkListenerHash() => r'd41d8cd98f00b204e9800998ecf8427e00000001';
+String _$deepLinkListenerHash() => r'b65006928c5a44d4ac2804a582f6b743637f0918';
 
 /// Subscribes to incoming `vocechat://` deep links (Android/iOS custom URL
 /// scheme — see AndroidManifest.xml / Info.plist) for the lifetime of the

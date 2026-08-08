@@ -80,8 +80,7 @@ class _$InviteLinkParseResultCopyWithImpl<$Res,
 
 /// @nodoc
 abstract class _$$InviteLinkParseValidImplCopyWith<$Res> {
-  factory _$$InviteLinkParseValidImplCopyWith(
-          _$InviteLinkParseValidImpl value,
+  factory _$$InviteLinkParseValidImplCopyWith(_$InviteLinkParseValidImpl value,
           $Res Function(_$InviteLinkParseValidImpl) then) =
       __$$InviteLinkParseValidImplCopyWithImpl<$Res>;
   @useResult
@@ -154,8 +153,9 @@ class _$InviteLinkParseValidImpl implements InviteLinkParseValid {
   @override
   @pragma('vm:prefer-inline')
   _$$InviteLinkParseValidImplCopyWith<_$InviteLinkParseValidImpl>
-      get copyWith => __$$InviteLinkParseValidImplCopyWithImpl<
-          _$InviteLinkParseValidImpl>(this, _$identity);
+      get copyWith =>
+          __$$InviteLinkParseValidImplCopyWithImpl<_$InviteLinkParseValidImpl>(
+              this, _$identity);
 
   @override
   @optionalTypeArgs

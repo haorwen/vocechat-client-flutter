@@ -1,5 +1,3 @@
-// ignore: unused_import
-import 'package:intl/intl.dart' as intl;
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -243,8 +241,7 @@ class AppL10nKo extends AppL10n {
   String get mediaLoadFailedRetry => 'Failed to load — tap to retry';
 
   @override
-  String get mediaLikelyIncompatible =>
-      'This device can\'t play this video format. Try downloading it instead.';
+  String get mediaLikelyIncompatible => 'This device can\'t play this video format. Try downloading it instead.';
 
   @override
   String get featureUnavailable => '아직 사용할 수 없는 기능입니다';
@@ -298,8 +295,7 @@ class AppL10nKo extends AppL10n {
   String get accountSwitcherRemoveConfirmTitle => 'Remove this account?';
 
   @override
-  String get accountSwitcherRemoveConfirmBody =>
-      'This removes the saved sign-in and cached messages for this account on this device.';
+  String get accountSwitcherRemoveConfirmBody => 'This removes the saved sign-in and cached messages for this account on this device.';
 
   @override
   String get accountSwitcherRemove => 'Remove';
@@ -308,8 +304,7 @@ class AppL10nKo extends AppL10n {
   String get accountSwitcherSignedOut => 'Signed out';
 
   @override
-  String get accountSwitcherSwitchFailed =>
-      'Couldn\'t sign in to that account — please log in again.';
+  String get accountSwitcherSwitchFailed => 'Couldn\'t sign in to that account — please log in again.';
 
   @override
   String get accountEmail => '이메일';
@@ -399,8 +394,7 @@ class AppL10nKo extends AppL10n {
   String get storageClearCacheConfirmTitle => '캐시를 지울까요?';
 
   @override
-  String get storageClearCacheConfirmBody =>
-      '로컬에 캐시된 메시지와 이미지가 삭제됩니다. 필요할 때 다시 다운로드됩니다.';
+  String get storageClearCacheConfirmBody => '로컬에 캐시된 메시지와 이미지가 삭제됩니다. 필요할 때 다시 다운로드됩니다.';
 
   @override
   String get storageClearCacheConfirm => '지우기';
@@ -478,8 +472,7 @@ class AppL10nKo extends AppL10n {
   String get loginErrorMethodNotSupported => '이 서버에서는 이 로그인 방식을 지원하지 않습니다.';
 
   @override
-  String get loginErrorCannotReachServer =>
-      '서버에 연결할 수 없습니다. 네트워크나 서버 주소를 확인해 주세요.';
+  String get loginErrorCannotReachServer => '서버에 연결할 수 없습니다. 네트워크나 서버 주소를 확인해 주세요.';
 
   @override
   String get registerTitle => '계정 만들기';
@@ -536,8 +529,7 @@ class AppL10nKo extends AppL10n {
   String get registerHaveAccount => '이미 계정이 있으신가요? ';
 
   @override
-  String get registerInviteRequiresEmailConfirmation =>
-      'This server requires email confirmation for invited signups, which isn\'t supported yet. Please ask your admin for help.';
+  String get registerInviteRequiresEmailConfirmation => 'This server requires email confirmation for invited signups, which isn\'t supported yet. Please ask your admin for help.';
 
   @override
   String get serverPickerTitle => '서버 선택';
@@ -603,16 +595,13 @@ class AppL10nKo extends AppL10n {
   String get inviteLinkPasteFromClipboard => 'Paste from clipboard';
 
   @override
-  String get inviteLinkInvalid =>
-      'This doesn\'t look like a valid invitation link';
+  String get inviteLinkInvalid => 'This doesn\'t look like a valid invitation link';
 
   @override
-  String get inviteLinkExpired =>
-      'This invitation link has expired or already been used';
+  String get inviteLinkExpired => 'This invitation link has expired or already been used';
 
   @override
-  String get inviteLinkCheckFailed =>
-      'Couldn\'t verify the invitation link. Check your network and try again.';
+  String get inviteLinkCheckFailed => 'Couldn\'t verify the invitation link. Check your network and try again.';
 
   @override
   String get inviteLinkContinue => 'Continue';
@@ -769,12 +758,10 @@ class AppL10nKo extends AppL10n {
   String get chatVoiceRecordingSend => '보내기';
 
   @override
-  String get chatRecordingPermissionDenied =>
-      '권한이 거부되었습니다 — 시스템 설정에서 마이크/카메라 접근을 허용해 주세요';
+  String get chatRecordingPermissionDenied => '권한이 거부되었습니다 — 시스템 설정에서 마이크/카메라 접근을 허용해 주세요';
 
   @override
-  String get chatPhotoPermissionDenied =>
-      'Permission denied — enable photo library access in system settings';
+  String get chatPhotoPermissionDenied => 'Permission denied — enable photo library access in system settings';
 
   @override
   String get chatAttachOpenFiles => 'Files';
@@ -950,8 +937,7 @@ class AppL10nKo extends AppL10n {
   String get channelDeleteTitle => '채널 삭제';
 
   @override
-  String get channelDeleteConfirmBody =>
-      '모든 멤버에게서 채널이 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.';
+  String get channelDeleteConfirmBody => '모든 멤버에게서 채널이 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.';
 
   @override
   String get actionLeave => '나가기';
@@ -1056,4 +1042,46 @@ class AppL10nKo extends AppL10n {
   String archiveViewAll(int count) {
     return '전체 $count개 메시지 보기';
   }
+
+  @override
+  String get voiceStartCall => 'Start voice call';
+
+  @override
+  String get voiceIncomingCall => 'Incoming call';
+
+  @override
+  String get voiceCallingOut => 'Calling...';
+
+  @override
+  String get voiceMute => 'Mute';
+
+  @override
+  String get voiceUnmute => 'Unmute';
+
+  @override
+  String get voiceDeafen => 'Deafen';
+
+  @override
+  String get voiceUndeafen => 'Undeafen';
+
+  @override
+  String get voiceCameraOn => 'Turn on camera';
+
+  @override
+  String get voiceCameraOff => 'Turn off camera';
+
+  @override
+  String get voiceShareScreen => 'Share screen';
+
+  @override
+  String get voiceFullscreen => 'Fullscreen';
+
+  @override
+  String get voiceLeave => 'Leave call';
+
+  @override
+  String get voiceConnected => 'Voice connected';
+
+  @override
+  String get voiceReconnecting => 'Reconnecting...';
 }

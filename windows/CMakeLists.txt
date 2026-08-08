@@ -55,6 +55,11 @@ add_subdirectory("runner")
 
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
+# Firebase C++ SDK 12.7.0 uses cmake_minimum_required < 3.5, which newer
+# CMake rejects. Setting this policy variable before including the plugins
+# propagates into firebase_core's add_subdirectory call and lets CMake
+# configure the SDK without aborting.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 include(flutter/generated_plugins.cmake)
 
 

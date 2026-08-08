@@ -6,7 +6,7 @@ part of 'sse_lifecycle.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$sseTokenWatcherHash() => r'8af869d89ad5c04644301391dc9632b817457d0f';
+String _$sseTokenWatcherHash() => r'7d549eafbc34936e68b4e554448c11a7c7df3e9a';
 
 /// See also [SseTokenWatcher].
 @ProviderFor(SseTokenWatcher)

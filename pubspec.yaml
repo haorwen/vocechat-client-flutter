@@ -97,9 +97,19 @@ dependencies:
   # Date
   intl: any
 
+  # Push notifications (Firebase Cloud Messaging — Android & iOS only)
+  firebase_core: ^3.6.0
+  firebase_messaging: ^15.1.3
+
   # Crypto
   crypto: ^3.0.3
   scrollable_positioned_list: ^0.3.8
+
+  # Voice/video calling (Agora RTC). No official Linux support — voice entry
+  # points are hidden on that platform (see voice_controller.dart). Pinned to
+  # 6.5.4, not the newer 6.6.x line — 6.6.x tightens its ffi constraint to
+  # ^1.1.2, which conflicts with super_clipboard's ffi ^2.0.1 requirement.
+  agora_rtc_engine: 6.5.4
 
 dev_dependencies:
   flutter_test:

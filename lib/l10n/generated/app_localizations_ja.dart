@@ -1,5 +1,3 @@
-// ignore: unused_import
-import 'package:intl/intl.dart' as intl;
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -243,8 +241,7 @@ class AppL10nJa extends AppL10n {
   String get mediaLoadFailedRetry => 'Failed to load — tap to retry';
 
   @override
-  String get mediaLikelyIncompatible =>
-      'This device can\'t play this video format. Try downloading it instead.';
+  String get mediaLikelyIncompatible => 'This device can\'t play this video format. Try downloading it instead.';
 
   @override
   String get featureUnavailable => 'この機能はまだご利用いただけません';
@@ -280,8 +277,7 @@ class AppL10nJa extends AppL10n {
   String get settingsLogoutConfirmTitle => 'ログアウトしますか？';
 
   @override
-  String get settingsLogoutConfirmContent =>
-      'このサーバーに再度アクセスするには、もう一度ログインする必要があります。';
+  String get settingsLogoutConfirmContent => 'このサーバーに再度アクセスするには、もう一度ログインする必要があります。';
 
   @override
   String get settingsSwitchAccount => 'Switch account';
@@ -299,8 +295,7 @@ class AppL10nJa extends AppL10n {
   String get accountSwitcherRemoveConfirmTitle => 'Remove this account?';
 
   @override
-  String get accountSwitcherRemoveConfirmBody =>
-      'This removes the saved sign-in and cached messages for this account on this device.';
+  String get accountSwitcherRemoveConfirmBody => 'This removes the saved sign-in and cached messages for this account on this device.';
 
   @override
   String get accountSwitcherRemove => 'Remove';
@@ -309,8 +304,7 @@ class AppL10nJa extends AppL10n {
   String get accountSwitcherSignedOut => 'Signed out';
 
   @override
-  String get accountSwitcherSwitchFailed =>
-      'Couldn\'t sign in to that account — please log in again.';
+  String get accountSwitcherSwitchFailed => 'Couldn\'t sign in to that account — please log in again.';
 
   @override
   String get accountEmail => 'メールアドレス';
@@ -400,8 +394,7 @@ class AppL10nJa extends AppL10n {
   String get storageClearCacheConfirmTitle => 'キャッシュを削除しますか？';
 
   @override
-  String get storageClearCacheConfirmBody =>
-      'ローカルに保存されたメッセージと画像のキャッシュが削除されます。必要に応じて再ダウンロードされます。';
+  String get storageClearCacheConfirmBody => 'ローカルに保存されたメッセージと画像のキャッシュが削除されます。必要に応じて再ダウンロードされます。';
 
   @override
   String get storageClearCacheConfirm => '削除';
@@ -479,8 +472,7 @@ class AppL10nJa extends AppL10n {
   String get loginErrorMethodNotSupported => 'このログイン方法はサーバーでサポートされていません。';
 
   @override
-  String get loginErrorCannotReachServer =>
-      'サーバーに接続できません。ネットワークまたはサーバーの URL を確認してください。';
+  String get loginErrorCannotReachServer => 'サーバーに接続できません。ネットワークまたはサーバーの URL を確認してください。';
 
   @override
   String get registerTitle => 'アカウントを作成';
@@ -537,8 +529,7 @@ class AppL10nJa extends AppL10n {
   String get registerHaveAccount => 'すでにアカウントをお持ちですか？ ';
 
   @override
-  String get registerInviteRequiresEmailConfirmation =>
-      'This server requires email confirmation for invited signups, which isn\'t supported yet. Please ask your admin for help.';
+  String get registerInviteRequiresEmailConfirmation => 'This server requires email confirmation for invited signups, which isn\'t supported yet. Please ask your admin for help.';
 
   @override
   String get serverPickerTitle => 'サーバーを選択';
@@ -604,16 +595,13 @@ class AppL10nJa extends AppL10n {
   String get inviteLinkPasteFromClipboard => 'Paste from clipboard';
 
   @override
-  String get inviteLinkInvalid =>
-      'This doesn\'t look like a valid invitation link';
+  String get inviteLinkInvalid => 'This doesn\'t look like a valid invitation link';
 
   @override
-  String get inviteLinkExpired =>
-      'This invitation link has expired or already been used';
+  String get inviteLinkExpired => 'This invitation link has expired or already been used';
 
   @override
-  String get inviteLinkCheckFailed =>
-      'Couldn\'t verify the invitation link. Check your network and try again.';
+  String get inviteLinkCheckFailed => 'Couldn\'t verify the invitation link. Check your network and try again.';
 
   @override
   String get inviteLinkContinue => 'Continue';
@@ -770,12 +758,10 @@ class AppL10nJa extends AppL10n {
   String get chatVoiceRecordingSend => '送信';
 
   @override
-  String get chatRecordingPermissionDenied =>
-      '権限が拒否されました — システム設定でマイク／カメラのアクセスを許可してください';
+  String get chatRecordingPermissionDenied => '権限が拒否されました — システム設定でマイク／カメラのアクセスを許可してください';
 
   @override
-  String get chatPhotoPermissionDenied =>
-      'Permission denied — enable photo library access in system settings';
+  String get chatPhotoPermissionDenied => 'Permission denied — enable photo library access in system settings';
 
   @override
   String get chatAttachOpenFiles => 'Files';
@@ -833,8 +819,7 @@ class AppL10nJa extends AppL10n {
   String get errorRequestFailed => 'リクエストに失敗しました';
 
   @override
-  String get authKickedFromOtherDevice =>
-      'ログアウトしました：あなたのアカウントが別のデバイスでログインしました。';
+  String get authKickedFromOtherDevice => 'ログアウトしました：あなたのアカウントが別のデバイスでログインしました。';
 
   @override
   String get authAccountDeleted => 'あなたのアカウントは削除されました。';
@@ -952,8 +937,7 @@ class AppL10nJa extends AppL10n {
   String get channelDeleteTitle => 'チャンネルを削除';
 
   @override
-  String get channelDeleteConfirmBody =>
-      'この操作を行うと、全メンバーに対してチャンネルが永久に削除されます。この操作は取り消せません。';
+  String get channelDeleteConfirmBody => 'この操作を行うと、全メンバーに対してチャンネルが永久に削除されます。この操作は取り消せません。';
 
   @override
   String get actionLeave => '退出';
@@ -1058,4 +1042,46 @@ class AppL10nJa extends AppL10n {
   String archiveViewAll(int count) {
     return '$count 件のメッセージをすべて表示';
   }
+
+  @override
+  String get voiceStartCall => 'Start voice call';
+
+  @override
+  String get voiceIncomingCall => 'Incoming call';
+
+  @override
+  String get voiceCallingOut => 'Calling...';
+
+  @override
+  String get voiceMute => 'Mute';
+
+  @override
+  String get voiceUnmute => 'Unmute';
+
+  @override
+  String get voiceDeafen => 'Deafen';
+
+  @override
+  String get voiceUndeafen => 'Undeafen';
+
+  @override
+  String get voiceCameraOn => 'Turn on camera';
+
+  @override
+  String get voiceCameraOff => 'Turn off camera';
+
+  @override
+  String get voiceShareScreen => 'Share screen';
+
+  @override
+  String get voiceFullscreen => 'Fullscreen';
+
+  @override
+  String get voiceLeave => 'Leave call';
+
+  @override
+  String get voiceConnected => 'Voice connected';
+
+  @override
+  String get voiceReconnecting => 'Reconnecting...';
 }

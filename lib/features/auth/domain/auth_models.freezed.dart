@@ -1384,6 +1384,7 @@ mixin _$SendRegMagicTokenResponse {
   @JsonKey(name: 'mail_is_sent')
   bool get mailIsSent => throw _privateConstructorUsedError;
 
+  /// Serializes this SendRegMagicTokenResponse to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
   /// Create a copy of SendRegMagicTokenResponse
@@ -1397,8 +1398,7 @@ mixin _$SendRegMagicTokenResponse {
 abstract class $SendRegMagicTokenResponseCopyWith<$Res> {
   factory $SendRegMagicTokenResponseCopyWith(SendRegMagicTokenResponse value,
           $Res Function(SendRegMagicTokenResponse) then) =
-      _$SendRegMagicTokenResponseCopyWithImpl<$Res,
-          SendRegMagicTokenResponse>;
+      _$SendRegMagicTokenResponseCopyWithImpl<$Res, SendRegMagicTokenResponse>;
   @useResult
   $Res call(
       {@JsonKey(name: 'new_magic_token') String newMagicToken,
@@ -1489,8 +1489,7 @@ class _$SendRegMagicTokenResponseImpl implements _SendRegMagicTokenResponse {
       {@JsonKey(name: 'new_magic_token') required this.newMagicToken,
       @JsonKey(name: 'mail_is_sent') required this.mailIsSent});
 
-  factory _$SendRegMagicTokenResponseImpl.fromJson(
-          Map<String, dynamic> json) =>
+  factory _$SendRegMagicTokenResponseImpl.fromJson(Map<String, dynamic> json) =>
       _$$SendRegMagicTokenResponseImplFromJson(json);
 
   @override
@@ -1537,11 +1536,9 @@ class _$SendRegMagicTokenResponseImpl implements _SendRegMagicTokenResponse {
   }
 }
 
-abstract class _SendRegMagicTokenResponse
-    implements SendRegMagicTokenResponse {
+abstract class _SendRegMagicTokenResponse implements SendRegMagicTokenResponse {
   const factory _SendRegMagicTokenResponse(
-      {@JsonKey(name: 'new_magic_token')
-      required final String newMagicToken,
+      {@JsonKey(name: 'new_magic_token') required final String newMagicToken,
       @JsonKey(name: 'mail_is_sent')
       required final bool mailIsSent}) = _$SendRegMagicTokenResponseImpl;
 

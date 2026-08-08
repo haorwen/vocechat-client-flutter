@@ -254,6 +254,15 @@ sealed class ChatEvent with _$ChatEvent {
   const factory ChatEvent.userSettingsChanged(
       {required Map<String, dynamic> data}) = ChatEventUserSettingsChanged;
 
+  /// DM call invite. Server-defined (`BroadcastEvent::UserCalling` /
+  /// `admin_agora.rs`) but not currently wired up server-side — voice call
+  /// discovery mostly relies on polling `/admin/agora/channel/:p/:s`
+  /// instead. Handled here so a future server fix needs no client change.
+  const factory ChatEvent.userCalling({
+    required int target,
+    required int uid,
+  }) = ChatEventUserCalling;
+
   const factory ChatEvent.unknown({
     required String type,
     required String raw,
@@ -315,6 +324,12 @@ ChatEvent parseSseEvent(String eventType, String rawData) {
       case 'user_settings_changed':
         final decoded = _decodeMap(rawData) ?? {};
         return ChatEvent.userSettingsChanged(data: decoded);
+      case 'user_calling':
+        final decoded = _decodeMap(rawData) ?? {};
+        return ChatEvent.userCalling(
+          target: (decoded['target'] as num?)?.toInt() ?? 0,
+          uid: (decoded['uid'] as num?)?.toInt() ?? 0,
+        );
     }
   } catch (_) {
     // Fall through to unknown

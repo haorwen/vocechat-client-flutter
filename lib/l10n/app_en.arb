@@ -445,5 +445,19 @@
   "archiveViewAll": "View all {count} messages",
   "@archiveViewAll": {
     "placeholders": {"count": {"type": "int"}}
-  }
+  },
+  "voiceStartCall": "Start voice call",
+  "voiceIncomingCall": "Incoming call",
+  "voiceCallingOut": "Calling...",
+  "voiceMute": "Mute",
+  "voiceUnmute": "Unmute",
+  "voiceDeafen": "Deafen",
+  "voiceUndeafen": "Undeafen",
+  "voiceCameraOn": "Turn on camera",
+  "voiceCameraOff": "Turn off camera",
+  "voiceShareScreen": "Share screen",
+  "voiceFullscreen": "Fullscreen",
+  "voiceLeave": "Leave call",
+  "voiceConnected": "Voice connected",
+  "voiceReconnecting": "Reconnecting..."
 }

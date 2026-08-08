@@ -17,8 +17,7 @@ _$AccountConfigImpl _$$AccountConfigImplFromJson(Map<String, dynamic> json) =>
       avatarUpdatedAt: (json['avatarUpdatedAt'] as num?)?.toInt(),
     );
 
-Map<String, dynamic> _$$AccountConfigImplToJson(
-        _$AccountConfigImpl instance) =>
+Map<String, dynamic> _$$AccountConfigImplToJson(_$AccountConfigImpl instance) =>
     <String, dynamic>{
       'accountId': instance.accountId,
       'serverId': instance.serverId,
@@ -33,7 +32,7 @@ Map<String, dynamic> _$$AccountConfigImplToJson(
 // RiverpodGenerator
 // **************************************************************************
 
-String _$accountStoreHash() => r'a1c6d8f0e2b4a6c8d0e2b4a6c8d0e2b4a6c8d0e2';
+String _$accountStoreHash() => r'768758bd79c20def23a98cd763be25f5f5f0fd2b';
 
 /// See also [AccountStore].
 @ProviderFor(AccountStore)
@@ -41,9 +40,8 @@ final accountStoreProvider =
     AutoDisposeAsyncNotifierProvider<AccountStore, AccountState>.internal(
   AccountStore.new,
   name: r'accountStoreProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$accountStoreHash,
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$accountStoreHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );

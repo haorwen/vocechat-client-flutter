@@ -365,5 +365,19 @@
   "archiveForwardedLabel": "转发的消息",
   "archiveLoadFailed": "加载转发消息失败",
   "archiveTapToView": "点击查看详情",
-  "archiveViewAll": "查看全部 {count} 条消息"
+  "archiveViewAll": "查看全部 {count} 条消息",
+  "voiceStartCall": "发起语音通话",
+  "voiceIncomingCall": "来电",
+  "voiceCallingOut": "正在呼叫...",
+  "voiceMute": "静音",
+  "voiceUnmute": "取消静音",
+  "voiceDeafen": "屏蔽声音",
+  "voiceUndeafen": "取消屏蔽",
+  "voiceCameraOn": "打开摄像头",
+  "voiceCameraOff": "关闭摄像头",
+  "voiceShareScreen": "共享屏幕",
+  "voiceFullscreen": "全屏",
+  "voiceLeave": "结束通话",
+  "voiceConnected": "语音已连接",
+  "voiceReconnecting": "正在重新连接..."
 }

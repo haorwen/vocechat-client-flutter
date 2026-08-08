@@ -33,6 +33,9 @@ import '../../../shared/widgets/voce_avatar.dart';
 import '../../../shared/widgets/voce_context_menu.dart';
 import '../../../shared/widgets/voce_dialog.dart';
 import '../../profile/presentation/user_profile_card.dart';
+import '../../voice/application/voice_controller.dart';
+import '../../voice/presentation/voice_entry_button.dart';
+import '../../voice/presentation/voice_operations_bar.dart';
 import '../application/chat_controller.dart';
 import '../application/chat_tools_provider.dart';
 import '../application/read_index_provider.dart';
@@ -972,6 +975,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             avatarUrl: avatarUrl,
                             isChannel: isChannel,
                             canPop: Navigator.of(context).canPop(),
+                            target: _target,
                             dmUid: dmUid,
                             isOnline: dmOnline,
                             showStatus: showStatus,
@@ -988,6 +992,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             onAutoDelete: () =>
                                 _showToolPanel(ChatTool.autoDelete),
                           ),
+                          if (ref.watch(voiceControllerProvider)?.context ==
+                              _target)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              child: VoiceOperationsBar(),
+                            ),
                           Expanded(
                             child: messagesAsync.when(
                               loading: () => Center(
@@ -1255,6 +1266,7 @@ class _ChatHeader extends StatelessWidget {
     required this.avatarUrl,
     required this.isChannel,
     required this.canPop,
+    required this.target,
     this.dmUid,
     this.isOnline = false,
     this.showStatus = true,
@@ -1272,6 +1284,7 @@ class _ChatHeader extends StatelessWidget {
   final String? avatarUrl;
   final bool isChannel;
   final bool canPop;
+  final MessageTarget target;
 
   /// Non-null for DM headers — tapping the avatar opens this user's profile.
   final int? dmUid;
@@ -1375,6 +1388,7 @@ class _ChatHeader extends StatelessWidget {
               ],
             ),
           ),
+          VoiceEntryButton(target: target),
           IconButton(
             key: searchAnchorKey,
             icon: Icon(Icons.search, size: 20, color: AppTokens.gray500),

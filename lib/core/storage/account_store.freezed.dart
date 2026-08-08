@@ -230,16 +230,15 @@ class _$AccountConfigImpl implements _AccountConfig {
             (identical(other.uid, uid) || other.uid == uid) &&
             (identical(other.name, name) || other.name == name) &&
             (identical(other.email, email) || other.email == email) &&
-            (identical(other.isAdmin, isAdmin) ||
-                other.isAdmin == isAdmin) &&
+            (identical(other.isAdmin, isAdmin) || other.isAdmin == isAdmin) &&
             (identical(other.avatarUpdatedAt, avatarUpdatedAt) ||
                 other.avatarUpdatedAt == avatarUpdatedAt));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
-      runtimeType, accountId, serverId, uid, name, email, isAdmin, avatarUpdatedAt);
+  int get hashCode => Object.hash(runtimeType, accountId, serverId, uid, name,
+      email, isAdmin, avatarUpdatedAt);
 
   /// Create a copy of AccountConfig
   /// with the given fields replaced by the non-null parameter values.

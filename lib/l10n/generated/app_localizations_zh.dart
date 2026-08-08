@@ -1,5 +1,3 @@
-// ignore: unused_import
-import 'package:intl/intl.dart' as intl;
 import 'app_localizations.dart';
 
 // ignore_for_file: type=lint
@@ -531,8 +529,7 @@ class AppL10nZh extends AppL10n {
   String get registerHaveAccount => '已有账户？ ';
 
   @override
-  String get registerInviteRequiresEmailConfirmation =>
-      '该服务器要求邀请注册时进行邮箱确认，目前暂不支持此流程，请联系管理员协助。';
+  String get registerInviteRequiresEmailConfirmation => '该服务器要求邀请注册时进行邮箱确认，目前暂不支持此流程，请联系管理员协助。';
 
   @override
   String get serverPickerTitle => '选择服务器';
@@ -1045,4 +1042,46 @@ class AppL10nZh extends AppL10n {
   String archiveViewAll(int count) {
     return '查看全部 $count 条消息';
   }
+
+  @override
+  String get voiceStartCall => '发起语音通话';
+
+  @override
+  String get voiceIncomingCall => '来电';
+
+  @override
+  String get voiceCallingOut => '正在呼叫...';
+
+  @override
+  String get voiceMute => '静音';
+
+  @override
+  String get voiceUnmute => '取消静音';
+
+  @override
+  String get voiceDeafen => '屏蔽声音';
+
+  @override
+  String get voiceUndeafen => '取消屏蔽';
+
+  @override
+  String get voiceCameraOn => '打开摄像头';
+
+  @override
+  String get voiceCameraOff => '关闭摄像头';
+
+  @override
+  String get voiceShareScreen => '共享屏幕';
+
+  @override
+  String get voiceFullscreen => '全屏';
+
+  @override
+  String get voiceLeave => '结束通话';
+
+  @override
+  String get voiceConnected => '语音已连接';
+
+  @override
+  String get voiceReconnecting => '正在重新连接...';
 }

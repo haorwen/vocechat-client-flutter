@@ -33,5 +33,9 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>VoceChat 需要使用相机，以便在视频通话中共享你的画面。</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>VoceChat 需要使用麦克风，以便进行语音/视频通话。</string>
 </dict>
 </plist>

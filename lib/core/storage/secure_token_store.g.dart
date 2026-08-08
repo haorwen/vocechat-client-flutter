@@ -6,7 +6,7 @@ part of 'secure_token_store.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$secureTokenStoreHash() => r'05cc1cf1948005f6ad89726ac7a3528fa55174a2';
+String _$secureTokenStoreHash() => r'a44efa88cfef1ec7648003dbedf0672a4c93bbf9';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -40,10 +40,10 @@ class SecureTokenStoreFamily extends Family<SecureTokenStore> {
 
   /// See also [secureTokenStore].
   SecureTokenStoreProvider call(
-    String serverId,
+    String id,
   ) {
     return SecureTokenStoreProvider(
-      serverId,
+      id,
     );
   }
 
@@ -52,7 +52,7 @@ class SecureTokenStoreFamily extends Family<SecureTokenStore> {
     covariant SecureTokenStoreProvider provider,
   ) {
     return call(
-      provider.serverId,
+      provider.id,
     );
   }
 
@@ -75,11 +75,11 @@ class SecureTokenStoreFamily extends Family<SecureTokenStore> {
 class SecureTokenStoreProvider extends AutoDisposeProvider<SecureTokenStore> {
   /// See also [secureTokenStore].
   SecureTokenStoreProvider(
-    String serverId,
+    String id,
   ) : this._internal(
           (ref) => secureTokenStore(
             ref as SecureTokenStoreRef,
-            serverId,
+            id,
           ),
           from: secureTokenStoreProvider,
           name: r'secureTokenStoreProvider',
@@ -90,7 +90,7 @@ class SecureTokenStoreProvider extends AutoDisposeProvider<SecureTokenStore> {
           dependencies: SecureTokenStoreFamily._dependencies,
           allTransitiveDependencies:
               SecureTokenStoreFamily._allTransitiveDependencies,
-          serverId: serverId,
+          id: id,
         );
 
   SecureTokenStoreProvider._internal(
@@ -100,10 +100,10 @@ class SecureTokenStoreProvider extends AutoDisposeProvider<SecureTokenStore> {
     required super.allTransitiveDependencies,
     required super.debugGetCreateSourceHash,
     required super.from,
-    required this.serverId,
+    required this.id,
   }) : super.internal();
 
-  final String serverId;
+  final String id;
 
   @override
   Override overrideWith(
@@ -118,7 +118,7 @@ class SecureTokenStoreProvider extends AutoDisposeProvider<SecureTokenStore> {
         dependencies: null,
         allTransitiveDependencies: null,
         debugGetCreateSourceHash: null,
-        serverId: serverId,
+        id: id,
       ),
     );
   }
@@ -130,13 +130,13 @@ class SecureTokenStoreProvider extends AutoDisposeProvider<SecureTokenStore> {
 
   @override
   bool operator ==(Object other) {
-    return other is SecureTokenStoreProvider && other.serverId == serverId;
+    return other is SecureTokenStoreProvider && other.id == id;
   }
 
   @override
   int get hashCode {
     var hash = _SystemHash.combine(0, runtimeType.hashCode);
-    hash = _SystemHash.combine(hash, serverId.hashCode);
+    hash = _SystemHash.combine(hash, id.hashCode);
 
     return _SystemHash.finish(hash);
   }
@@ -145,8 +145,8 @@ class SecureTokenStoreProvider extends AutoDisposeProvider<SecureTokenStore> {
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 mixin SecureTokenStoreRef on AutoDisposeProviderRef<SecureTokenStore> {
-  /// The parameter `serverId` of this provider.
-  String get serverId;
+  /// The parameter `id` of this provider.
+  String get id;
 }
 
 class _SecureTokenStoreProviderElement
@@ -155,7 +155,7 @@ class _SecureTokenStoreProviderElement
   _SecureTokenStoreProviderElement(super.provider);
 
   @override
-  String get serverId => (origin as SecureTokenStoreProvider).serverId;
+  String get id => (origin as SecureTokenStoreProvider).id;
 }
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

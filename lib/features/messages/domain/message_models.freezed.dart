@@ -1514,6 +1514,7 @@ mixin _$ChatEvent {
     required TResult Function(Map<String, dynamic> data) serverConfigChanged,
     required TResult Function(Map<String, dynamic> data) userSettings,
     required TResult Function(Map<String, dynamic> data) userSettingsChanged,
+    required TResult Function(int target, int uid) userCalling,
     required TResult Function(String type, String raw) unknown,
   }) =>
       throw _privateConstructorUsedError;
@@ -1531,6 +1532,7 @@ mixin _$ChatEvent {
     TResult? Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult? Function(Map<String, dynamic> data)? userSettings,
     TResult? Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult? Function(int target, int uid)? userCalling,
     TResult? Function(String type, String raw)? unknown,
   }) =>
       throw _privateConstructorUsedError;
@@ -1548,6 +1550,7 @@ mixin _$ChatEvent {
     TResult Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult Function(Map<String, dynamic> data)? userSettings,
     TResult Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult Function(int target, int uid)? userCalling,
     TResult Function(String type, String raw)? unknown,
     required TResult orElse(),
   }) =>
@@ -1567,6 +1570,7 @@ mixin _$ChatEvent {
     required TResult Function(ChatEventUserSettings value) userSettings,
     required TResult Function(ChatEventUserSettingsChanged value)
         userSettingsChanged,
+    required TResult Function(ChatEventUserCalling value) userCalling,
     required TResult Function(ChatEventUnknown value) unknown,
   }) =>
       throw _privateConstructorUsedError;
@@ -1583,6 +1587,7 @@ mixin _$ChatEvent {
     TResult? Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult? Function(ChatEventUserSettings value)? userSettings,
     TResult? Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult? Function(ChatEventUserCalling value)? userCalling,
     TResult? Function(ChatEventUnknown value)? unknown,
   }) =>
       throw _privateConstructorUsedError;
@@ -1599,6 +1604,7 @@ mixin _$ChatEvent {
     TResult Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult Function(ChatEventUserSettings value)? userSettings,
     TResult Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult Function(ChatEventUserCalling value)? userCalling,
     TResult Function(ChatEventUnknown value)? unknown,
     required TResult orElse(),
   }) =>
@@ -1678,6 +1684,7 @@ class _$ChatEventReadyImpl implements ChatEventReady {
     required TResult Function(Map<String, dynamic> data) serverConfigChanged,
     required TResult Function(Map<String, dynamic> data) userSettings,
     required TResult Function(Map<String, dynamic> data) userSettingsChanged,
+    required TResult Function(int target, int uid) userCalling,
     required TResult Function(String type, String raw) unknown,
   }) {
     return ready();
@@ -1698,6 +1705,7 @@ class _$ChatEventReadyImpl implements ChatEventReady {
     TResult? Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult? Function(Map<String, dynamic> data)? userSettings,
     TResult? Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult? Function(int target, int uid)? userCalling,
     TResult? Function(String type, String raw)? unknown,
   }) {
     return ready?.call();
@@ -1718,6 +1726,7 @@ class _$ChatEventReadyImpl implements ChatEventReady {
     TResult Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult Function(Map<String, dynamic> data)? userSettings,
     TResult Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult Function(int target, int uid)? userCalling,
     TResult Function(String type, String raw)? unknown,
     required TResult orElse(),
   }) {
@@ -1743,6 +1752,7 @@ class _$ChatEventReadyImpl implements ChatEventReady {
     required TResult Function(ChatEventUserSettings value) userSettings,
     required TResult Function(ChatEventUserSettingsChanged value)
         userSettingsChanged,
+    required TResult Function(ChatEventUserCalling value) userCalling,
     required TResult Function(ChatEventUnknown value) unknown,
   }) {
     return ready(this);
@@ -1762,6 +1772,7 @@ class _$ChatEventReadyImpl implements ChatEventReady {
     TResult? Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult? Function(ChatEventUserSettings value)? userSettings,
     TResult? Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult? Function(ChatEventUserCalling value)? userCalling,
     TResult? Function(ChatEventUnknown value)? unknown,
   }) {
     return ready?.call(this);
@@ -1781,6 +1792,7 @@ class _$ChatEventReadyImpl implements ChatEventReady {
     TResult Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult Function(ChatEventUserSettings value)? userSettings,
     TResult Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult Function(ChatEventUserCalling value)? userCalling,
     TResult Function(ChatEventUnknown value)? unknown,
     required TResult orElse(),
   }) {
@@ -1876,6 +1888,7 @@ class _$ChatEventHeartbeatImpl implements ChatEventHeartbeat {
     required TResult Function(Map<String, dynamic> data) serverConfigChanged,
     required TResult Function(Map<String, dynamic> data) userSettings,
     required TResult Function(Map<String, dynamic> data) userSettingsChanged,
+    required TResult Function(int target, int uid) userCalling,
     required TResult Function(String type, String raw) unknown,
   }) {
     return heartbeat(time);
@@ -1896,6 +1909,7 @@ class _$ChatEventHeartbeatImpl implements ChatEventHeartbeat {
     TResult? Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult? Function(Map<String, dynamic> data)? userSettings,
     TResult? Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult? Function(int target, int uid)? userCalling,
     TResult? Function(String type, String raw)? unknown,
   }) {
     return heartbeat?.call(time);
@@ -1916,6 +1930,7 @@ class _$ChatEventHeartbeatImpl implements ChatEventHeartbeat {
     TResult Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult Function(Map<String, dynamic> data)? userSettings,
     TResult Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult Function(int target, int uid)? userCalling,
     TResult Function(String type, String raw)? unknown,
     required TResult orElse(),
   }) {
@@ -1941,6 +1956,7 @@ class _$ChatEventHeartbeatImpl implements ChatEventHeartbeat {
     required TResult Function(ChatEventUserSettings value) userSettings,
     required TResult Function(ChatEventUserSettingsChanged value)
         userSettingsChanged,
+    required TResult Function(ChatEventUserCalling value) userCalling,
     required TResult Function(ChatEventUnknown value) unknown,
   }) {
     return heartbeat(this);
@@ -1960,6 +1976,7 @@ class _$ChatEventHeartbeatImpl implements ChatEventHeartbeat {
     TResult? Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult? Function(ChatEventUserSettings value)? userSettings,
     TResult? Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult? Function(ChatEventUserCalling value)? userCalling,
     TResult? Function(ChatEventUnknown value)? unknown,
   }) {
     return heartbeat?.call(this);
@@ -1979,6 +1996,7 @@ class _$ChatEventHeartbeatImpl implements ChatEventHeartbeat {
     TResult Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult Function(ChatEventUserSettings value)? userSettings,
     TResult Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult Function(ChatEventUserCalling value)? userCalling,
     TResult Function(ChatEventUnknown value)? unknown,
     required TResult orElse(),
   }) {
@@ -2094,6 +2112,7 @@ class _$ChatEventChatImpl implements ChatEventChat {
     required TResult Function(Map<String, dynamic> data) serverConfigChanged,
     required TResult Function(Map<String, dynamic> data) userSettings,
     required TResult Function(Map<String, dynamic> data) userSettingsChanged,
+    required TResult Function(int target, int uid) userCalling,
     required TResult Function(String type, String raw) unknown,
   }) {
     return chat(message);
@@ -2114,6 +2133,7 @@ class _$ChatEventChatImpl implements ChatEventChat {
     TResult? Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult? Function(Map<String, dynamic> data)? userSettings,
     TResult? Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult? Function(int target, int uid)? userCalling,
     TResult? Function(String type, String raw)? unknown,
   }) {
     return chat?.call(message);
@@ -2134,6 +2154,7 @@ class _$ChatEventChatImpl implements ChatEventChat {
     TResult Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult Function(Map<String, dynamic> data)? userSettings,
     TResult Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult Function(int target, int uid)? userCalling,
     TResult Function(String type, String raw)? unknown,
     required TResult orElse(),
   }) {
@@ -2159,6 +2180,7 @@ class _$ChatEventChatImpl implements ChatEventChat {
     required TResult Function(ChatEventUserSettings value) userSettings,
     required TResult Function(ChatEventUserSettingsChanged value)
         userSettingsChanged,
+    required TResult Function(ChatEventUserCalling value) userCalling,
     required TResult Function(ChatEventUnknown value) unknown,
   }) {
     return chat(this);
@@ -2178,6 +2200,7 @@ class _$ChatEventChatImpl implements ChatEventChat {
     TResult? Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult? Function(ChatEventUserSettings value)? userSettings,
     TResult? Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult? Function(ChatEventUserCalling value)? userCalling,
     TResult? Function(ChatEventUnknown value)? unknown,
   }) {
     return chat?.call(this);
@@ -2197,6 +2220,7 @@ class _$ChatEventChatImpl implements ChatEventChat {
     TResult Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult Function(ChatEventUserSettings value)? userSettings,
     TResult Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult Function(ChatEventUserCalling value)? userCalling,
     TResult Function(ChatEventUnknown value)? unknown,
     required TResult orElse(),
   }) {
@@ -2300,6 +2324,7 @@ class _$ChatEventKickImpl implements ChatEventKick {
     required TResult Function(Map<String, dynamic> data) serverConfigChanged,
     required TResult Function(Map<String, dynamic> data) userSettings,
     required TResult Function(Map<String, dynamic> data) userSettingsChanged,
+    required TResult Function(int target, int uid) userCalling,
     required TResult Function(String type, String raw) unknown,
   }) {
     return kick(reason);
@@ -2320,6 +2345,7 @@ class _$ChatEventKickImpl implements ChatEventKick {
     TResult? Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult? Function(Map<String, dynamic> data)? userSettings,
     TResult? Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult? Function(int target, int uid)? userCalling,
     TResult? Function(String type, String raw)? unknown,
   }) {
     return kick?.call(reason);
@@ -2340,6 +2366,7 @@ class _$ChatEventKickImpl implements ChatEventKick {
     TResult Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult Function(Map<String, dynamic> data)? userSettings,
     TResult Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult Function(int target, int uid)? userCalling,
     TResult Function(String type, String raw)? unknown,
     required TResult orElse(),
   }) {
@@ -2365,6 +2392,7 @@ class _$ChatEventKickImpl implements ChatEventKick {
     required TResult Function(ChatEventUserSettings value) userSettings,
     required TResult Function(ChatEventUserSettingsChanged value)
         userSettingsChanged,
+    required TResult Function(ChatEventUserCalling value) userCalling,
     required TResult Function(ChatEventUnknown value) unknown,
   }) {
     return kick(this);
@@ -2384,6 +2412,7 @@ class _$ChatEventKickImpl implements ChatEventKick {
     TResult? Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult? Function(ChatEventUserSettings value)? userSettings,
     TResult? Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult? Function(ChatEventUserCalling value)? userCalling,
     TResult? Function(ChatEventUnknown value)? unknown,
   }) {
     return kick?.call(this);
@@ -2403,6 +2432,7 @@ class _$ChatEventKickImpl implements ChatEventKick {
     TResult Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult Function(ChatEventUserSettings value)? userSettings,
     TResult Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult Function(ChatEventUserCalling value)? userCalling,
     TResult Function(ChatEventUnknown value)? unknown,
     required TResult orElse(),
   }) {
@@ -2525,6 +2555,7 @@ class _$ChatEventUsersSnapshotImpl implements ChatEventUsersSnapshot {
     required TResult Function(Map<String, dynamic> data) serverConfigChanged,
     required TResult Function(Map<String, dynamic> data) userSettings,
     required TResult Function(Map<String, dynamic> data) userSettingsChanged,
+    required TResult Function(int target, int uid) userCalling,
     required TResult Function(String type, String raw) unknown,
   }) {
     return usersSnapshot(users, version);
@@ -2545,6 +2576,7 @@ class _$ChatEventUsersSnapshotImpl implements ChatEventUsersSnapshot {
     TResult? Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult? Function(Map<String, dynamic> data)? userSettings,
     TResult? Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult? Function(int target, int uid)? userCalling,
     TResult? Function(String type, String raw)? unknown,
   }) {
     return usersSnapshot?.call(users, version);
@@ -2565,6 +2597,7 @@ class _$ChatEventUsersSnapshotImpl implements ChatEventUsersSnapshot {
     TResult Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult Function(Map<String, dynamic> data)? userSettings,
     TResult Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult Function(int target, int uid)? userCalling,
     TResult Function(String type, String raw)? unknown,
     required TResult orElse(),
   }) {
@@ -2590,6 +2623,7 @@ class _$ChatEventUsersSnapshotImpl implements ChatEventUsersSnapshot {
     required TResult Function(ChatEventUserSettings value) userSettings,
     required TResult Function(ChatEventUserSettingsChanged value)
         userSettingsChanged,
+    required TResult Function(ChatEventUserCalling value) userCalling,
     required TResult Function(ChatEventUnknown value) unknown,
   }) {
     return usersSnapshot(this);
@@ -2609,6 +2643,7 @@ class _$ChatEventUsersSnapshotImpl implements ChatEventUsersSnapshot {
     TResult? Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult? Function(ChatEventUserSettings value)? userSettings,
     TResult? Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult? Function(ChatEventUserCalling value)? userCalling,
     TResult? Function(ChatEventUnknown value)? unknown,
   }) {
     return usersSnapshot?.call(this);
@@ -2628,6 +2663,7 @@ class _$ChatEventUsersSnapshotImpl implements ChatEventUsersSnapshot {
     TResult Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult Function(ChatEventUserSettings value)? userSettings,
     TResult Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult Function(ChatEventUserCalling value)? userCalling,
     TResult Function(ChatEventUnknown value)? unknown,
     required TResult orElse(),
   }) {
@@ -2742,6 +2778,7 @@ class _$ChatEventGroupChangedImpl implements ChatEventGroupChanged {
     required TResult Function(Map<String, dynamic> data) serverConfigChanged,
     required TResult Function(Map<String, dynamic> data) userSettings,
     required TResult Function(Map<String, dynamic> data) userSettingsChanged,
+    required TResult Function(int target, int uid) userCalling,
     required TResult Function(String type, String raw) unknown,
   }) {
     return groupChanged(data);
@@ -2762,6 +2799,7 @@ class _$ChatEventGroupChangedImpl implements ChatEventGroupChanged {
     TResult? Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult? Function(Map<String, dynamic> data)? userSettings,
     TResult? Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult? Function(int target, int uid)? userCalling,
     TResult? Function(String type, String raw)? unknown,
   }) {
     return groupChanged?.call(data);
@@ -2782,6 +2820,7 @@ class _$ChatEventGroupChangedImpl implements ChatEventGroupChanged {
     TResult Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult Function(Map<String, dynamic> data)? userSettings,
     TResult Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult Function(int target, int uid)? userCalling,
     TResult Function(String type, String raw)? unknown,
     required TResult orElse(),
   }) {
@@ -2807,6 +2846,7 @@ class _$ChatEventGroupChangedImpl implements ChatEventGroupChanged {
     required TResult Function(ChatEventUserSettings value) userSettings,
     required TResult Function(ChatEventUserSettingsChanged value)
         userSettingsChanged,
+    required TResult Function(ChatEventUserCalling value) userCalling,
     required TResult Function(ChatEventUnknown value) unknown,
   }) {
     return groupChanged(this);
@@ -2826,6 +2866,7 @@ class _$ChatEventGroupChangedImpl implements ChatEventGroupChanged {
     TResult? Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult? Function(ChatEventUserSettings value)? userSettings,
     TResult? Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult? Function(ChatEventUserCalling value)? userCalling,
     TResult? Function(ChatEventUnknown value)? unknown,
   }) {
     return groupChanged?.call(this);
@@ -2845,6 +2886,7 @@ class _$ChatEventGroupChangedImpl implements ChatEventGroupChanged {
     TResult Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult Function(ChatEventUserSettings value)? userSettings,
     TResult Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult Function(ChatEventUserCalling value)? userCalling,
     TResult Function(ChatEventUnknown value)? unknown,
     required TResult orElse(),
   }) {
@@ -2967,6 +3009,7 @@ class _$ChatEventUserJoinedGroupImpl implements ChatEventUserJoinedGroup {
     required TResult Function(Map<String, dynamic> data) serverConfigChanged,
     required TResult Function(Map<String, dynamic> data) userSettings,
     required TResult Function(Map<String, dynamic> data) userSettingsChanged,
+    required TResult Function(int target, int uid) userCalling,
     required TResult Function(String type, String raw) unknown,
   }) {
     return userJoinedGroup(gid, uid);
@@ -2987,6 +3030,7 @@ class _$ChatEventUserJoinedGroupImpl implements ChatEventUserJoinedGroup {
     TResult? Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult? Function(Map<String, dynamic> data)? userSettings,
     TResult? Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult? Function(int target, int uid)? userCalling,
     TResult? Function(String type, String raw)? unknown,
   }) {
     return userJoinedGroup?.call(gid, uid);
@@ -3007,6 +3051,7 @@ class _$ChatEventUserJoinedGroupImpl implements ChatEventUserJoinedGroup {
     TResult Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult Function(Map<String, dynamic> data)? userSettings,
     TResult Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult Function(int target, int uid)? userCalling,
     TResult Function(String type, String raw)? unknown,
     required TResult orElse(),
   }) {
@@ -3032,6 +3077,7 @@ class _$ChatEventUserJoinedGroupImpl implements ChatEventUserJoinedGroup {
     required TResult Function(ChatEventUserSettings value) userSettings,
     required TResult Function(ChatEventUserSettingsChanged value)
         userSettingsChanged,
+    required TResult Function(ChatEventUserCalling value) userCalling,
     required TResult Function(ChatEventUnknown value) unknown,
   }) {
     return userJoinedGroup(this);
@@ -3051,6 +3097,7 @@ class _$ChatEventUserJoinedGroupImpl implements ChatEventUserJoinedGroup {
     TResult? Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult? Function(ChatEventUserSettings value)? userSettings,
     TResult? Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult? Function(ChatEventUserCalling value)? userCalling,
     TResult? Function(ChatEventUnknown value)? unknown,
   }) {
     return userJoinedGroup?.call(this);
@@ -3070,6 +3117,7 @@ class _$ChatEventUserJoinedGroupImpl implements ChatEventUserJoinedGroup {
     TResult Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult Function(ChatEventUserSettings value)? userSettings,
     TResult Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult Function(ChatEventUserCalling value)? userCalling,
     TResult Function(ChatEventUnknown value)? unknown,
     required TResult orElse(),
   }) {
@@ -3194,6 +3242,7 @@ class _$ChatEventUserLeavedGroupImpl implements ChatEventUserLeavedGroup {
     required TResult Function(Map<String, dynamic> data) serverConfigChanged,
     required TResult Function(Map<String, dynamic> data) userSettings,
     required TResult Function(Map<String, dynamic> data) userSettingsChanged,
+    required TResult Function(int target, int uid) userCalling,
     required TResult Function(String type, String raw) unknown,
   }) {
     return userLeavedGroup(gid, uid);
@@ -3214,6 +3263,7 @@ class _$ChatEventUserLeavedGroupImpl implements ChatEventUserLeavedGroup {
     TResult? Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult? Function(Map<String, dynamic> data)? userSettings,
     TResult? Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult? Function(int target, int uid)? userCalling,
     TResult? Function(String type, String raw)? unknown,
   }) {
     return userLeavedGroup?.call(gid, uid);
@@ -3234,6 +3284,7 @@ class _$ChatEventUserLeavedGroupImpl implements ChatEventUserLeavedGroup {
     TResult Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult Function(Map<String, dynamic> data)? userSettings,
     TResult Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult Function(int target, int uid)? userCalling,
     TResult Function(String type, String raw)? unknown,
     required TResult orElse(),
   }) {
@@ -3259,6 +3310,7 @@ class _$ChatEventUserLeavedGroupImpl implements ChatEventUserLeavedGroup {
     required TResult Function(ChatEventUserSettings value) userSettings,
     required TResult Function(ChatEventUserSettingsChanged value)
         userSettingsChanged,
+    required TResult Function(ChatEventUserCalling value) userCalling,
     required TResult Function(ChatEventUnknown value) unknown,
   }) {
     return userLeavedGroup(this);
@@ -3278,6 +3330,7 @@ class _$ChatEventUserLeavedGroupImpl implements ChatEventUserLeavedGroup {
     TResult? Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult? Function(ChatEventUserSettings value)? userSettings,
     TResult? Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult? Function(ChatEventUserCalling value)? userCalling,
     TResult? Function(ChatEventUnknown value)? unknown,
   }) {
     return userLeavedGroup?.call(this);
@@ -3297,6 +3350,7 @@ class _$ChatEventUserLeavedGroupImpl implements ChatEventUserLeavedGroup {
     TResult Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult Function(ChatEventUserSettings value)? userSettings,
     TResult Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult Function(ChatEventUserCalling value)? userCalling,
     TResult Function(ChatEventUnknown value)? unknown,
     required TResult orElse(),
   }) {
@@ -3415,6 +3469,7 @@ class _$ChatEventServerConfigChangedImpl
     required TResult Function(Map<String, dynamic> data) serverConfigChanged,
     required TResult Function(Map<String, dynamic> data) userSettings,
     required TResult Function(Map<String, dynamic> data) userSettingsChanged,
+    required TResult Function(int target, int uid) userCalling,
     required TResult Function(String type, String raw) unknown,
   }) {
     return serverConfigChanged(data);
@@ -3435,6 +3490,7 @@ class _$ChatEventServerConfigChangedImpl
     TResult? Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult? Function(Map<String, dynamic> data)? userSettings,
     TResult? Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult? Function(int target, int uid)? userCalling,
     TResult? Function(String type, String raw)? unknown,
   }) {
     return serverConfigChanged?.call(data);
@@ -3455,6 +3511,7 @@ class _$ChatEventServerConfigChangedImpl
     TResult Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult Function(Map<String, dynamic> data)? userSettings,
     TResult Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult Function(int target, int uid)? userCalling,
     TResult Function(String type, String raw)? unknown,
     required TResult orElse(),
   }) {
@@ -3480,6 +3537,7 @@ class _$ChatEventServerConfigChangedImpl
     required TResult Function(ChatEventUserSettings value) userSettings,
     required TResult Function(ChatEventUserSettingsChanged value)
         userSettingsChanged,
+    required TResult Function(ChatEventUserCalling value) userCalling,
     required TResult Function(ChatEventUnknown value) unknown,
   }) {
     return serverConfigChanged(this);
@@ -3499,6 +3557,7 @@ class _$ChatEventServerConfigChangedImpl
     TResult? Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult? Function(ChatEventUserSettings value)? userSettings,
     TResult? Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult? Function(ChatEventUserCalling value)? userCalling,
     TResult? Function(ChatEventUnknown value)? unknown,
   }) {
     return serverConfigChanged?.call(this);
@@ -3518,6 +3577,7 @@ class _$ChatEventServerConfigChangedImpl
     TResult Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult Function(ChatEventUserSettings value)? userSettings,
     TResult Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult Function(ChatEventUserCalling value)? userCalling,
     TResult Function(ChatEventUnknown value)? unknown,
     required TResult orElse(),
   }) {
@@ -3632,6 +3692,7 @@ class _$ChatEventUserSettingsImpl implements ChatEventUserSettings {
     required TResult Function(Map<String, dynamic> data) serverConfigChanged,
     required TResult Function(Map<String, dynamic> data) userSettings,
     required TResult Function(Map<String, dynamic> data) userSettingsChanged,
+    required TResult Function(int target, int uid) userCalling,
     required TResult Function(String type, String raw) unknown,
   }) {
     return userSettings(data);
@@ -3652,6 +3713,7 @@ class _$ChatEventUserSettingsImpl implements ChatEventUserSettings {
     TResult? Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult? Function(Map<String, dynamic> data)? userSettings,
     TResult? Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult? Function(int target, int uid)? userCalling,
     TResult? Function(String type, String raw)? unknown,
   }) {
     return userSettings?.call(data);
@@ -3672,6 +3734,7 @@ class _$ChatEventUserSettingsImpl implements ChatEventUserSettings {
     TResult Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult Function(Map<String, dynamic> data)? userSettings,
     TResult Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult Function(int target, int uid)? userCalling,
     TResult Function(String type, String raw)? unknown,
     required TResult orElse(),
   }) {
@@ -3697,6 +3760,7 @@ class _$ChatEventUserSettingsImpl implements ChatEventUserSettings {
     required TResult Function(ChatEventUserSettings value) userSettings,
     required TResult Function(ChatEventUserSettingsChanged value)
         userSettingsChanged,
+    required TResult Function(ChatEventUserCalling value) userCalling,
     required TResult Function(ChatEventUnknown value) unknown,
   }) {
     return userSettings(this);
@@ -3716,6 +3780,7 @@ class _$ChatEventUserSettingsImpl implements ChatEventUserSettings {
     TResult? Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult? Function(ChatEventUserSettings value)? userSettings,
     TResult? Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult? Function(ChatEventUserCalling value)? userCalling,
     TResult? Function(ChatEventUnknown value)? unknown,
   }) {
     return userSettings?.call(this);
@@ -3735,6 +3800,7 @@ class _$ChatEventUserSettingsImpl implements ChatEventUserSettings {
     TResult Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult Function(ChatEventUserSettings value)? userSettings,
     TResult Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult Function(ChatEventUserCalling value)? userCalling,
     TResult Function(ChatEventUnknown value)? unknown,
     required TResult orElse(),
   }) {
@@ -3851,6 +3917,7 @@ class _$ChatEventUserSettingsChangedImpl
     required TResult Function(Map<String, dynamic> data) serverConfigChanged,
     required TResult Function(Map<String, dynamic> data) userSettings,
     required TResult Function(Map<String, dynamic> data) userSettingsChanged,
+    required TResult Function(int target, int uid) userCalling,
     required TResult Function(String type, String raw) unknown,
   }) {
     return userSettingsChanged(data);
@@ -3871,6 +3938,7 @@ class _$ChatEventUserSettingsChangedImpl
     TResult? Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult? Function(Map<String, dynamic> data)? userSettings,
     TResult? Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult? Function(int target, int uid)? userCalling,
     TResult? Function(String type, String raw)? unknown,
   }) {
     return userSettingsChanged?.call(data);
@@ -3891,6 +3959,7 @@ class _$ChatEventUserSettingsChangedImpl
     TResult Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult Function(Map<String, dynamic> data)? userSettings,
     TResult Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult Function(int target, int uid)? userCalling,
     TResult Function(String type, String raw)? unknown,
     required TResult orElse(),
   }) {
@@ -3916,6 +3985,7 @@ class _$ChatEventUserSettingsChangedImpl
     required TResult Function(ChatEventUserSettings value) userSettings,
     required TResult Function(ChatEventUserSettingsChanged value)
         userSettingsChanged,
+    required TResult Function(ChatEventUserCalling value) userCalling,
     required TResult Function(ChatEventUnknown value) unknown,
   }) {
     return userSettingsChanged(this);
@@ -3935,6 +4005,7 @@ class _$ChatEventUserSettingsChangedImpl
     TResult? Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult? Function(ChatEventUserSettings value)? userSettings,
     TResult? Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult? Function(ChatEventUserCalling value)? userCalling,
     TResult? Function(ChatEventUnknown value)? unknown,
   }) {
     return userSettingsChanged?.call(this);
@@ -3954,6 +4025,7 @@ class _$ChatEventUserSettingsChangedImpl
     TResult Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult Function(ChatEventUserSettings value)? userSettings,
     TResult Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult Function(ChatEventUserCalling value)? userCalling,
     TResult Function(ChatEventUnknown value)? unknown,
     required TResult orElse(),
   }) {
@@ -3976,6 +4048,230 @@ abstract class ChatEventUserSettingsChanged implements ChatEvent {
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$ChatEventUserSettingsChangedImplCopyWith<
           _$ChatEventUserSettingsChangedImpl>
+      get copyWith => throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$ChatEventUserCallingImplCopyWith<$Res> {
+  factory _$$ChatEventUserCallingImplCopyWith(_$ChatEventUserCallingImpl value,
+          $Res Function(_$ChatEventUserCallingImpl) then) =
+      __$$ChatEventUserCallingImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({int target, int uid});
+}
+
+/// @nodoc
+class __$$ChatEventUserCallingImplCopyWithImpl<$Res>
+    extends _$ChatEventCopyWithImpl<$Res, _$ChatEventUserCallingImpl>
+    implements _$$ChatEventUserCallingImplCopyWith<$Res> {
+  __$$ChatEventUserCallingImplCopyWithImpl(_$ChatEventUserCallingImpl _value,
+      $Res Function(_$ChatEventUserCallingImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of ChatEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? target = null,
+    Object? uid = null,
+  }) {
+    return _then(_$ChatEventUserCallingImpl(
+      target: null == target
+          ? _value.target
+          : target // ignore: cast_nullable_to_non_nullable
+              as int,
+      uid: null == uid
+          ? _value.uid
+          : uid // ignore: cast_nullable_to_non_nullable
+              as int,
+    ));
+  }
+}
+
+/// @nodoc
+
+class _$ChatEventUserCallingImpl implements ChatEventUserCalling {
+  const _$ChatEventUserCallingImpl({required this.target, required this.uid});
+
+  @override
+  final int target;
+  @override
+  final int uid;
+
+  @override
+  String toString() {
+    return 'ChatEvent.userCalling(target: $target, uid: $uid)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ChatEventUserCallingImpl &&
+            (identical(other.target, target) || other.target == target) &&
+            (identical(other.uid, uid) || other.uid == uid));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, target, uid);
+
+  /// Create a copy of ChatEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$ChatEventUserCallingImplCopyWith<_$ChatEventUserCallingImpl>
+      get copyWith =>
+          __$$ChatEventUserCallingImplCopyWithImpl<_$ChatEventUserCallingImpl>(
+              this, _$identity);
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() ready,
+    required TResult Function(String? time) heartbeat,
+    required TResult Function(ChatMessage message) chat,
+    required TResult Function(String? reason) kick,
+    required TResult Function(List<Map<String, dynamic>> users, int version)
+        usersSnapshot,
+    required TResult Function(Map<String, dynamic> data) groupChanged,
+    required TResult Function(int gid, List<int> uid) userJoinedGroup,
+    required TResult Function(int gid, List<int> uid) userLeavedGroup,
+    required TResult Function(Map<String, dynamic> data) serverConfigChanged,
+    required TResult Function(Map<String, dynamic> data) userSettings,
+    required TResult Function(Map<String, dynamic> data) userSettingsChanged,
+    required TResult Function(int target, int uid) userCalling,
+    required TResult Function(String type, String raw) unknown,
+  }) {
+    return userCalling(target, uid);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? ready,
+    TResult? Function(String? time)? heartbeat,
+    TResult? Function(ChatMessage message)? chat,
+    TResult? Function(String? reason)? kick,
+    TResult? Function(List<Map<String, dynamic>> users, int version)?
+        usersSnapshot,
+    TResult? Function(Map<String, dynamic> data)? groupChanged,
+    TResult? Function(int gid, List<int> uid)? userJoinedGroup,
+    TResult? Function(int gid, List<int> uid)? userLeavedGroup,
+    TResult? Function(Map<String, dynamic> data)? serverConfigChanged,
+    TResult? Function(Map<String, dynamic> data)? userSettings,
+    TResult? Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult? Function(int target, int uid)? userCalling,
+    TResult? Function(String type, String raw)? unknown,
+  }) {
+    return userCalling?.call(target, uid);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? ready,
+    TResult Function(String? time)? heartbeat,
+    TResult Function(ChatMessage message)? chat,
+    TResult Function(String? reason)? kick,
+    TResult Function(List<Map<String, dynamic>> users, int version)?
+        usersSnapshot,
+    TResult Function(Map<String, dynamic> data)? groupChanged,
+    TResult Function(int gid, List<int> uid)? userJoinedGroup,
+    TResult Function(int gid, List<int> uid)? userLeavedGroup,
+    TResult Function(Map<String, dynamic> data)? serverConfigChanged,
+    TResult Function(Map<String, dynamic> data)? userSettings,
+    TResult Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult Function(int target, int uid)? userCalling,
+    TResult Function(String type, String raw)? unknown,
+    required TResult orElse(),
+  }) {
+    if (userCalling != null) {
+      return userCalling(target, uid);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventHeartbeat value) heartbeat,
+    required TResult Function(ChatEventChat value) chat,
+    required TResult Function(ChatEventKick value) kick,
+    required TResult Function(ChatEventUsersSnapshot value) usersSnapshot,
+    required TResult Function(ChatEventGroupChanged value) groupChanged,
+    required TResult Function(ChatEventUserJoinedGroup value) userJoinedGroup,
+    required TResult Function(ChatEventUserLeavedGroup value) userLeavedGroup,
+    required TResult Function(ChatEventServerConfigChanged value)
+        serverConfigChanged,
+    required TResult Function(ChatEventUserSettings value) userSettings,
+    required TResult Function(ChatEventUserSettingsChanged value)
+        userSettingsChanged,
+    required TResult Function(ChatEventUserCalling value) userCalling,
+    required TResult Function(ChatEventUnknown value) unknown,
+  }) {
+    return userCalling(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventHeartbeat value)? heartbeat,
+    TResult? Function(ChatEventChat value)? chat,
+    TResult? Function(ChatEventKick value)? kick,
+    TResult? Function(ChatEventUsersSnapshot value)? usersSnapshot,
+    TResult? Function(ChatEventGroupChanged value)? groupChanged,
+    TResult? Function(ChatEventUserJoinedGroup value)? userJoinedGroup,
+    TResult? Function(ChatEventUserLeavedGroup value)? userLeavedGroup,
+    TResult? Function(ChatEventServerConfigChanged value)? serverConfigChanged,
+    TResult? Function(ChatEventUserSettings value)? userSettings,
+    TResult? Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult? Function(ChatEventUserCalling value)? userCalling,
+    TResult? Function(ChatEventUnknown value)? unknown,
+  }) {
+    return userCalling?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventHeartbeat value)? heartbeat,
+    TResult Function(ChatEventChat value)? chat,
+    TResult Function(ChatEventKick value)? kick,
+    TResult Function(ChatEventUsersSnapshot value)? usersSnapshot,
+    TResult Function(ChatEventGroupChanged value)? groupChanged,
+    TResult Function(ChatEventUserJoinedGroup value)? userJoinedGroup,
+    TResult Function(ChatEventUserLeavedGroup value)? userLeavedGroup,
+    TResult Function(ChatEventServerConfigChanged value)? serverConfigChanged,
+    TResult Function(ChatEventUserSettings value)? userSettings,
+    TResult Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult Function(ChatEventUserCalling value)? userCalling,
+    TResult Function(ChatEventUnknown value)? unknown,
+    required TResult orElse(),
+  }) {
+    if (userCalling != null) {
+      return userCalling(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class ChatEventUserCalling implements ChatEvent {
+  const factory ChatEventUserCalling(
+      {required final int target,
+      required final int uid}) = _$ChatEventUserCallingImpl;
+
+  int get target;
+  int get uid;
+
+  /// Create a copy of ChatEvent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$ChatEventUserCallingImplCopyWith<_$ChatEventUserCallingImpl>
       get copyWith => throw _privateConstructorUsedError;
 }
 
@@ -4068,6 +4364,7 @@ class _$ChatEventUnknownImpl implements ChatEventUnknown {
     required TResult Function(Map<String, dynamic> data) serverConfigChanged,
     required TResult Function(Map<String, dynamic> data) userSettings,
     required TResult Function(Map<String, dynamic> data) userSettingsChanged,
+    required TResult Function(int target, int uid) userCalling,
     required TResult Function(String type, String raw) unknown,
   }) {
     return unknown(type, raw);
@@ -4088,6 +4385,7 @@ class _$ChatEventUnknownImpl implements ChatEventUnknown {
     TResult? Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult? Function(Map<String, dynamic> data)? userSettings,
     TResult? Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult? Function(int target, int uid)? userCalling,
     TResult? Function(String type, String raw)? unknown,
   }) {
     return unknown?.call(type, raw);
@@ -4108,6 +4406,7 @@ class _$ChatEventUnknownImpl implements ChatEventUnknown {
     TResult Function(Map<String, dynamic> data)? serverConfigChanged,
     TResult Function(Map<String, dynamic> data)? userSettings,
     TResult Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult Function(int target, int uid)? userCalling,
     TResult Function(String type, String raw)? unknown,
     required TResult orElse(),
   }) {
@@ -4133,6 +4432,7 @@ class _$ChatEventUnknownImpl implements ChatEventUnknown {
     required TResult Function(ChatEventUserSettings value) userSettings,
     required TResult Function(ChatEventUserSettingsChanged value)
         userSettingsChanged,
+    required TResult Function(ChatEventUserCalling value) userCalling,
     required TResult Function(ChatEventUnknown value) unknown,
   }) {
     return unknown(this);
@@ -4152,6 +4452,7 @@ class _$ChatEventUnknownImpl implements ChatEventUnknown {
     TResult? Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult? Function(ChatEventUserSettings value)? userSettings,
     TResult? Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult? Function(ChatEventUserCalling value)? userCalling,
     TResult? Function(ChatEventUnknown value)? unknown,
   }) {
     return unknown?.call(this);
@@ -4171,6 +4472,7 @@ class _$ChatEventUnknownImpl implements ChatEventUnknown {
     TResult Function(ChatEventServerConfigChanged value)? serverConfigChanged,
     TResult Function(ChatEventUserSettings value)? userSettings,
     TResult Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult Function(ChatEventUserCalling value)? userCalling,
     TResult Function(ChatEventUnknown value)? unknown,
     required TResult orElse(),
   }) {
