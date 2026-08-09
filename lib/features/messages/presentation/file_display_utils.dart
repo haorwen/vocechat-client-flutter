@@ -5,6 +5,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:media_store_plus/media_store_plus.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/utils/app_log.dart';
@@ -39,9 +41,28 @@ IconData iconForContentType(String type) {
   return Icons.insert_drive_file_outlined;
 }
 
-/// Downloads [url] via the app's Dio client and saves the file via the
-/// platform's native save-file picker (SAF on Android, UIDocumentPicker on
-/// iOS, system dialog on desktop). Shows a snackbar on success or failure.
+/// Subfolder name under the platform's shared Downloads directory that
+/// Android attachment downloads are saved into (`Downloads/vocechat/...`).
+const String _kDownloadAppFolder = 'vocechat';
+
+bool _mediaStoreReady = false;
+
+Future<void> _ensureMediaStoreReady() async {
+  if (_mediaStoreReady) return;
+  MediaStore.appFolder = _kDownloadAppFolder;
+  await MediaStore.ensureInitialized();
+  _mediaStoreReady = true;
+}
+
+/// Downloads [url] via the app's Dio client and saves the file.
+///
+/// - Android: writes straight into `Downloads/vocechat` via [MediaStore] —
+///   no SAF picker, no permission prompt on API 29+.
+/// - iOS / desktop: no direct "Downloads" folder equivalent is exposed to
+///   apps, so this falls back to file_picker's native save-file dialog
+///   (document picker on iOS, save dialog on desktop).
+///
+/// Shows a snackbar on success or failure.
 Future<void> downloadAndSave(
   BuildContext context,
   ProviderContainer container,
@@ -61,7 +82,20 @@ Future<void> downloadAndSave(
     final Uint8List data =
         bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
 
-    if (kIsWeb || Platform.isAndroid || Platform.isIOS) {
+    if (!kIsWeb && Platform.isAndroid) {
+      await _ensureMediaStoreReady();
+      // MediaStore.saveFile takes a source file path (it copies then
+      // deletes it), so stage the bytes in the app's temp dir first.
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/$filename');
+      await tempFile.writeAsBytes(data, flush: true);
+      final saveInfo = await MediaStore().saveFile(
+        tempFilePath: tempFile.path,
+        dirType: DirType.download,
+        dirName: DirName.download,
+      );
+      if (saveInfo == null) throw Exception('MediaStore save returned null');
+    } else if (kIsWeb || Platform.isIOS) {
       await FilePicker.platform.saveFile(fileName: filename, bytes: data);
     } else {
       // Desktop: saveFile returns the chosen path; write bytes ourselves.
