@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
@@ -13,10 +14,13 @@
     <!-- media_store_plus (attachment "Download" button, saves to
          Downloads/vocechat): below API 30 it falls back to a direct file
          write instead of MediaStore, which needs this on API <=29. Capped
-         at 29 since MediaStore.Downloads needs no permission from API 30. -->
+         at 29 since MediaStore.Downloads needs no permission from API 30.
+         tools:replace overrides camera_android_camerax's own declaration
+         of this permission at maxSdkVersion=28. -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="29"/>
+        android:maxSdkVersion="29"
+        tools:replace="android:maxSdkVersion"/>
     <application
         android:label="VoceChat"
         android:name="${applicationName}"
