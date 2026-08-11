@@ -11,3 +11,6 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Injected by CI or supplied locally for Firebase Cloud Messaging.
+/app/google-services.json

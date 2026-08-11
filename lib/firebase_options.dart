@@ -9,7 +9,9 @@
 //            flutterfire configure
 //      That will overwrite this file with real values automatically.
 //
-// Until you do that, running on Android/iOS will throw at Firebase.initializeApp().
+// Until you do that, the app skips the Dart-options fallback on Android/iOS and
+// push notifications remain unavailable unless a native Firebase config is
+// supplied by the build.
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'

@@ -28,11 +28,34 @@ Future<void> main() async {
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS)) {
     try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+      // FlutterFire automatically discovers GoogleService-Info.plist (iOS) or
+      // google-services.json (Android) and creates the default native app.
+      // Initialising with Dart options first can race that native setup (or
+      // use the checked-in REPLACE_ME placeholders) and makes FirebaseCore
+      // throw an uncaught duplicate-app NSException. Reuse the native app
+      // whenever it is available.
+      await Firebase.initializeApp();
     } catch (e) {
-      debugPrint('Firebase.initializeApp failed, push notifications disabled: $e');
+      // Some development/CI builds intentionally omit native Firebase
+      // resources. If real Dart options were generated, use them as a
+      // fallback; never pass the checked-in placeholders to native Firebase.
+      if (Firebase.apps.isEmpty) {
+        final options = DefaultFirebaseOptions.currentPlatform;
+        if (_hasUsableFirebaseOptions(options)) {
+          try {
+            await Firebase.initializeApp(options: options);
+          } catch (fallbackError) {
+            debugPrint(
+              'Firebase.initializeApp failed, push notifications disabled: '
+              '$fallbackError',
+            );
+          }
+        } else {
+          debugPrint(
+            'Firebase.initializeApp failed, push notifications disabled: $e',
+          );
+        }
+      }
     }
   }
 
@@ -50,6 +73,19 @@ Future<void> main() async {
     await VideoStreamCache.initialize();
   }
   runApp(const ProviderScope(child: VoceChatApp()));
+}
+
+bool _hasUsableFirebaseOptions(FirebaseOptions options) {
+  const placeholder = 'REPLACE_ME';
+  final requiredValues = <String>[
+    options.apiKey,
+    options.appId,
+    options.messagingSenderId,
+    options.projectId,
+  ];
+  return requiredValues.every(
+    (value) => value.isNotEmpty && value != placeholder,
+  );
 }
 
 class VoceChatApp extends ConsumerWidget {

@@ -9,6 +9,21 @@ plugins {
     // why.
 }
 
+// Firebase's Google Services plugin requires a physical JSON file. CI can
+// provide that file as a base64 secret without putting project credentials in
+// the repository; a checked-in/local file still works when no secret is set.
+def googleServicesFile = file("google-services.json")
+def googleServicesJsonBase64 = System.getenv("GOOGLE_SERVICES_JSON_BASE64")
+if (googleServicesJsonBase64?.trim()) {
+    try {
+        def normalizedBase64 = googleServicesJsonBase64.replaceAll(/\s+/, "")
+        googleServicesFile.bytes = java.util.Base64.getDecoder().decode(normalizedBase64)
+    } catch (IllegalArgumentException error) {
+        throw new GradleException(
+                "GOOGLE_SERVICES_JSON_BASE64 is not valid base64", error)
+    }
+}
+
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
@@ -66,6 +81,6 @@ flutter {
 // Apply Google Services only when its config file has been injected (e.g. by
 // CI from a secret, or manually for local FCM testing) — see plugins block
 // above for why this can't be a plain `apply plugin`.
-if (file("google-services.json").exists()) {
+if (googleServicesFile.exists()) {
     apply plugin: "com.google.gms.google-services"
 }
