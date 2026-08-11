@@ -1,0 +1,10 @@
+name: native_dio_adapter
+description: Dio compatibility adapter used by flutter_video_caching.
+version: 1.7.0
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  dio: ^5.9.1

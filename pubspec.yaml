@@ -82,6 +82,14 @@ dependencies:
   fvp: ^0.37.3
   chewie: ^1.8.5
   just_audio: ^0.9.42
+  # Native Range proxy: video_player reads 2 MB segments while the same bytes
+  # are persisted into a size-bounded LRU cache for later/offline playback.
+  flutter_video_caching: 1.1.6
+  # just_audio ships no Windows/Linux implementation. media_kit supplies both
+  # while leaving Android/iOS/macOS on just_audio's native backends.
+  just_audio_media_kit: ^2.1.0
+  media_kit_libs_linux: ^1.2.1
+  media_kit_libs_windows_audio: ^1.0.9
 
   # Media capture (voice/video messages)
   record: ^6.2.1
@@ -125,6 +133,15 @@ dev_dependencies:
   json_serializable: ^6.9.0
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.14.2
+
+# Flutter 3.27 pins path 1.9.0 through flutter_test. flutter_video_caching only
+# uses path APIs already present in 1.9.0, despite declaring ^1.9.1.
+dependency_overrides:
+  path: 1.9.0
+  # flutter_video_caching only needs HTTP Range support. Its native adapter
+  # raises Android/iOS/macOS deployment floors, so use Dio's portable adapter.
+  native_dio_adapter:
+    path: packages/native_dio_adapter_compat
 
 flutter:
   uses-material-design: true

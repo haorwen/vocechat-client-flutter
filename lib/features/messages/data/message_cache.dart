@@ -10,6 +10,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../../../core/config/env.dart';
 import '../../../core/storage/account_store.dart';
+import '../../../core/storage/media_cache.dart';
 import '../../../core/utils/app_log.dart';
 import '../domain/message_models.dart';
 
@@ -640,50 +641,14 @@ Future<MessageCache> messageCache(Ref ref) async {
 }
 
 /// Total on-disk bytes used by the app's caches: the SQLite message/meta
-/// database plus the `flutter_cache_manager` image/file store. Recomputed on
-/// each watch (not kept alive) so the settings readout reflects clears and
-/// growth; `ref.invalidate` after "clear cache" drops it back to ~0.
+/// database plus cached images, videos, and streamed audio. Recomputed on each
+/// watch so the settings readout reflects cache growth and clears.
 @riverpod
 Future<int> cacheUsageBytes(Ref ref) async {
   final cache = await ref.watch(messageCacheProvider.future);
   final dbBytes = await cache.diskSizeBytes();
-  final imgBytes = await _imageCacheDirSize();
-  return dbBytes + imgBytes;
-}
-
-/// Size of `flutter_cache_manager`'s default on-disk store. Its files live
-/// under `<temp>/libCachedImageData` (the `DefaultCacheManager` store key).
-/// Best-effort: missing dir or any IO error counts as zero.
-Future<int> _imageCacheDirSize() async {
-  try {
-    final tmp = await getTemporaryDirectory();
-    final sep = Platform.pathSeparator;
-    final dir = Directory('${tmp.path}${sep}libCachedImageData');
-    return _dirSizeBytes(dir);
-  } catch (_) {
-    return 0;
-  }
-}
-
-/// Recursively sum the sizes of all files under [dir]. Best-effort: unreadable
-/// entries are skipped rather than throwing.
-Future<int> _dirSizeBytes(Directory dir) async {
-  var total = 0;
-  try {
-    if (!await dir.exists()) return 0;
-    await for (final entity in dir.list(recursive: true, followLinks: false)) {
-      if (entity is File) {
-        try {
-          total += await entity.length();
-        } catch (_) {
-          // skip unreadable file
-        }
-      }
-    }
-  } catch (_) {
-    // best-effort
-  }
-  return total;
+  final mediaBytes = await MediaCache.diskUsageBytes();
+  return dbBytes + mediaBytes;
 }
 
 // ---------------------------------------------------------------------------

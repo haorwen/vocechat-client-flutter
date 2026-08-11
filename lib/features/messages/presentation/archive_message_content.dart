@@ -4,6 +4,8 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/storage/account_store.dart';
+import '../../../core/storage/media_cache.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/safe_text.dart';
@@ -52,6 +54,9 @@ String? _currentBaseUrl(WidgetRef ref) {
   return base.isEmpty ? null : base;
 }
 
+String? _currentCacheNamespace(WidgetRef ref) =>
+    ref.watch(accountStoreProvider).valueOrNull?.currentAccountId;
+
 /// Builds the `/api/resource/archive/attachment` URL for [attachmentId] in
 /// the archive identified by [filePath]. Mirrors
 /// `file_message_content.dart`'s `_buildResourceUrls` pattern.
@@ -77,24 +82,29 @@ Map<String, String> _refererHeaders(String? baseUrl) {
   return {'Referer': '${uri.scheme}://${uri.authority}/'};
 }
 
-// Note: archive attachment avatars are rendered via VoceAvatar, which (like
-// the existing avatar rendering in chat_tool_panels.dart's _userAvatarUrl)
-// does not support custom auth headers on its underlying image widget. This
-// mirrors the codebase's existing avatar-loading pattern rather than adding
-// authenticated-image plumbing that no other avatar path uses.
+// Archive attachment avatars need no auth headers. VoceAvatar's disk cache is
+// disabled when the containing burn-after-read archive is ephemeral.
 
 /// Renders a forwarded-message card for a `vocechat/archive` message whose
 /// [content] is the archive file-path id. The card previews the first few
 /// bundled messages; tapping opens [_ArchiveDetailScreen] with everything.
 class ArchiveMessageContent extends ConsumerWidget {
-  const ArchiveMessageContent({super.key, required this.filePath});
+  const ArchiveMessageContent({
+    super.key,
+    required this.filePath,
+    this.cacheMedia = true,
+  });
   final String filePath;
+  final bool cacheMedia;
 
   void _openDetail(BuildContext context) {
     Navigator.of(context, rootNavigator: true).push(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => _ArchiveDetailScreen(filePath: filePath),
+        builder: (_) => _ArchiveDetailScreen(
+          filePath: filePath,
+          cacheMedia: cacheMedia,
+        ),
       ),
     );
   }
@@ -135,8 +145,7 @@ class ArchiveMessageContent extends ConsumerWidget {
                   ),
                 ),
                 if (archiveAsync.hasValue)
-                  Icon(Icons.chevron_right,
-                      size: 16, color: AppTokens.gray400),
+                  Icon(Icons.chevron_right, size: 16, color: AppTokens.gray400),
               ],
             ),
             const SizedBox(height: 8),
@@ -167,6 +176,7 @@ class ArchiveMessageContent extends ConsumerWidget {
                         archive: archive,
                         message: shown[i],
                         filePath: filePath,
+                        cacheMedia: cacheMedia,
                       ),
                     ],
                     const SizedBox(height: 8),
@@ -196,11 +206,13 @@ class _ArchivePreviewRow extends ConsumerWidget {
     required this.archive,
     required this.message,
     required this.filePath,
+    required this.cacheMedia,
   });
 
   final Archive archive;
   final ArchiveMessage message;
   final String filePath;
+  final bool cacheMedia;
 
   String _preview() {
     final c = message.content;
@@ -228,7 +240,12 @@ class _ArchivePreviewRow extends ConsumerWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        VoceAvatar(name: name, imageUrl: avatarUrl, size: 20),
+        VoceAvatar(
+          name: name,
+          imageUrl: avatarUrl,
+          size: 20,
+          cacheImage: cacheMedia,
+        ),
         const SizedBox(width: 8),
         Expanded(
           child: Column(
@@ -264,8 +281,12 @@ class _ArchivePreviewRow extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 
 class _ArchiveDetailScreen extends ConsumerWidget {
-  const _ArchiveDetailScreen({required this.filePath});
+  const _ArchiveDetailScreen({
+    required this.filePath,
+    required this.cacheMedia,
+  });
   final String filePath;
+  final bool cacheMedia;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -275,7 +296,8 @@ class _ArchiveDetailScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppTokens.canvas,
       appBar: AppBar(
-        title: Text(l.archiveForwardedLabel, style: const TextStyle(fontSize: 16)),
+        title:
+            Text(l.archiveForwardedLabel, style: const TextStyle(fontSize: 16)),
       ),
       body: archiveAsync.when(
         loading: () => const Center(
@@ -299,6 +321,7 @@ class _ArchiveDetailScreen extends ConsumerWidget {
             archive: archive,
             message: archive.messages[i],
             filePath: filePath,
+            cacheMedia: cacheMedia,
           ),
         ),
       ),
@@ -311,11 +334,13 @@ class _ArchiveDetailRow extends ConsumerWidget {
     required this.archive,
     required this.message,
     required this.filePath,
+    required this.cacheMedia,
   });
 
   final Archive archive;
   final ArchiveMessage message;
   final String filePath;
+  final bool cacheMedia;
 
   String _formatTime() {
     if (message.createdAt == 0) return '';
@@ -345,7 +370,12 @@ class _ArchiveDetailRow extends ConsumerWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        VoceAvatar(name: name, imageUrl: avatarUrl, size: 32),
+        VoceAvatar(
+          name: name,
+          imageUrl: avatarUrl,
+          size: 32,
+          cacheImage: cacheMedia,
+        ),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
@@ -372,14 +402,17 @@ class _ArchiveDetailRow extends ConsumerWidget {
                     const SizedBox(width: 8),
                     Text(
                       time,
-                      style:
-                          TextStyle(fontSize: 11, color: AppTokens.gray400),
+                      style: TextStyle(fontSize: 11, color: AppTokens.gray400),
                     ),
                   ],
                 ],
               ),
               const SizedBox(height: 4),
-              _ArchiveDetailBody(message: message, filePath: filePath),
+              _ArchiveDetailBody(
+                message: message,
+                filePath: filePath,
+                cacheMedia: cacheMedia,
+              ),
             ],
           ),
         ),
@@ -389,10 +422,15 @@ class _ArchiveDetailRow extends ConsumerWidget {
 }
 
 class _ArchiveDetailBody extends ConsumerWidget {
-  const _ArchiveDetailBody({required this.message, required this.filePath});
+  const _ArchiveDetailBody({
+    required this.message,
+    required this.filePath,
+    required this.cacheMedia,
+  });
 
   final ArchiveMessage message;
   final String filePath;
+  final bool cacheMedia;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -412,7 +450,11 @@ class _ArchiveDetailBody extends ConsumerWidget {
     }
 
     if (c.contentType == 'vocechat/file') {
-      return _ArchiveAttachment(message: message, filePath: filePath);
+      return _ArchiveAttachment(
+        message: message,
+        filePath: filePath,
+        cacheMedia: cacheMedia,
+      );
     }
 
     // text/plain and anything unknown-but-textual — show the full content,
@@ -431,10 +473,15 @@ class _ArchiveDetailBody extends ConsumerWidget {
 /// A `vocechat/file` entry inside an archive: inline image (tap → viewer)
 /// when the attachment is an image, otherwise a file card with download.
 class _ArchiveAttachment extends ConsumerWidget {
-  const _ArchiveAttachment({required this.message, required this.filePath});
+  const _ArchiveAttachment({
+    required this.message,
+    required this.filePath,
+    required this.cacheMedia,
+  });
 
   final ArchiveMessage message;
   final String filePath;
+  final bool cacheMedia;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -458,10 +505,18 @@ class _ArchiveAttachment extends ConsumerWidget {
 
     if (isImage) {
       final headers = _refererHeaders(baseUrl);
+      final cacheNamespace = _currentCacheNamespace(ref);
+      final shouldCache = cacheMedia && cacheNamespace != null;
+      final originCacheKey = cacheNamespace == null
+          ? null
+          : MediaCache.scopedKey(cacheNamespace, fileUrl);
       // Thumbnail attachment when the archive bundled one, else the original.
       final thumbUrl = c.thumbnailId != null
           ? _archiveAttachmentUrl(ref, filePath, c.thumbnailId!) ?? fileUrl
           : fileUrl;
+      final thumbnailCacheKey = cacheNamespace == null
+          ? null
+          : MediaCache.scopedKey(cacheNamespace, thumbUrl);
       final natW = (props['width'] as num?)?.toDouble();
       final natH = (props['height'] as num?)?.toDouble();
       const maxSize = 240.0;
@@ -482,6 +537,8 @@ class _ArchiveAttachment extends ConsumerWidget {
               fullscreenDialog: true,
               builder: (_) => ImagePreviewScreen(
                 originUrl: fileUrl,
+                cacheKey: shouldCache ? originCacheKey : null,
+                cacheMedia: shouldCache,
                 downloadUrl: downloadUrl ?? fileUrl,
                 headers: headers,
                 title: name,
@@ -494,29 +551,23 @@ class _ArchiveAttachment extends ConsumerWidget {
           child: SizedBox(
             width: w,
             height: h,
-            child: CachedNetworkImage(
-              imageUrl: thumbUrl,
-              httpHeaders: headers,
-              fit: BoxFit.cover,
-              placeholder: (context, _) => Container(
-                color: AppTokens.gray100,
-                alignment: Alignment.center,
-                child: const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-              errorWidget: (context, url, error) => Container(
-                color: AppTokens.gray100,
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.broken_image_outlined,
-                  color: AppTokens.gray400,
-                  size: 32,
-                ),
-              ),
-            ),
+            child: shouldCache
+                ? CachedNetworkImage(
+                    imageUrl: thumbUrl,
+                    cacheKey: thumbnailCacheKey,
+                    httpHeaders: headers,
+                    fit: BoxFit.cover,
+                    placeholder: (context, _) => _imagePlaceholder(),
+                    errorWidget: (context, url, error) => _imageError(),
+                  )
+                : Image.network(
+                    thumbUrl,
+                    headers: headers,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, progress) =>
+                        progress == null ? child : _imagePlaceholder(),
+                    errorBuilder: (context, error, stackTrace) => _imageError(),
+                  ),
           ),
         ),
       );
@@ -581,4 +632,24 @@ class _ArchiveAttachment extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _imagePlaceholder() => Container(
+        color: AppTokens.gray100,
+        alignment: Alignment.center,
+        child: const SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+
+  Widget _imageError() => Container(
+        color: AppTokens.gray100,
+        alignment: Alignment.center,
+        child: Icon(
+          Icons.broken_image_outlined,
+          color: AppTokens.gray400,
+          size: 32,
+        ),
+      );
 }

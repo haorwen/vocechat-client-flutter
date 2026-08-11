@@ -1756,9 +1756,13 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
           localBytes: localBytes,
           sending: isSending,
           progress: isSending ? notifier.progressFor(msg.mid) : null,
+          cacheMedia: expiresIn == null,
         );
       } else if (displayContentType == 'vocechat/archive') {
-        content = ArchiveMessageContent(filePath: displayContent);
+        content = ArchiveMessageContent(
+          filePath: displayContent,
+          cacheMedia: expiresIn == null,
+        );
       } else if (displayContentType == 'text/markdown') {
         content = MarkdownBody(
           data: safeText(displayContent),
@@ -1875,9 +1879,13 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
             FileMessageContent(
               content: displayContent,
               properties: detail.properties,
+              cacheMedia: expiresIn == null,
             )
           else if (displayContentType == 'vocechat/archive')
-            ArchiveMessageContent(filePath: displayContent)
+            ArchiveMessageContent(
+              filePath: displayContent,
+              cacheMedia: expiresIn == null,
+            )
           else
             MentionText(
               text: displayContent,
@@ -2291,12 +2299,21 @@ class _ReplyQuotePreview extends StatelessWidget {
     if (type == 'vocechat/file') {
       final detail = original.detail;
       final props = detail is NormalMessageDetail ? detail.properties : null;
+      final cacheMedia = switch (detail) {
+        NormalMessageDetail() => detail.expiresIn == null,
+        ReplyMessageDetail() => detail.expiresIn == null,
+        _ => true,
+      };
       // Reuse the shared file/image renderer so image originals show a real
       // thumbnail and other files show the icon + filename row, identical to
       // a normal file message. Constrain it so a quoted image stays compact.
       return ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 220, maxHeight: 160),
-        child: FileMessageContent(content: content, properties: props),
+        child: FileMessageContent(
+          content: content,
+          properties: props,
+          cacheMedia: cacheMedia,
+        ),
       );
     }
 

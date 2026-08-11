@@ -74,6 +74,10 @@ set_target_properties(${BINARY_NAME}
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# media_kit_libs_linux exposes mimalloc for the process-wide allocator. The
+# backend recommends linking it here to avoid libmpv allocation leaks.
+target_link_libraries(${BINARY_NAME} PRIVATE ${MIMALLOC_LIB})
+
 
 # === Installation ===
 # By default, "installing" just makes a relocatable bundle in the build

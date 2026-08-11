@@ -14,11 +14,15 @@ class VoceAvatar extends StatelessWidget {
     required this.name,
     this.imageUrl,
     this.size = 40,
+    this.cacheImage = true,
   });
 
   final String name;
   final String? imageUrl;
   final double size;
+
+  /// Disabled for ephemeral archive attachments that must not persist on disk.
+  final bool cacheImage;
 
   static Color _colorFromName(String name) {
     const palette = [
@@ -77,28 +81,34 @@ class VoceAvatar extends StatelessWidget {
     if (imageUrl == null || imageUrl!.isEmpty) {
       return _initials();
     }
-    // ClipOval over CachedNetworkImage — keeps real transparency intact.
+    // ClipOval over the image keeps real transparency intact.
     // We deliberately do NOT set a backgroundColor on the clipped area,
     // so transparent PNGs let the surface behind show through.
     return SizedBox(
       width: size,
       height: size,
       child: ClipOval(
-        child: CachedNetworkImage(
-          imageUrl: imageUrl!,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          fadeInDuration: const Duration(milliseconds: 120),
-          fadeOutDuration: Duration.zero,
-          // While the image is downloading or if it fails, fall back to
-          // initials — never to a colored disc that would clash with the
-          // surrounding surface.
-          placeholder: (_, __) => _initials(),
-          errorWidget: (_, __, ___) => _initials(),
-        ),
+        child: cacheImage
+            ? CachedNetworkImage(
+                imageUrl: imageUrl!,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                fadeInDuration: const Duration(milliseconds: 120),
+                fadeOutDuration: Duration.zero,
+                placeholder: (_, __) => _initials(),
+                errorWidget: (_, __, ___) => _initials(),
+              )
+            : Image.network(
+                imageUrl!,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                loadingBuilder: (_, child, progress) =>
+                    progress == null ? child : _initials(),
+                errorBuilder: (_, __, ___) => _initials(),
+              ),
       ),
     );
   }
 }
-

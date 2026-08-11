@@ -574,6 +574,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.3"
+  flutter_hls_parser:
+    dependency: transitive
+    description:
+      name: flutter_hls_parser
+      sha256: f4b7df4f927623aea5c72006232693e07fdd11438f600c08670d6a23c1aa85c8
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.1"
   flutter_launcher_icons:
     dependency: "direct dev"
     description:
@@ -680,6 +688,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_video_caching:
+    dependency: "direct main"
+    description:
+      name: flutter_video_caching
+      sha256: "37f15a6082b8ed5a51c65455300475ce49e6a6bc717f5dad19937cfa071d7f34"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.6"
   flutter_web_plugins:
     dependency: transitive
     description: flutter
@@ -925,6 +941,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.9.46"
+  just_audio_media_kit:
+    dependency: "direct main"
+    description:
+      name: just_audio_media_kit
+      sha256: f3cf04c3a50339709e87e90b4e841eef4364ab4be2bdbac0c54cc48679f84d23
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.0"
   just_audio_platform_interface:
     dependency: transitive
     description:
@@ -1013,6 +1037,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.11.1"
+  media_kit:
+    dependency: transitive
+    description:
+      name: media_kit
+      sha256: ae9e79597500c7ad6083a3c7b7b7544ddabfceacce7ae5c9709b0ec16a5d6643
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.6"
+  media_kit_libs_linux:
+    dependency: "direct main"
+    description:
+      name: media_kit_libs_linux
+      sha256: "2b473399a49ec94452c4d4ae51cfc0f6585074398d74216092bf3d54aac37ecf"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.1"
+  media_kit_libs_windows_audio:
+    dependency: "direct main"
+    description:
+      name: media_kit_libs_windows_audio
+      sha256: c2fd558cc87b9d89a801141fcdffe02e338a3b21a41a18fbd63d5b221a1b8e53
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.9"
   media_store_plus:
     dependency: "direct main"
     description:
@@ -1037,6 +1085,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
+  native_dio_adapter:
+    dependency: "direct overridden"
+    description:
+      path: "packages/native_dio_adapter_compat"
+      relative: true
+    source: path
+    version: "1.7.0"
   nested:
     dependency: transitive
     description:
@@ -1086,7 +1141,7 @@ packages:
     source: hosted
     version: "3.2.1"
   path:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
       name: path
       sha256: "087ce49c3f0dc39180befefc60fdb4acd8f8620e5682fe2476afd0b3688bb4af"
@@ -1237,6 +1292,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.5.0"
+  quiver:
+    dependency: transitive
+    description:
+      name: quiver
+      sha256: ea0b925899e64ecdfbf9c7becb60d5b50e706ade44a85b2363be2a22d88117d2
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.2.2"
   record:
     dependency: "direct main"
     description:
@@ -1341,6 +1404,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.28.0"
+  safe_local_storage:
+    dependency: transitive
+    description:
+      name: safe_local_storage
+      sha256: "494b982d5edb71030650ea463d939670e91b232b588323dc75229d2c5f23e7b7"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.6"
   scrollable_positioned_list:
     dependency: "direct main"
     description:
@@ -1610,6 +1681,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.0"
+  uri_parser:
+    dependency: transitive
+    description:
+      name: uri_parser
+      sha256: "051c62e5f693de98ca9f130ee707f8916e2266945565926be3ff20659f7853ce"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.2"
   url_launcher:
     dependency: "direct main"
     description:

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chewie/chewie.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,8 +14,10 @@ import 'package:video_player/video_player.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/storage/account_store.dart';
+import '../../../core/storage/media_cache.dart';
 import '../../../core/storage/secure_token_store.dart';
 import '../../../core/storage/server_store.dart';
+import '../../../core/storage/video_stream_cache.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
@@ -40,6 +43,7 @@ class FileMessageContent extends ConsumerWidget {
     this.localBytes,
     this.sending = false,
     this.progress,
+    this.cacheMedia = true,
   });
 
   final String content;
@@ -57,6 +61,10 @@ class FileMessageContent extends ConsumerWidget {
   /// Upload progress in [0, 1] for an in-flight row. Null when unknown — the
   /// overlay then shows an indeterminate spinner.
   final double? progress;
+
+  /// Disabled for burn-after-read messages so ephemeral attachments never
+  /// outlive their message in a persistent device cache.
+  final bool cacheMedia;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -88,13 +96,28 @@ class FileMessageContent extends ConsumerWidget {
     }
 
     if (_isImage(parsed.contentType, parsed.size)) {
-      return _ImageBubble(meta: parsed, urls: urls);
+      return _ImageBubble(
+        key: ValueKey((urls.originCacheKey, cacheMedia)),
+        meta: parsed,
+        urls: urls,
+        cacheMedia: cacheMedia,
+      );
     }
     if (parsed.contentType.startsWith('video')) {
-      return _VideoBubble(meta: parsed, urls: urls);
+      return _VideoBubble(
+        key: ValueKey((urls.originCacheKey, cacheMedia)),
+        meta: parsed,
+        urls: urls,
+        cacheMedia: cacheMedia,
+      );
     }
     if (parsed.contentType.startsWith('audio')) {
-      return _AudioBubble(meta: parsed, urls: urls);
+      return _AudioBubble(
+        key: ValueKey((urls.originCacheKey, cacheMedia)),
+        meta: parsed,
+        urls: urls,
+        cacheMedia: cacheMedia,
+      );
     }
     return _FileCard(meta: parsed, urls: urls);
   }
@@ -152,13 +175,17 @@ _FileMeta? _parseFileMessage(String content, Map<String, dynamic>? props) {
 class _ResourceUrls {
   const _ResourceUrls({
     required this.thumbnail,
+    required this.thumbnailCacheKey,
     required this.origin,
+    required this.originCacheKey,
     required this.download,
     required this.baseUrl,
   });
 
   final String thumbnail;
+  final String thumbnailCacheKey;
   final String origin;
+  final String originCacheKey;
   final String download;
   final String baseUrl;
 }
@@ -170,11 +197,17 @@ _ResourceUrls? _buildResourceUrls(WidgetRef ref, String path) {
       .firstOrNull;
   final base = server?.baseUrl ?? '';
   if (base.isEmpty) return null;
+  final accountId =
+      ref.watch(accountStoreProvider).valueOrNull?.currentAccountId;
+  if (accountId == null) return null;
   final encoded = Uri.encodeQueryComponent(path);
   final root = '$base/api/resource/file?file_path=$encoded';
+  final thumbnail = '$root&thumbnail=true';
   return _ResourceUrls(
-    thumbnail: '$root&thumbnail=true',
+    thumbnail: thumbnail,
+    thumbnailCacheKey: MediaCache.scopedKey(accountId, thumbnail),
     origin: root,
+    originCacheKey: MediaCache.scopedKey(accountId, root),
     download: '$root&download=true',
     baseUrl: base,
   );
@@ -196,7 +229,8 @@ Future<Map<String, String>> _buildAuthHeaders(
   String baseUrl,
 ) async {
   final headers = _refererOnlyHeaders(baseUrl);
-  final accountId = ref.read(accountStoreProvider).valueOrNull?.currentAccountId;
+  final accountId =
+      ref.read(accountStoreProvider).valueOrNull?.currentAccountId;
   if (accountId != null) {
     final store = ref.read(secureTokenStoreProvider(accountId));
     final tokens = await store.readTokens();
@@ -282,7 +316,8 @@ class _LocalImageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (bubbleW, bubbleH) = _imageBubbleSize(meta.width, meta.height);
-    final pct = progress == null ? null : (progress!.clamp(0.0, 1.0) * 100).round();
+    final pct =
+        progress == null ? null : (progress!.clamp(0.0, 1.0) * 100).round();
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: SizedBox(
@@ -346,10 +381,16 @@ class _LocalImageBubble extends StatelessWidget {
 }
 
 class _ImageBubble extends ConsumerStatefulWidget {
-  const _ImageBubble({required this.meta, required this.urls});
+  const _ImageBubble({
+    super.key,
+    required this.meta,
+    required this.urls,
+    required this.cacheMedia,
+  });
 
   final _FileMeta meta;
   final _ResourceUrls urls;
+  final bool cacheMedia;
 
   @override
   ConsumerState<_ImageBubble> createState() => _ImageBubbleState();
@@ -377,7 +418,25 @@ class _ImageBubbleState extends ConsumerState<_ImageBubble> {
     final natH = widget.meta.height;
     final (bubbleW, bubbleH) = _imageBubbleSize(natW, natH);
 
-    final headers = _resolvedHeaders ?? _refererOnlyHeaders(widget.urls.baseUrl);
+    final headers =
+        _resolvedHeaders ?? _refererOnlyHeaders(widget.urls.baseUrl);
+    final image = widget.cacheMedia
+        ? CachedNetworkImage(
+            imageUrl: widget.urls.thumbnail,
+            cacheKey: widget.urls.thumbnailCacheKey,
+            httpHeaders: headers,
+            fit: BoxFit.cover,
+            placeholder: (context, _) => _buildPlaceholder(),
+            errorWidget: (context, url, error) => _buildError(),
+          )
+        : Image.network(
+            widget.urls.thumbnail,
+            headers: headers,
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, progress) =>
+                progress == null ? child : _buildPlaceholder(),
+            errorBuilder: (context, error, stackTrace) => _buildError(),
+          );
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -389,35 +448,33 @@ class _ImageBubbleState extends ConsumerState<_ImageBubble> {
         child: SizedBox(
           width: bubbleW,
           height: bubbleH,
-          child: CachedNetworkImage(
-            imageUrl: widget.urls.thumbnail,
-            httpHeaders: headers,
-            fit: BoxFit.cover,
-            placeholder: (context, _) => Container(
-              color: AppTokens.gray100,
-              alignment: Alignment.center,
-              child: const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-            errorWidget: (context, url, error) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted && !_failed) setState(() => _failed = true);
-              });
-              return Container(
-                color: AppTokens.gray100,
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.broken_image_outlined,
-                  color: AppTokens.gray400,
-                  size: 32,
-                ),
-              );
-            },
-          ),
+          child: image,
         ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder() => Container(
+        color: AppTokens.gray100,
+        alignment: Alignment.center,
+        child: const SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+
+  Widget _buildError() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_failed) setState(() => _failed = true);
+    });
+    return Container(
+      color: AppTokens.gray100,
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.broken_image_outlined,
+        color: AppTokens.gray400,
+        size: 32,
       ),
     );
   }
@@ -428,6 +485,8 @@ class _ImageBubbleState extends ConsumerState<_ImageBubble> {
         fullscreenDialog: true,
         builder: (_) => ImagePreviewScreen(
           originUrl: widget.urls.origin,
+          cacheKey: widget.cacheMedia ? widget.urls.originCacheKey : null,
+          cacheMedia: widget.cacheMedia,
           downloadUrl: widget.urls.download,
           headers: headers,
           title: widget.meta.name,
@@ -443,12 +502,16 @@ class ImagePreviewScreen extends StatefulWidget {
   const ImagePreviewScreen({
     super.key,
     required this.originUrl,
+    this.cacheKey,
+    this.cacheMedia = true,
     required this.downloadUrl,
     required this.headers,
     required this.title,
   });
 
   final String originUrl;
+  final String? cacheKey;
+  final bool cacheMedia;
   final String downloadUrl;
   final Map<String, String> headers;
   final String title;
@@ -493,6 +556,13 @@ class _ImagePreviewScreenState extends State<ImagePreviewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ImageProvider imageProvider = widget.cacheMedia
+        ? CachedNetworkImageProvider(
+            widget.originUrl,
+            cacheKey: widget.cacheKey,
+            headers: widget.headers,
+          )
+        : NetworkImage(widget.originUrl, headers: widget.headers);
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -501,10 +571,7 @@ class _ImagePreviewScreenState extends State<ImagePreviewScreen> {
           Positioned.fill(
             child: PhotoView(
               controller: _photoCtrl,
-              imageProvider: CachedNetworkImageProvider(
-                widget.originUrl,
-                headers: widget.headers,
-              ),
+              imageProvider: imageProvider,
               backgroundDecoration: const BoxDecoration(color: Colors.black),
               minScale: PhotoViewComputedScale.contained,
               maxScale: PhotoViewComputedScale.covered * 4,
@@ -571,6 +638,9 @@ class _ImagePreviewScreenState extends State<ImagePreviewScreen> {
                           ProviderScope.containerOf(context, listen: false),
                           widget.downloadUrl,
                           widget.title,
+                          cacheKey: widget.cacheMedia
+                              ? (widget.cacheKey ?? widget.originUrl)
+                              : null,
                         ),
                       ),
                       _ToolbarBtn(
@@ -645,10 +715,16 @@ class _ToolbarBtn extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _VideoBubble extends ConsumerStatefulWidget {
-  const _VideoBubble({required this.meta, required this.urls});
+  const _VideoBubble({
+    super.key,
+    required this.meta,
+    required this.urls,
+    required this.cacheMedia,
+  });
 
   final _FileMeta meta;
   final _ResourceUrls urls;
+  final bool cacheMedia;
 
   @override
   ConsumerState<_VideoBubble> createState() => _VideoBubbleState();
@@ -682,15 +758,31 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
 
   // Decodes the first frame as an inline thumbnail — the server only
   // generates thumbnails for images, so there is no cheaper source.
-  Future<void> _initPreview(Map<String, String> headers) async {
+  Future<void> _initPreview(
+    Map<String, String> headers, {
+    bool useStreamCache = true,
+  }) async {
+    final proxyReady = widget.cacheMedia &&
+        useStreamCache &&
+        await VideoStreamCache.ensureReady();
+    if (!mounted) return;
+    final playbackUri = proxyReady
+        ? VideoStreamCache.playbackUri(widget.urls.origin)
+        : Uri.parse(widget.urls.origin);
+    final playbackHeaders = proxyReady
+        ? VideoStreamCache.playbackHeaders(
+            headers,
+            cacheKey: widget.urls.originCacheKey,
+          )
+        : headers;
     final ctrl = VideoPlayerController.networkUrl(
-      Uri.parse(widget.urls.origin),
-      httpHeaders: headers,
+      playbackUri,
+      httpHeaders: playbackHeaders,
     );
     try {
       await ctrl.initialize();
       if (!mounted) {
-        ctrl.dispose();
+        await ctrl.dispose();
         return;
       }
       setState(() {
@@ -698,8 +790,11 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
         _status = _MediaLoadStatus.ready;
       });
     } catch (_) {
-      ctrl.dispose();
+      await ctrl.dispose();
       if (!mounted) return;
+      if (proxyReady) {
+        return _initPreview(headers, useStreamCache: false);
+      }
       // The player failing to initialize doesn't tell us whether the file is
       // actually gone — timeouts, flaky connections, and unsupported codecs
       // all throw the same way. Ask the server directly before showing the
@@ -722,6 +817,36 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
     if (headers == null) return;
     setState(() => _status = _MediaLoadStatus.loading);
     _initPreview(headers);
+  }
+
+  Future<void> _download() async {
+    final headers = _headers;
+    final exported = widget.cacheMedia && headers != null
+        ? await MediaCache.exportVideoForDownload(
+            widget.urls.origin,
+            headers,
+            cacheKey: widget.urls.originCacheKey,
+          )
+        : null;
+    try {
+      if (!mounted) return;
+      await downloadAndSave(
+        context,
+        ProviderScope.containerOf(context, listen: false),
+        widget.urls.download,
+        widget.meta.name,
+        cacheKey: widget.cacheMedia ? widget.urls.originCacheKey : null,
+        cachedFile: exported,
+      );
+    } finally {
+      try {
+        if (exported != null && await exported.exists()) {
+          await exported.delete();
+        }
+      } catch (_) {
+        // The cache may have been cleared while the save dialog was open.
+      }
+    }
   }
 
   @override
@@ -748,13 +873,10 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
       onTap: loadError
           ? _retry
           : likelyIncompatible
-              ? () => downloadAndSave(
-                  context,
-                  ProviderScope.containerOf(context, listen: false),
-                  widget.urls.download,
-                  widget.meta.name,
-                )
-              : (_headers == null ? null : () => _openPlayer(context, _headers!)),
+              ? _download
+              : (_headers == null
+                  ? null
+                  : () => _openPlayer(context, _headers!)),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
@@ -832,7 +954,9 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 11,
-                          shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+                          shadows: [
+                            Shadow(color: Colors.black54, blurRadius: 6)
+                          ],
                         ),
                       ),
                     ],
@@ -857,7 +981,9 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 11,
-                            shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+                            shadows: [
+                              Shadow(color: Colors.black54, blurRadius: 6)
+                            ],
                           ),
                         ),
                       ),
@@ -886,10 +1012,13 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
         fullscreenDialog: true,
         builder: (_) => _VideoPlayerScreen(
           url: widget.urls.origin,
+          cacheKey: widget.urls.originCacheKey,
+          cacheMedia: widget.cacheMedia,
           headers: headers,
           title: widget.meta.name,
           downloadUrl: widget.urls.download,
-          checkMissing: () => _resourceConfirmedMissing(ref, widget.urls.origin),
+          checkMissing: () =>
+              _resourceConfirmedMissing(ref, widget.urls.origin),
           onMissing: () {
             if (mounted) setState(() => _status = _MediaLoadStatus.missing);
           },
@@ -902,6 +1031,8 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
 class _VideoPlayerScreen extends StatefulWidget {
   const _VideoPlayerScreen({
     required this.url,
+    required this.cacheKey,
+    required this.cacheMedia,
     required this.headers,
     required this.title,
     required this.downloadUrl,
@@ -910,6 +1041,8 @@ class _VideoPlayerScreen extends StatefulWidget {
   });
 
   final String url;
+  final String cacheKey;
+  final bool cacheMedia;
   final Map<String, String> headers;
   final String title;
   final String downloadUrl;
@@ -935,15 +1068,38 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
     _init();
   }
 
-  Future<void> _init() async {
+  Future<void> _init({bool useStreamCache = true}) async {
     setState(() => _status = _MediaLoadStatus.loading);
+    final oldChewie = _chewieCtrl;
+    final oldVideo = _videoCtrl;
+    _chewieCtrl = null;
+    _videoCtrl = null;
+    oldChewie?.dispose();
+    await oldVideo?.dispose();
+
+    final proxyReady = widget.cacheMedia &&
+        useStreamCache &&
+        await VideoStreamCache.ensureReady();
+    if (!mounted) return;
+    final playbackUri = proxyReady
+        ? VideoStreamCache.playbackUri(widget.url)
+        : Uri.parse(widget.url);
+    final playbackHeaders = proxyReady
+        ? VideoStreamCache.playbackHeaders(
+            widget.headers,
+            cacheKey: widget.cacheKey,
+          )
+        : widget.headers;
+    final ctrl = VideoPlayerController.networkUrl(
+      playbackUri,
+      httpHeaders: playbackHeaders,
+    );
     try {
-      final ctrl = VideoPlayerController.networkUrl(
-        Uri.parse(widget.url),
-        httpHeaders: widget.headers,
-      );
       await ctrl.initialize();
-      if (!mounted) return;
+      if (!mounted) {
+        await ctrl.dispose();
+        return;
+      }
       _chewieCtrl = ChewieController(
         videoPlayerController: ctrl,
         autoPlay: true,
@@ -960,7 +1116,11 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
         _status = _MediaLoadStatus.ready;
       });
     } catch (_) {
+      await ctrl.dispose();
       if (!mounted) return;
+      if (proxyReady) {
+        return _init(useStreamCache: false);
+      }
       final missing = await widget.checkMissing();
       if (!mounted) return;
       if (missing) widget.onMissing();
@@ -972,6 +1132,35 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
                 ? _MediaLoadStatus.likelyIncompatible
                 : _MediaLoadStatus.loadError);
       });
+    }
+  }
+
+  Future<void> _download() async {
+    final exported = widget.cacheMedia
+        ? await MediaCache.exportVideoForDownload(
+            widget.url,
+            widget.headers,
+            cacheKey: widget.cacheKey,
+          )
+        : null;
+    try {
+      if (!mounted) return;
+      await downloadAndSave(
+        context,
+        ProviderScope.containerOf(context, listen: false),
+        widget.downloadUrl,
+        widget.title,
+        cacheKey: widget.cacheMedia ? widget.cacheKey : null,
+        cachedFile: exported,
+      );
+    } finally {
+      try {
+        if (exported != null && await exported.exists()) {
+          await exported.delete();
+        }
+      } catch (_) {
+        // The cache may have been cleared while the save dialog was open.
+      }
     }
   }
 
@@ -1000,12 +1189,7 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
           IconButton(
             tooltip: l.tooltipDownload,
             icon: const Icon(Icons.download_outlined),
-            onPressed: () => downloadAndSave(
-              context,
-              ProviderScope.containerOf(context, listen: false),
-              widget.downloadUrl,
-              widget.title,
-            ),
+            onPressed: _download,
           ),
         ],
       ),
@@ -1019,7 +1203,8 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
           _MediaLoadStatus.loadError => Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.error_outline, color: Colors.white54, size: 48),
+                const Icon(Icons.error_outline,
+                    color: Colors.white54, size: 48),
                 const SizedBox(height: 12),
                 Text(
                   l.mediaLoadFailedRetry,
@@ -1029,7 +1214,8 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
                 OutlinedButton.icon(
                   onPressed: _init,
                   icon: const Icon(Icons.refresh, color: Colors.white),
-                  label: Text(l.actionRetry, style: const TextStyle(color: Colors.white)),
+                  label: Text(l.actionRetry,
+                      style: const TextStyle(color: Colors.white)),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Colors.white54),
                   ),
@@ -1041,7 +1227,8 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.error_outline, color: Colors.white54, size: 48),
+                  const Icon(Icons.error_outline,
+                      color: Colors.white54, size: 48),
                   const SizedBox(height: 12),
                   Text(
                     l.mediaLikelyIncompatible,
@@ -1050,15 +1237,11 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
-                    onPressed: () => downloadAndSave(
-                      context,
-                      ProviderScope.containerOf(context, listen: false),
-                      widget.downloadUrl,
-                      widget.title,
-                    ),
-                    icon: const Icon(Icons.download_outlined, color: Colors.white),
-                    label:
-                        Text(l.tooltipDownload, style: const TextStyle(color: Colors.white)),
+                    onPressed: _download,
+                    icon: const Icon(Icons.download_outlined,
+                        color: Colors.white),
+                    label: Text(l.tooltipDownload,
+                        style: const TextStyle(color: Colors.white)),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.white54),
                     ),
@@ -1066,7 +1249,8 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
                 ],
               ),
             ),
-          _MediaLoadStatus.loading => const CircularProgressIndicator(color: Colors.white),
+          _MediaLoadStatus.loading =>
+            const CircularProgressIndicator(color: Colors.white),
           _MediaLoadStatus.ready => Chewie(controller: _chewieCtrl!),
         },
       ),
@@ -1079,10 +1263,16 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
 // ---------------------------------------------------------------------------
 
 class _AudioBubble extends ConsumerStatefulWidget {
-  const _AudioBubble({required this.meta, required this.urls});
+  const _AudioBubble({
+    super.key,
+    required this.meta,
+    required this.urls,
+    required this.cacheMedia,
+  });
 
   final _FileMeta meta;
   final _ResourceUrls urls;
+  final bool cacheMedia;
 
   @override
   ConsumerState<_AudioBubble> createState() => _AudioBubbleState();
@@ -1090,51 +1280,181 @@ class _AudioBubble extends ConsumerStatefulWidget {
 
 class _AudioBubbleState extends ConsumerState<_AudioBubble> {
   final AudioPlayer _player = AudioPlayer();
+  String? _audioCachePath;
+  int? _audioCacheReaderToken;
   Duration? _duration;
   Duration _position = Duration.zero;
   bool _failed = false;
   bool _ready = false;
+  bool _loading = false;
 
   StreamSubscription<Duration?>? _durSub;
   StreamSubscription<Duration>? _posSub;
   StreamSubscription<PlayerState>? _stateSub;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  StreamSubscription<double>? _cacheProgressSub;
 
   Future<void> _load() async {
+    if (_ready || _loading) return;
+    setState(() => _loading = true);
+    String? writerPath;
+    int? writerToken;
+    Map<String, String>? resolvedHeaders;
     try {
       final headers = await _buildAuthHeaders(ref, widget.urls.baseUrl);
-      final dur = await _player.setAudioSource(
-        AudioSource.uri(
+      resolvedHeaders = headers;
+      if (!mounted) return;
+      late final AudioSource source;
+      if (kIsWeb || !widget.cacheMedia) {
+        source = AudioSource.uri(
           Uri.parse(widget.urls.origin),
           headers: headers,
-        ),
+        );
+      } else {
+        final cacheFile = await MediaCache.audioFileForKey(
+          widget.urls.originCacheKey,
+        );
+        if (!mounted) return;
+        final readerToken = MediaCache.claimAudioCacheReader(cacheFile.path);
+        if (readerToken == null) {
+          source = AudioSource.uri(
+            Uri.parse(widget.urls.origin),
+            headers: headers,
+          );
+        } else {
+          _audioCachePath = cacheFile.path;
+          _audioCacheReaderToken = readerToken;
+          writerToken = MediaCache.claimAudioCacheWriter(cacheFile.path);
+        }
+        if (readerToken != null && writerToken == null) {
+          // Another visible copy of this attachment owns the cache writer.
+          // Stream this player directly so both sources never truncate the
+          // same `.part` file.
+          _releaseAudioCacheReader();
+          source = AudioSource.uri(
+            Uri.parse(widget.urls.origin),
+            headers: headers,
+          );
+        } else if (writerToken != null) {
+          writerPath = cacheFile.path;
+          final cacheSource = LockCachingAudioSource(
+            Uri.parse(widget.urls.origin),
+            headers: headers,
+            cacheFile: cacheFile,
+          );
+          unawaited(
+            MediaCache.monitorAudioCacheWriter(cacheFile.path, writerToken),
+          );
+          _cacheProgressSub =
+              cacheSource.downloadProgressStream.listen((value) {
+            if (value >= 1) unawaited(MediaCache.trimAudioCache());
+          });
+          // Keep the caching source even on a completed hit so its MIME
+          // sidecar is used when the cache filename has no media extension.
+          source = cacheSource;
+        }
+      }
+      final dur = await _player.setAudioSource(
+        source,
       );
       if (!mounted) return;
-      setState(() {
-        _duration = dur;
-        _ready = true;
-      });
-      _durSub = _player.durationStream.listen((d) {
-        if (mounted) setState(() => _duration = d);
-      });
-      _posSub = _player.positionStream.listen((p) {
-        if (mounted) setState(() => _position = p);
-      });
-      _stateSub = _player.playerStateStream.listen((s) {
-        if (s.processingState == ProcessingState.completed) {
-          _player.seek(Duration.zero);
-          _player.pause();
-        }
-        if (mounted) setState(() {});
-      });
+      _markReady(dur);
     } catch (_) {
-      if (mounted) setState(() => _failed = true);
+      await _cacheProgressSub?.cancel();
+      _cacheProgressSub = null;
+      if (writerPath != null && writerToken != null) {
+        await MediaCache.failAudioCacheWriter(writerPath, writerToken);
+      }
+      _releaseAudioCacheReader();
+      if (writerPath != null && resolvedHeaders != null && mounted) {
+        try {
+          final dur = await _player.setAudioSource(
+            AudioSource.uri(
+              Uri.parse(widget.urls.origin),
+              headers: resolvedHeaders,
+            ),
+          );
+          if (!mounted) return;
+          _markReady(dur);
+          return;
+        } catch (_) {
+          // The direct retry failed too; show the existing expired/error card.
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _failed = true;
+          _loading = false;
+        });
+      }
     }
+  }
+
+  void _markReady(Duration? duration) {
+    setState(() {
+      _duration = duration;
+      _ready = true;
+      _loading = false;
+    });
+    _durSub = _player.durationStream.listen((d) {
+      if (mounted) setState(() => _duration = d);
+    });
+    _posSub = _player.positionStream.listen((p) {
+      if (mounted) setState(() => _position = p);
+    });
+    _stateSub = _player.playerStateStream.listen((s) {
+      if (s.processingState == ProcessingState.completed) {
+        _player.seek(Duration.zero);
+        _player.pause();
+      }
+      if (mounted) setState(() {});
+    });
+  }
+
+  Future<void> _togglePlayback() async {
+    if (_player.playing) {
+      await _player.pause();
+      return;
+    }
+    if (!_ready) await _load();
+    if (mounted && _ready) await _player.play();
+  }
+
+  Future<void> _download() async {
+    var cachedFile = widget.cacheMedia
+        ? await MediaCache.completedAudioFile(widget.urls.originCacheKey)
+        : null;
+    if (cachedFile == null && widget.cacheMedia) {
+      final candidate = await MediaCache.audioFileForKey(
+        widget.urls.originCacheKey,
+      );
+      try {
+        if (await candidate.exists() && await candidate.length() > 0) {
+          cachedFile = candidate;
+        }
+      } catch (_) {
+        // An eviction racing this lookup is an ordinary cache miss.
+      }
+    }
+    if (cachedFile != null) {
+      if (!mounted) return;
+      await downloadAndSave(
+        context,
+        ProviderScope.containerOf(context, listen: false),
+        widget.urls.download,
+        widget.meta.name,
+        cacheKey: widget.urls.originCacheKey,
+        cachedFile: cachedFile,
+      );
+      return;
+    }
+    if (!mounted) return;
+    await downloadAndSave(
+      context,
+      ProviderScope.containerOf(context, listen: false),
+      widget.urls.download,
+      widget.meta.name,
+      cacheKey: widget.cacheMedia ? widget.urls.originCacheKey : null,
+    );
   }
 
   @override
@@ -1142,8 +1462,21 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> {
     _durSub?.cancel();
     _posSub?.cancel();
     _stateSub?.cancel();
-    _player.dispose();
+    _cacheProgressSub?.cancel();
+    final playerDisposed = _player.dispose();
+    _releaseAudioCacheReader(after: playerDisposed);
     super.dispose();
+  }
+
+  void _releaseAudioCacheReader({Future<void>? after}) {
+    final path = _audioCachePath;
+    final token = _audioCacheReaderToken;
+    _audioCachePath = null;
+    _audioCacheReaderToken = null;
+    if (path != null && token != null) {
+      Future<void> release() => MediaCache.releaseAudioCacheReader(path, token);
+      unawaited(after == null ? release() : after.whenComplete(release));
+    }
   }
 
   @override
@@ -1205,12 +1538,7 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> {
                 ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                onPressed: () => downloadAndSave(
-                  context,
-                  ProviderScope.containerOf(context, listen: false),
-                  widget.urls.download,
-                  widget.meta.name,
-                ),
+                onPressed: _download,
               ),
             ],
           ),
@@ -1218,14 +1546,21 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> {
           Row(
             children: [
               IconButton(
-                onPressed: !_ready
-                    ? null
-                    : () => playing ? _player.pause() : _player.play(),
-                icon: Icon(
-                  playing ? Icons.pause_circle : Icons.play_circle,
-                  color: AppTokens.primary500,
-                  size: 32,
-                ),
+                onPressed: _loading ? null : _togglePlayback,
+                icon: _loading
+                    ? SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTokens.primary500,
+                        ),
+                      )
+                    : Icon(
+                        playing ? Icons.pause_circle : Icons.play_circle,
+                        color: AppTokens.primary500,
+                        size: 32,
+                      ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),

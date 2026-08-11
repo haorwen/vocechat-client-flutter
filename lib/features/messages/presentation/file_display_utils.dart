@@ -9,6 +9,7 @@ import 'package:media_store_plus/media_store_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../core/network/dio_client.dart';
+import '../../../core/storage/media_cache.dart';
 import '../../../core/utils/app_log.dart';
 import '../../../l10n/generated/app_localizations.dart';
 
@@ -54,7 +55,60 @@ Future<void> _ensureMediaStoreReady() async {
   _mediaStoreReady = true;
 }
 
+String _safeDownloadFilename(String filename) {
+  final safe = filename.trim().replaceAll(RegExp(r'[/\\]'), '_');
+  return safe.isEmpty || safe == '.' || safe == '..' ? 'download' : safe;
+}
+
+Future<Uint8List> _downloadBytes(
+  ProviderContainer container,
+  String url,
+  File? localFile,
+) async {
+  if (localFile != null) {
+    try {
+      final data = await localFile.readAsBytes();
+      if (data.isNotEmpty) return data;
+    } on FileSystemException {
+      // An LRU eviction racing this read is a normal network-cache miss.
+    }
+  }
+
+  final dio = container.read(dioProvider);
+  final response = await dio.get<List<int>>(
+    url,
+    options: Options(responseType: ResponseType.bytes),
+  );
+  final bytes = response.data;
+  if (bytes == null || bytes.isEmpty) throw Exception('empty response');
+  return bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
+}
+
+Future<void> _downloadToFile(
+  ProviderContainer container,
+  String url,
+  File target,
+  File? localFile,
+) async {
+  if (localFile != null) {
+    try {
+      await localFile.copy(target.path);
+      if (await target.length() > 0) return;
+    } on FileSystemException {
+      // Fall through when the cache is evicted during the copy.
+    }
+  }
+
+  await container.read(dioProvider).download(url, target.path);
+  if (!await target.exists() || await target.length() == 0) {
+    throw Exception('empty response');
+  }
+}
+
 /// Downloads [url] via the app's Dio client and saves the file.
+///
+/// If [cachedFile] is available, or [cacheKey] resolves to a completed local
+/// media file, those bytes are reused instead of re-fetching over the network.
 ///
 /// - Android: writes straight into `Downloads/vocechat` via [MediaStore] —
 ///   no SAF picker, no permission prompt on API 29+.
@@ -67,41 +121,50 @@ Future<void> downloadAndSave(
   BuildContext context,
   ProviderContainer container,
   String url,
-  String filename,
-) async {
+  String filename, {
+  String? cacheKey,
+  File? cachedFile,
+}) async {
   final l = AppL10n.of(context);
   try {
-    final dio = container.read(dioProvider);
-    final response = await dio.get<List<int>>(
-      url,
-      options: Options(responseType: ResponseType.bytes),
-    );
-    final bytes = response.data;
-    if (bytes == null || bytes.isEmpty) throw Exception('empty response');
-
-    final Uint8List data =
-        bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
+    final localFile = cachedFile ??
+        (cacheKey == null ? null : await MediaCache.fileForKey(cacheKey));
 
     if (!kIsWeb && Platform.isAndroid) {
       await _ensureMediaStoreReady();
-      // MediaStore.saveFile takes a source file path (it copies then
-      // deletes it), so stage the bytes in the app's temp dir first.
+      // MediaStore copies then deletes its source. A unique subdirectory keeps
+      // simultaneous same-name downloads separate without changing the name
+      // shown in Downloads/vocechat.
       final tempDir = await getTemporaryDirectory();
-      final tempFile = File('${tempDir.path}/$filename');
-      await tempFile.writeAsBytes(data, flush: true);
-      final saveInfo = await MediaStore().saveFile(
-        tempFilePath: tempFile.path,
-        dirType: DirType.download,
-        dirName: DirName.download,
-      );
-      if (saveInfo == null) throw Exception('MediaStore save returned null');
+      final stagingDir = await tempDir.createTemp('voce_download_');
+      try {
+        final tempFile = File(
+          '${stagingDir.path}/${_safeDownloadFilename(filename)}',
+        );
+        await _downloadToFile(container, url, tempFile, localFile);
+        final saveInfo = await MediaStore().saveFile(
+          tempFilePath: tempFile.path,
+          dirType: DirType.download,
+          dirName: DirName.download,
+        );
+        if (saveInfo == null) throw Exception('MediaStore save returned null');
+      } finally {
+        try {
+          if (await stagingDir.exists()) {
+            await stagingDir.delete(recursive: true);
+          }
+        } on FileSystemException {
+          // The OS may still be finishing the MediaStore copy.
+        }
+      }
     } else if (kIsWeb || Platform.isIOS) {
+      final data = await _downloadBytes(container, url, localFile);
       await FilePicker.platform.saveFile(fileName: filename, bytes: data);
     } else {
-      // Desktop: saveFile returns the chosen path; write bytes ourselves.
+      // Desktop: saveFile returns the chosen path; copy or stream into it.
       final path = await FilePicker.platform.saveFile(fileName: filename);
       if (path == null) return; // user cancelled
-      await File(path).writeAsBytes(data, flush: true);
+      await _downloadToFile(container, url, File(path), localFile);
     }
 
     if (context.mounted) {

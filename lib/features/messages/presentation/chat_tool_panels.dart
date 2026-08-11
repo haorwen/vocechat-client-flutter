@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -543,10 +544,11 @@ class _FavArchiveCard extends ConsumerWidget {
                   child: ConstrainedBox(
                     constraints:
                         const BoxConstraints(maxWidth: 220, maxHeight: 160),
-                    child: Image.network(
-                      imageUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      cacheKey: '$currentUid::$imageUrl',
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Text(
+                      errorWidget: (_, __, ___) => Text(
                         l.previewImage,
                         style:
                             TextStyle(fontSize: 13, color: AppTokens.gray600),

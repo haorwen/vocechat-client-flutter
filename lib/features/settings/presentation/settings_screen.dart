@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/i18n/locale_provider.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/storage/media_cache.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_provider.dart';
@@ -1290,10 +1290,10 @@ class _StoragePaneState extends ConsumerState<_StoragePane> {
       // SQLite message + directory snapshot cache.
       final cache = await ref.read(messageCacheProvider.future);
       await cache.clearAll();
-      // Network image cache: in-memory decoded images + on-disk file cache.
+      // Decoded images plus persistent image/video/streamed-audio files.
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();
-      await DefaultCacheManager().emptyCache();
+      await MediaCache.clear();
       // Rebuild the conversation list from the now-empty cache; it falls back
       // to a network refresh (see Conversations.build no-cache path).
       ref.invalidate(conversationsProvider);

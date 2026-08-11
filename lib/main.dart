@@ -1,14 +1,20 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fvp/fvp.dart' as fvp;
+import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:vocechat_client/core/i18n/locale_provider.dart';
 import 'package:vocechat_client/core/router/app_router.dart';
 import 'package:vocechat_client/core/router/deep_link_listener.dart';
+import 'package:vocechat_client/core/storage/media_cache.dart';
+import 'package:vocechat_client/core/storage/video_stream_cache.dart';
 import 'package:vocechat_client/core/theme/app_theme.dart';
 import 'package:vocechat_client/core/theme/theme_provider.dart';
 import 'package:vocechat_client/l10n/generated/app_localizations.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
   // video_player has no official Windows/Linux backend; fvp fills that gap
   // and defers to the official implementation on platforms that have one.
   // Android is also opted in (even though video_player_android exists)
@@ -17,6 +23,11 @@ void main() {
   // stock plugin has no such fallback and its channel just dies, so some
   // servers' HEVC uploads simply won't play at all on affected devices.
   fvp.registerWith(options: {'platforms': ['windows', 'linux', 'android']});
+  if (!kIsWeb) {
+    JustAudioMediaKit.ensureInitialized();
+    await MediaCache.trimAudioCache();
+    await VideoStreamCache.initialize();
+  }
   runApp(const ProviderScope(child: VoceChatApp()));
 }
 
