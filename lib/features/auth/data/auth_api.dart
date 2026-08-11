@@ -88,6 +88,13 @@ class AuthApi {
     return RenewResponse.fromJson(resp.data as Map<String, dynamic>);
   }
 
+  Future<void> updateDeviceToken(String deviceToken) async {
+    await _dio.put(
+      '/api/token/device_token',
+      data: {'device_token': deviceToken},
+    );
+  }
+
   Future<void> logout() async {
     await _dio.get('/api/token/logout');
   }

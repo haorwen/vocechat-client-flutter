@@ -3,6 +3,10 @@ plugins {
     id "kotlin-android"
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id "dev.flutter.flutter-gradle-plugin"
+    // com.google.gms.google-services (declared with apply false in
+    // settings.gradle) is applied conditionally near the bottom of this
+    // file, only when google-services.json is present — see that block for
+    // why.
 }
 
 def keystoreProperties = new Properties()
@@ -57,4 +61,11 @@ android {
 
 flutter {
     source = "../.."
+}
+
+// Apply Google Services only when its config file has been injected (e.g. by
+// CI from a secret, or manually for local FCM testing) — see plugins block
+// above for why this can't be a plain `apply plugin`.
+if (file("google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
 }

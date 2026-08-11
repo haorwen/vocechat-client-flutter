@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/notifications/fcm_service.dart';
 import '../../features/auth/application/auth_controller.dart';
 import '../../features/server/presentation/server_picker_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
@@ -68,6 +69,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   final refreshNotifier = _RouterRefreshNotifier();
   ref.listen(authControllerProvider, (_, __) => refreshNotifier.refresh());
   ref.listen(serverStoreProvider, (_, __) => refreshNotifier.refresh());
+  ref.listen(fcmPendingChatTargetProvider, (_, __) => refreshNotifier.refresh());
   ref.onDispose(refreshNotifier.dispose);
 
   return GoRouter(
@@ -118,6 +120,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // Authenticated → block auth screens, send splash to home
       const authScreens = ['/login', '/register', '/splash'];
       if (authScreens.contains(location)) return '/home';
+
+      // FCM notification tap: navigate to the target chat and clear the
+      // pending state so the redirect only fires once.
+      final pendingFcm = ref.read(fcmPendingChatTargetProvider);
+      if (pendingFcm != null) {
+        ref.read(fcmPendingChatTargetProvider.notifier).state = null;
+        return '/home/chat/$pendingFcm';
+      }
 
       // Validate nested chat route IDs — redirect invalid ones to /home.
       // Tile IDs are emitted as `u-<uid>` / `g-<gid>`, so the hyphen is part

@@ -2,6 +2,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/dio_client.dart';
+import '../../../core/notifications/fcm_service.dart';
 import '../../../core/storage/account_store.dart';
 import '../../../core/storage/secure_token_store.dart';
 import '../../../core/storage/server_store.dart';
@@ -320,12 +321,14 @@ class AuthController extends _$AuthController {
             ? ref.read(authApiProvider)
             : AuthApi(VoceDioClient(baseUrl: targetBaseUrl, ref: ref).dio);
 
+        final deviceToken = await getFcmDeviceToken();
         final request = LoginRequest(
           credential: Credential.password(
             email: email,
             password: AuthApi.hashPassword(password),
           ),
           device: 'flutter',
+          deviceToken: deviceToken.isEmpty ? null : deviceToken,
         );
         final response = await api.login(request);
 
@@ -547,6 +550,15 @@ class AuthController extends _$AuthController {
               ),
             );
         await ref.read(accountStoreProvider.notifier).selectAccount(accountId);
+
+        // Best-effort: upload the FCM token so this device receives pushes.
+        // Failures are silently swallowed — registration itself has succeeded.
+        final regDeviceToken = await getFcmDeviceToken();
+        if (regDeviceToken.isNotEmpty) {
+          try {
+            await api.updateDeviceToken(regDeviceToken);
+          } catch (_) {}
+        }
 
         return AuthState.authenticated(user: response.user);
       } finally {

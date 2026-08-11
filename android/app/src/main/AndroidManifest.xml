@@ -11,6 +11,8 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED"/>
+    <!-- Required on Android 13+ to display FCM push notifications -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- media_store_plus (attachment "Download" button, saves to
          Downloads/vocechat): below API 30 it falls back to a direct file
          write instead of MediaStore, which needs this on API <=29. Capped

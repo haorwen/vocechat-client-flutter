@@ -25,6 +25,11 @@ jobs:
           cache: true
           cache-key: "flutter-:channel:-:version:-:arch:-:hash:"
 
+      # Agora 6.5.4's iOS Swift package cannot resolve AgoraPIPController.h.
+      # Remove this fallback after https://github.com/AgoraIO-Extensions/Agora-Flutter-SDK/issues/2626 is released.
+      - name: Use CocoaPods for iOS plugins
+        run: flutter config --no-enable-swift-package-manager
+
       - name: Cache Pub dependencies
         uses: actions/cache@v4
         with:
@@ -79,6 +84,24 @@ jobs:
         run: |
           mkdir -p ~/private_keys
           echo -n "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode -o ~/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
+
+      # --- Firebase Cloud Messaging (FCM) setup ---
+      # Optional: if GOOGLE_SERVICE_INFO_PLIST_BASE64 isn't set, the step
+      # below is a no-op and the app still builds — Firebase.initializeApp()
+      # is wrapped in a try/catch in main.dart, so push notifications are
+      # just silently unavailable.
+      # Required secret to enable FCM:
+      #   GOOGLE_SERVICE_INFO_PLIST_BASE64   base64 of GoogleService-Info.plist
+      #                                       (Firebase Console → iOS app → download)
+      - name: Install Firebase config (GoogleService-Info.plist)
+        env:
+          GOOGLE_SERVICE_INFO_PLIST_BASE64: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+        run: |
+          if [ -n "$GOOGLE_SERVICE_INFO_PLIST_BASE64" ]; then
+            echo -n "$GOOGLE_SERVICE_INFO_PLIST_BASE64" | base64 --decode -o ios/Runner/GoogleService-Info.plist
+          else
+            echo "GOOGLE_SERVICE_INFO_PLIST_BASE64 not set — skipping, FCM will be unavailable in this build."
+          fi
 
       - name: Bump build number
         run: |
