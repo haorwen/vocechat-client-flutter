@@ -165,6 +165,20 @@ class _VoceVideoUrlMatcher extends UrlMatcherDefault {
   String _resourcePath(Uri uri) =>
       (uri.queryParameters['file_path'] ?? uri.path).toLowerCase();
 
+  // The server stores uploads under an extensionless UUID path
+  // (vocechat-server/src/api/resource.rs) and rejects any `file_path`
+  // containing `.`, so `_resourcePath` never ends in `.mp4`. Without this,
+  // `matchMp4` was always false, every chat video fell through to
+  // `UrlParserDefault`, and that parser's range handling answers the
+  // player's initial `bytes=0-` probe with `200 OK` + a `Content-Range`
+  // header — a combination that signals a broken range server and can make
+  // the player hang instead of starting playback. `UrlParserMp4` answers
+  // that probe correctly, so route every real resource request there.
+  bool _isResourceFileRequest(Uri uri) =>
+      uri.path.toLowerCase().endsWith('/api/resource/file') &&
+      uri.queryParameters['file_path'] != null &&
+      uri.queryParameters['thumbnail'] != 'true';
+
   @override
   bool matchM3u8(Uri uri) => _resourcePath(uri).endsWith('.m3u8');
 
@@ -177,9 +191,14 @@ class _VoceVideoUrlMatcher extends UrlMatcherDefault {
   @override
   bool matchMp4(Uri uri) {
     final path = _resourcePath(uri);
-    return path.endsWith('.mp4') ||
+    if (path.endsWith('.mp4') ||
         path.endsWith('.m4v') ||
-        path.endsWith('.mov');
+        path.endsWith('.mov')) {
+      return true;
+    }
+    // The server never serves HLS playlists, so any non-thumbnail resource
+    // request that reaches this matcher is a single-file video stream.
+    return _isResourceFileRequest(uri);
   }
 
   @override
