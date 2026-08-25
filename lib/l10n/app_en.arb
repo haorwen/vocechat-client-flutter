@@ -416,7 +416,7 @@
   "chatCopiedToClipboard": "Copied to clipboard",
   "chatForwardedMessagePreview": "[Forwarded message]",
   "chatAutoDeleteTitle": "Auto-delete messages",
-  "chatExpiresTooltip": "Disappears {duration} after being sent",
+  "chatExpiresTooltip": "Automatically deleted {duration} after being sent",
   "@chatExpiresTooltip": {
     "placeholders": {"duration": {"type": "String"}}
   },

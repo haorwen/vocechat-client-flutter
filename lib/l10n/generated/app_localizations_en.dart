@@ -983,7 +983,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String chatExpiresTooltip(String duration) {
-    return 'Disappears $duration after being sent';
+    return 'Automatically deleted $duration after being sent';
   }
 
   @override

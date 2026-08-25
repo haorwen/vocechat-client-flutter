@@ -727,9 +727,23 @@ class _AutoDeletePanelState extends ConsumerState<_AutoDeletePanel> {
     final l = AppL10n.of(context);
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              l.chatExpiresTooltip(l.chatAutoDelete5Min),
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: AppTokens.gray500,
+              ),
+            ),
+          ),
+        ),
         Expanded(
           child: ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: 4),
             itemCount: _options.length,
             separatorBuilder: (_, __) =>
                 Divider(height: 1, color: AppTokens.gray200),

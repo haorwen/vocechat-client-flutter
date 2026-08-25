@@ -77,7 +77,8 @@ class BurnAfterRead extends _$BurnAfterRead {
   Future<bool> setUser(int uid, int expiresIn) async {
     final api = ref.read(messageApiProvider);
     try {
-      await api.updateBurnAfterReading(users: [(uid: uid, expiresIn: expiresIn)]);
+      await api
+          .updateBurnAfterReading(users: [(uid: uid, expiresIn: expiresIn)]);
       final next = Map<int, int>.from(state.users);
       if (expiresIn > 0) {
         next[uid] = expiresIn;
@@ -86,9 +87,10 @@ class BurnAfterRead extends _$BurnAfterRead {
       }
       state = state.copyWith(users: next);
       return true;
-    } on DioException catch (e) {
-      AppLog.w(LogTag.chat,
-          () => '[burnAfterRead] setUser($uid) failed: ${e.message}');
+    } catch (e) {
+      final message = e is DioException ? e.message : e.toString();
+      AppLog.w(
+          LogTag.chat, () => '[burnAfterRead] setUser($uid) failed: $message');
       return false;
     }
   }
@@ -107,9 +109,10 @@ class BurnAfterRead extends _$BurnAfterRead {
       }
       state = state.copyWith(groups: next);
       return true;
-    } on DioException catch (e) {
-      AppLog.w(LogTag.chat,
-          () => '[burnAfterRead] setGroup($gid) failed: ${e.message}');
+    } catch (e) {
+      final message = e is DioException ? e.message : e.toString();
+      AppLog.w(
+          LogTag.chat, () => '[burnAfterRead] setGroup($gid) failed: $message');
       return false;
     }
   }

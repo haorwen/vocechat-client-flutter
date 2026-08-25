@@ -1964,7 +1964,7 @@ abstract class AppL10n {
   /// No description provided for @chatExpiresTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Disappears {duration} after being sent'**
+  /// **'Automatically deleted {duration} after being sent'**
   String chatExpiresTooltip(String duration);
 
   /// No description provided for @chatAutoDeleteOff.

@@ -979,11 +979,11 @@ class AppL10nZh extends AppL10n {
   String get chatForwardedMessagePreview => '[转发的消息]';
 
   @override
-  String get chatAutoDeleteTitle => '阅后即焚';
+  String get chatAutoDeleteTitle => '自动删除消息';
 
   @override
   String chatExpiresTooltip(String duration) {
-    return '发送后 $duration 消失';
+    return '发送后 $duration 自动删除';
   }
 
   @override
