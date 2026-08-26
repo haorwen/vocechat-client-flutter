@@ -138,23 +138,42 @@ Future<void> downloadAndSave(
       final tempDir = await getTemporaryDirectory();
       final stagingDir = await tempDir.createTemp('voce_download_');
       try {
-        final tempFile = File(
-          '${stagingDir.path}/${_safeDownloadFilename(filename)}',
-        );
+        final safeFilename = _safeDownloadFilename(filename);
+        final tempFile = File('${stagingDir.path}/$safeFilename');
         await _downloadToFile(container, url, tempFile, localFile);
-        final saveInfo = await MediaStore().saveFile(
+        final mediaStore = MediaStore();
+        final saveInfo = await mediaStore.saveFile(
           tempFilePath: tempFile.path,
           dirType: DirType.download,
           dirName: DirName.download,
         );
-        if (saveInfo == null) throw Exception('MediaStore save returned null');
+        if (saveInfo == null) {
+          // media_store_plus 0.1.3 can save successfully but fail to decode
+          // SaveInfo in release builds. Verify the final MediaStore entry
+          // before reporting a failure to the user.
+          final savedUri = await mediaStore.getFileUri(
+            fileName: safeFilename,
+            dirType: DirType.download,
+            dirName: DirName.download,
+          );
+          if (savedUri == null) {
+            throw Exception('MediaStore save returned null');
+          }
+        }
       } finally {
         try {
           if (await stagingDir.exists()) {
             await stagingDir.delete(recursive: true);
           }
-        } on FileSystemException {
-          // The OS may still be finishing the MediaStore copy.
+        } catch (e, st) {
+          // Saving has already completed. Cleanup failure must not turn a
+          // successful download into a user-visible failure.
+          AppLog.w(
+            LogTag.general,
+            () => 'download staging cleanup failed path=${stagingDir.path}',
+            error: e,
+            stackTrace: st,
+          );
         }
       }
     } else if (kIsWeb || Platform.isIOS) {
@@ -172,7 +191,8 @@ Future<void> downloadAndSave(
           .showSnackBar(SnackBar(content: Text(l.downloadSaved)));
     }
   } catch (e, st) {
-    AppLog.e(LogTag.general, () => 'download failed url=$url', error: e, stackTrace: st);
+    AppLog.e(LogTag.general, () => 'download failed url=$url',
+        error: e, stackTrace: st);
     if (context.mounted) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(l.downloadFailed)));
