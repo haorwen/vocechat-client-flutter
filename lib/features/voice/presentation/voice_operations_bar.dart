@@ -12,7 +12,9 @@ import 'voice_fullscreen_view.dart';
 /// Wrap layout on narrow mobile screens so the hang-up button never overflows.
 /// Also shows a local camera preview when video is active.
 class VoiceOperationsBar extends ConsumerWidget {
-  const VoiceOperationsBar({super.key});
+  const VoiceOperationsBar({super.key, this.fullscreen = false});
+
+  final bool fullscreen;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -25,10 +27,7 @@ class VoiceOperationsBar extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final engine = controller.engineOrNull;
-    final channelName = controller.channelNameOrNull;
-    final localUid = controller.localUidOrNull;
-    final showLocalPreview =
-        info.video && engine != null && !kIsWeb;
+    final showLocalPreview = info.video && engine != null && !kIsWeb;
 
     return Material(
       color: isDark ? const Color(0xFF15171C) : const Color(0xFFF1F2F4),
@@ -50,8 +49,7 @@ class VoiceOperationsBar extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color:
-                        reconnecting ? Colors.red : Colors.green.shade700,
+                    color: reconnecting ? Colors.red : Colors.green.shade700,
                   ),
                 ),
               ],
@@ -92,10 +90,8 @@ class VoiceOperationsBar extends ConsumerWidget {
                 ),
                 if (isVoiceCallingSupported)
                   _ToolButton(
-                    tooltip:
-                        info.video ? l.voiceCameraOff : l.voiceCameraOn,
-                    icon:
-                        info.video ? Icons.videocam : Icons.videocam_off,
+                    tooltip: info.video ? l.voiceCameraOff : l.voiceCameraOn,
+                    icon: info.video ? Icons.videocam : Icons.videocam_off,
                     active: info.video,
                     onTap: () => info.video
                         ? controller.closeCamera()
@@ -114,13 +110,22 @@ class VoiceOperationsBar extends ConsumerWidget {
                         : controller.startShareScreen(),
                   ),
                 _ToolButton(
-                  tooltip: l.voiceFullscreen,
-                  icon: Icons.fullscreen,
+                  tooltip: fullscreen
+                      ? MaterialLocalizations.of(context).closeButtonTooltip
+                      : l.voiceFullscreen,
+                  icon: fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
                   active: false,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => const VoiceFullscreenView()),
-                  ),
+                  onTap: () {
+                    if (fullscreen) {
+                      Navigator.of(context).pop();
+                      return;
+                    }
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const VoiceFullscreenView(),
+                      ),
+                    );
+                  },
                 ),
                 _ToolButton(
                   tooltip: l.voiceLeave,

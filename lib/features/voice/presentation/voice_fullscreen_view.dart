@@ -18,7 +18,8 @@ class VoiceFullscreenView extends ConsumerStatefulWidget {
   const VoiceFullscreenView({super.key});
 
   @override
-  ConsumerState<VoiceFullscreenView> createState() => _VoiceFullscreenViewState();
+  ConsumerState<VoiceFullscreenView> createState() =>
+      _VoiceFullscreenViewState();
 }
 
 class _VoiceFullscreenViewState extends ConsumerState<VoiceFullscreenView> {
@@ -51,7 +52,7 @@ class _VoiceFullscreenViewState extends ConsumerState<VoiceFullscreenView> {
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: VoiceOperationsBar(),
+                  child: VoiceOperationsBar(fullscreen: true),
                 ),
               ],
             );
@@ -85,7 +86,8 @@ class _SpotlightLayout extends ConsumerWidget {
       children: [
         Expanded(
           flex: 3,
-          child: _VideoTile(uid: pinnedUid, info: members.byId[pinnedUid], large: true),
+          child: _VideoTile(
+              uid: pinnedUid, info: members.byId[pinnedUid], large: true),
         ),
         if (others.isNotEmpty)
           SizedBox(
@@ -160,7 +162,8 @@ class _VideoTile extends ConsumerWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF23262E),
           borderRadius: BorderRadius.circular(12),
-          border: speaking ? Border.all(color: Colors.greenAccent, width: 2) : null,
+          border:
+              speaking ? Border.all(color: Colors.greenAccent, width: 2) : null,
         ),
         clipBehavior: Clip.antiAlias,
         child: Stack(
@@ -196,9 +199,12 @@ class _VideoTile extends ConsumerWidget {
                     if (info?.muted ?? false)
                       const Padding(
                         padding: EdgeInsets.only(right: 4),
-                        child: Icon(Icons.mic_off, color: Colors.white, size: 12),
+                        child:
+                            Icon(Icons.mic_off, color: Colors.white, size: 12),
                       ),
-                    Text(name, style: const TextStyle(color: Colors.white, fontSize: 11)),
+                    Text(name,
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 11)),
                   ],
                 ),
               ),

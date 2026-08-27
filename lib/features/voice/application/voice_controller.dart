@@ -38,7 +38,6 @@ bool get isVoiceCallingSupported =>
 @Riverpod(keepAlive: true)
 class VoiceController extends _$VoiceController {
   RtcEngine? _engine;
-  RtcEngineEventHandler? _handler;
   String? _channelName;
   int? _localUid;
 
@@ -84,7 +83,8 @@ class VoiceController extends _$VoiceController {
 
     final handler = RtcEngineEventHandler(
       onJoinChannelSuccess: (connection, elapsed) {
-        AppLog.d(LogTag.voice, () => '🎙️ joined channel=${connection.channelId}');
+        AppLog.d(
+            LogTag.voice, () => '🎙️ joined channel=${connection.channelId}');
       },
       onUserJoined: (connection, remoteUid, elapsed) {
         _upsertMember(remoteUid, const VoicingMemberInfo());
@@ -101,10 +101,12 @@ class VoiceController extends _$VoiceController {
       onUserMuteVideo: (connection, remoteUid, muted) {
         _patchMember(
           remoteUid,
-          (m) => m.copyWith(video: !muted, shareScreen: muted ? false : m.shareScreen),
+          (m) => m.copyWith(
+              video: !muted, shareScreen: muted ? false : m.shareScreen),
         );
       },
-      onAudioVolumeIndication: (connection, speakers, speakerNumber, totalVolume) {
+      onAudioVolumeIndication:
+          (connection, speakers, speakerNumber, totalVolume) {
         for (final s in speakers) {
           final uid = s.uid;
           final volume = s.volume;
@@ -132,7 +134,6 @@ class VoiceController extends _$VoiceController {
     engine.registerEventHandler(handler);
 
     _engine = engine;
-    _handler = handler;
     return engine;
   }
 
@@ -290,8 +291,12 @@ class VoiceController extends _$VoiceController {
     if (current.shareScreen) await _stopShareScreenInternal(engine, current);
     await engine.enableLocalVideo(true);
     await engine.muteLocalVideoStream(false);
+    await engine.startPreview();
     await engine.updateChannelMediaOptions(
-      const ChannelMediaOptions(publishCameraTrack: true, publishScreenTrack: false),
+      const ChannelMediaOptions(
+        publishCameraTrack: true,
+        publishScreenTrack: false,
+      ),
     );
     state = (state ?? current).copyWith(video: true, shareScreen: false);
   }
@@ -304,6 +309,7 @@ class VoiceController extends _$VoiceController {
     await engine.updateChannelMediaOptions(
       const ChannelMediaOptions(publishCameraTrack: false),
     );
+    await engine.stopPreview();
     state = current.copyWith(video: false);
   }
 
@@ -325,7 +331,8 @@ class VoiceController extends _$VoiceController {
         captureParams: const ScreenCaptureParameters(),
       );
       await engine.updateChannelMediaOptions(
-        const ChannelMediaOptions(publishScreenTrack: true, publishCameraTrack: false),
+        const ChannelMediaOptions(
+            publishScreenTrack: true, publishCameraTrack: false),
       );
     } else {
       // Android/iOS: in-app screen sharing via ReplayKit/MediaProjection.
@@ -359,7 +366,8 @@ class VoiceController extends _$VoiceController {
         const ChannelMediaOptions(publishScreenTrack: false),
       );
     } else {
-      await engine.stopScreenCaptureBySourceType(VideoSourceType.videoSourceScreen);
+      await engine
+          .stopScreenCaptureBySourceType(VideoSourceType.videoSourceScreen);
       await engine.updateChannelMediaOptions(
         const ChannelMediaOptions(publishScreenCaptureVideo: false),
       );
