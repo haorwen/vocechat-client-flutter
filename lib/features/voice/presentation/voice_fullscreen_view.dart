@@ -1,14 +1,13 @@
-import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/generated/app_localizations.dart';
-import '../../../shared/widgets/voce_avatar.dart';
 import '../../contacts/application/user_directory_provider.dart';
 import '../../messages/domain/message_models.dart';
 import '../application/voice_controller.dart';
 import '../domain/voice_models.dart';
 import 'voice_operations_bar.dart';
+import 'voice_participant_video_tile.dart';
 
 /// Multi-user video grid, mirrors the web reference's
 /// `routes/chat/VoiceFullscreen.tsx`: a pinned/spotlighted tile up top (if
@@ -86,8 +85,12 @@ class _SpotlightLayout extends ConsumerWidget {
       children: [
         Expanded(
           flex: 3,
-          child: _VideoTile(
-              uid: pinnedUid, info: members.byId[pinnedUid], large: true),
+          child: VoiceParticipantVideoTile(
+            uid: pinnedUid,
+            memberInfo: members.byId[pinnedUid],
+            large: true,
+            onTap: () => ref.read(voiceControllerProvider.notifier).unpin(),
+          ),
         ),
         if (others.isNotEmpty)
           SizedBox(
@@ -102,7 +105,12 @@ class _SpotlightLayout extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: SizedBox(
                     width: 100,
-                    child: _VideoTile(uid: uid, info: members.byId[uid]),
+                    child: VoiceParticipantVideoTile(
+                      uid: uid,
+                      memberInfo: members.byId[uid],
+                      onTap: () =>
+                          ref.read(voiceControllerProvider.notifier).pin(uid),
+                    ),
                   ),
                 );
               },
@@ -113,13 +121,13 @@ class _SpotlightLayout extends ConsumerWidget {
   }
 }
 
-class _GridLayout extends StatelessWidget {
+class _GridLayout extends ConsumerWidget {
   const _GridLayout({required this.members});
 
   final VoicingMembers members;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (members.ids.isEmpty) return const SizedBox.shrink();
     return GridView.builder(
       padding: const EdgeInsets.all(8),
@@ -132,86 +140,12 @@ class _GridLayout extends StatelessWidget {
       itemCount: members.ids.length,
       itemBuilder: (context, i) {
         final uid = members.ids[i];
-        return _VideoTile(uid: uid, info: members.byId[uid]);
+        return VoiceParticipantVideoTile(
+          uid: uid,
+          memberInfo: members.byId[uid],
+          onTap: () => ref.read(voiceControllerProvider.notifier).pin(uid),
+        );
       },
-    );
-  }
-}
-
-class _VideoTile extends ConsumerWidget {
-  const _VideoTile({required this.uid, this.info, this.large = false});
-
-  final int uid;
-  final VoicingMemberInfo? info;
-  final bool large;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final userDir = ref.watch(userDirectoryProvider).valueOrNull ?? const {};
-    final name = userDir[uid]?.name ?? '#$uid';
-    final controller = ref.read(voiceControllerProvider.notifier);
-    final engine = controller.engineOrNull;
-    final channelName = controller.channelNameOrNull;
-    final localUid = controller.localUidOrNull;
-    final showVideo = (info?.video ?? false) || (info?.shareScreen ?? false);
-    final speaking = (info?.speakingVolume ?? 0) > 50;
-
-    return GestureDetector(
-      onTap: () => controller.pin(uid),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF23262E),
-          borderRadius: BorderRadius.circular(12),
-          border:
-              speaking ? Border.all(color: Colors.greenAccent, width: 2) : null,
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (showVideo && engine != null && channelName != null)
-              AgoraVideoView(
-                controller: uid == localUid
-                    ? VideoViewController(
-                        rtcEngine: engine,
-                        canvas: VideoCanvas(uid: 0),
-                      )
-                    : VideoViewController.remote(
-                        rtcEngine: engine,
-                        canvas: VideoCanvas(uid: uid),
-                        connection: RtcConnection(channelId: channelName),
-                      ),
-              )
-            else
-              Center(child: VoceAvatar(name: name, size: large ? 96 : 48)),
-            Positioned(
-              left: 8,
-              bottom: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (info?.muted ?? false)
-                      const Padding(
-                        padding: EdgeInsets.only(right: 4),
-                        child:
-                            Icon(Icons.mic_off, color: Colors.white, size: 12),
-                      ),
-                    Text(name,
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 11)),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

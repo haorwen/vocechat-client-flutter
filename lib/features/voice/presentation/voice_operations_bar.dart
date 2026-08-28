@@ -1,4 +1,3 @@
-import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,17 +6,25 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../application/voice_controller.dart';
 import '../domain/voice_models.dart';
 import 'voice_fullscreen_view.dart';
+import 'voice_participant_video_tile.dart';
 
 /// In-call control bar. Adapts from a single row (wide screens) to a two-row
 /// Wrap layout on narrow mobile screens so the hang-up button never overflows.
-/// Also shows a local camera preview when video is active.
-class VoiceOperationsBar extends ConsumerWidget {
+/// The compact mode shows every participant in a horizontally scrollable strip.
+class VoiceOperationsBar extends ConsumerStatefulWidget {
   const VoiceOperationsBar({super.key, this.fullscreen = false});
 
   final bool fullscreen;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<VoiceOperationsBar> createState() => _VoiceOperationsBarState();
+}
+
+class _VoiceOperationsBarState extends ConsumerState<VoiceOperationsBar> {
+  bool _openingFullscreen = false;
+
+  @override
+  Widget build(BuildContext context) {
     final info = ref.watch(voiceControllerProvider);
     if (info == null) return const SizedBox.shrink();
     final l = AppL10n.of(context);
@@ -26,8 +33,7 @@ class VoiceOperationsBar extends ConsumerWidget {
         info.connectionState == VoiceConnectionState.reconnecting;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final engine = controller.engineOrNull;
-    final showLocalPreview = info.video && engine != null && !kIsWeb;
+    final showParticipants = !widget.fullscreen && !_openingFullscreen;
 
     return Material(
       color: isDark ? const Color(0xFF15171C) : const Color(0xFFF1F2F4),
@@ -38,39 +44,51 @@ class VoiceOperationsBar extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Status row
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _NetworkDot(quality: info.downlinkNetworkQuality),
-                const SizedBox(width: 6),
-                Text(
-                  reconnecting ? l.voiceReconnecting : l.voiceConnected,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: reconnecting ? Colors.red : Colors.green.shade700,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            // Local camera preview — shown only when video is on
-            if (showLocalPreview)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: 100,
-                  height: 75,
-                  child: AgoraVideoView(
-                    controller: VideoViewController(
-                      rtcEngine: engine,
-                      canvas: const VideoCanvas(uid: 0),
+            if (!widget.fullscreen)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _NetworkDot(quality: info.downlinkNetworkQuality),
+                  const SizedBox(width: 6),
+                  Text(
+                    reconnecting ? l.voiceReconnecting : l.voiceConnected,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: reconnecting ? Colors.red : Colors.green.shade700,
                     ),
                   ),
-                ),
+                ],
               ),
-            if (showLocalPreview) const SizedBox(height: 4),
+            if (showParticipants) ...[
+              const SizedBox(height: 8),
+              ValueListenableBuilder<VoicingMembers>(
+                valueListenable: controller.members,
+                builder: (context, members, _) {
+                  if (members.ids.isEmpty) return const SizedBox.shrink();
+                  return SizedBox(
+                    height: 90,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: members.ids.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        final uid = members.ids[index];
+                        return SizedBox(
+                          width: 120,
+                          child: VoiceParticipantVideoTile(
+                            key: ValueKey('compact-participant-$uid'),
+                            uid: uid,
+                            memberInfo: members.byId[uid],
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ],
+            if (!widget.fullscreen) const SizedBox(height: 4),
             // Controls — Wrap so buttons reflow on narrow screens
             Wrap(
               spacing: 0,
@@ -110,22 +128,14 @@ class VoiceOperationsBar extends ConsumerWidget {
                         : controller.startShareScreen(),
                   ),
                 _ToolButton(
-                  tooltip: fullscreen
-                      ? MaterialLocalizations.of(context).closeButtonTooltip
+                  tooltip: widget.fullscreen
+                      ? l.tooltipExitFullscreen
                       : l.voiceFullscreen,
-                  icon: fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                  icon: widget.fullscreen
+                      ? Icons.fullscreen_exit
+                      : Icons.fullscreen,
                   active: false,
-                  onTap: () {
-                    if (fullscreen) {
-                      Navigator.of(context).pop();
-                      return;
-                    }
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const VoiceFullscreenView(),
-                      ),
-                    );
-                  },
+                  onTap: _toggleFullscreen,
                 ),
                 _ToolButton(
                   tooltip: l.voiceLeave,
@@ -140,6 +150,31 @@ class VoiceOperationsBar extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _toggleFullscreen() async {
+    if (widget.fullscreen) {
+      Navigator.of(context).pop();
+      return;
+    }
+    if (_openingFullscreen) return;
+
+    setState(() => _openingFullscreen = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+
+    try {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => const VoiceFullscreenView(),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        await WidgetsBinding.instance.endOfFrame;
+        if (mounted) setState(() => _openingFullscreen = false);
+      }
+    }
   }
 }
 
