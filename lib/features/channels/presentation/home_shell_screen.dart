@@ -98,15 +98,7 @@ class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
     // in didChangeDependencies) rather than GoRouterState.of(context), whose
     // dependency does not re-fire on a nested Navigator pop.
     final location = GoRouterState.of(context).uri.path;
-    final isChatting =
-        !isWide && RegExp(r'^/home/chat/').hasMatch(location);
-
-    // Suppress the floating incoming-call banner while the matching DM is
-    // already open — the chat screen's own VoiceOperationsBar/entry button
-    // handles ringing there instead of stacking a duplicate card on top.
-    final chatMatch = RegExp(r'^/home/chat/u-(\d+)').firstMatch(location);
-    final currentChatPeerUid =
-        chatMatch != null ? int.tryParse(chatMatch.group(1)!) : null;
+    final isChatting = !isWide && RegExp(r'^/home/chat/').hasMatch(location);
 
     if (isWide) {
       return Scaffold(
@@ -135,7 +127,7 @@ class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
                   const SizedBox(width: 12),
                 ],
               ),
-              IncomingCallBanner(currentChatPeerUid: currentChatPeerUid),
+              const IncomingCallBanner(),
             ],
           ),
         ),
@@ -148,7 +140,7 @@ class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
         child: Stack(
           children: [
             navigationShell,
-            IncomingCallBanner(currentChatPeerUid: currentChatPeerUid),
+            const IncomingCallBanner(),
           ],
         ),
       ),
@@ -157,8 +149,7 @@ class _HomeShellScreenState extends ConsumerState<HomeShellScreen> {
           : NavigationBar(
               selectedIndex: navigationShell.currentIndex,
               onDestinationSelected: _onDestinationSelected,
-              indicatorColor:
-                  Theme.of(context).colorScheme.primaryContainer,
+              indicatorColor: Theme.of(context).colorScheme.primaryContainer,
               destinations: [
                 NavigationDestination(
                   icon: const Icon(Icons.chat_bubble_outline),

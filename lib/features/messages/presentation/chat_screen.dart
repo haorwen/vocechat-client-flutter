@@ -33,9 +33,7 @@ import '../../../shared/widgets/voce_avatar.dart';
 import '../../../shared/widgets/voce_context_menu.dart';
 import '../../../shared/widgets/voce_dialog.dart';
 import '../../profile/presentation/user_profile_card.dart';
-import '../../voice/application/voice_controller.dart';
 import '../../voice/presentation/voice_entry_button.dart';
-import '../../voice/presentation/voice_operations_bar.dart';
 import '../application/chat_controller.dart';
 import '../application/chat_tools_provider.dart';
 import '../application/read_index_provider.dart';
@@ -992,13 +990,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             onAutoDelete: () =>
                                 _showToolPanel(ChatTool.autoDelete),
                           ),
-                          if (ref.watch(voiceControllerProvider)?.context ==
-                              _target)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                              child: VoiceOperationsBar(),
-                            ),
                           Expanded(
                             child: messagesAsync.when(
                               loading: () => Center(
