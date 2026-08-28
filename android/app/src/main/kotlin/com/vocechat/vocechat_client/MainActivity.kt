@@ -1,5 +1,5 @@
 package com.vocechat.vocechat_client
 
-import io.flutter.embedding.android.FlutterActivity
+import io.agora.agora_rtc_ng.AgoraPIPFlutterActivity
 
-class MainActivity: FlutterActivity()
+class MainActivity : AgoraPIPFlutterActivity()

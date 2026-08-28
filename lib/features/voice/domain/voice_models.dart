@@ -65,6 +65,31 @@ class VoicingMembers with _$VoicingMembers {
   }) = _VoicingMembers;
 }
 
+/// Returns the only remote video uid that is eligible for picture-in-picture.
+///
+/// PiP is intentionally limited to one-to-one calls. Group calls, incomplete
+/// rosters, duplicate ids, and remote screen sharing without camera video are
+/// excluded.
+int? remoteVideoUidForPictureInPicture({
+  required VoicingInfo? call,
+  required VoicingMembers members,
+  required int? localUid,
+}) {
+  if (call == null ||
+      call.joining ||
+      call.connectionState != VoiceConnectionState.connected ||
+      localUid == null ||
+      call.context is! MessageTargetUser ||
+      members.ids.length != 2 ||
+      members.ids.toSet().length != 2 ||
+      !members.ids.contains(localUid)) {
+    return null;
+  }
+
+  final remoteUid = members.ids.firstWhere((uid) => uid != localUid);
+  return members.byId[remoteUid]?.video == true ? remoteUid : null;
+}
+
 /// Response from `POST /admin/agora/token`.
 class AgoraTokenResponse {
   const AgoraTokenResponse({
