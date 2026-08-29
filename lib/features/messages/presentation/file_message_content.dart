@@ -489,7 +489,9 @@ class _ImageBubbleState extends ConsumerState<_ImageBubble> {
           cacheMedia: widget.cacheMedia,
           downloadUrl: widget.urls.download,
           headers: headers,
-          title: widget.meta.name,
+          title: widget.meta.name.isEmpty
+              ? widget.meta.path.split('/').last
+              : widget.meta.name,
         ),
       ),
     );
@@ -638,6 +640,7 @@ class _ImagePreviewScreenState extends State<ImagePreviewScreen> {
                           ProviderScope.containerOf(context, listen: false),
                           widget.downloadUrl,
                           widget.title,
+                          contentType: 'image/',
                           cacheKey: widget.cacheMedia
                               ? (widget.cacheKey ?? widget.originUrl)
                               : null,
@@ -834,7 +837,10 @@ class _VideoBubbleState extends ConsumerState<_VideoBubble> {
         context,
         ProviderScope.containerOf(context, listen: false),
         widget.urls.download,
-        widget.meta.name,
+        widget.meta.name.isEmpty
+            ? widget.meta.path.split('/').last
+            : widget.meta.name,
+        contentType: widget.meta.contentType,
         cacheKey: widget.cacheMedia ? widget.urls.originCacheKey : null,
         cachedFile: exported,
       );
@@ -1150,6 +1156,7 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
         ProviderScope.containerOf(context, listen: false),
         widget.downloadUrl,
         widget.title,
+        contentType: 'video/',
         cacheKey: widget.cacheMedia ? widget.cacheKey : null,
         cachedFile: exported,
       );
@@ -1442,6 +1449,7 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> {
         ProviderScope.containerOf(context, listen: false),
         widget.urls.download,
         widget.meta.name,
+        contentType: widget.meta.contentType,
         cacheKey: widget.urls.originCacheKey,
         cachedFile: cachedFile,
       );
@@ -1453,6 +1461,7 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> {
       ProviderScope.containerOf(context, listen: false),
       widget.urls.download,
       widget.meta.name,
+      contentType: widget.meta.contentType,
       cacheKey: widget.cacheMedia ? widget.urls.originCacheKey : null,
     );
   }
@@ -1680,6 +1689,7 @@ class _FileCard extends StatelessWidget {
                 ProviderScope.containerOf(context, listen: false),
                 urls!.download,
                 meta.name.isEmpty ? meta.path.split('/').last : meta.name,
+                contentType: meta.contentType,
               ),
             ),
         ],

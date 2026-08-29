@@ -541,7 +541,7 @@ class _ArchiveAttachment extends ConsumerWidget {
                 cacheMedia: shouldCache,
                 downloadUrl: downloadUrl ?? fileUrl,
                 headers: headers,
-                title: name,
+                title: name.isEmpty ? filePath.split('/').last : name,
               ),
             ),
           );
@@ -625,7 +625,8 @@ class _ArchiveAttachment extends ConsumerWidget {
                 context,
                 ProviderScope.containerOf(context, listen: false),
                 downloadUrl,
-                name.isEmpty ? '[file]' : name,
+                name.isEmpty ? filePath.split('/').last : name,
+                contentType: contentType,
               ),
             ),
         ],

@@ -13,9 +13,9 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED"/>
     <!-- Required on Android 13+ to display FCM push notifications -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <!-- media_store_plus (attachment "Download" button, saves to
-         Downloads/vocechat): below API 30 it falls back to a direct file
-         write instead of MediaStore, which needs this on API <=29. Capped
+    <!-- media_store_plus (attachment "Download" button, saves media to
+         DCIM/vocechat and other files to Download/vocechat): below API 30 it
+         falls back to a direct file write, which needs this on API <=29. Capped
          at 29 since MediaStore.Downloads needs no permission from API 30.
          tools:replace overrides camera_android_camerax's own declaration
          of this permission at maxSdkVersion=28. -->

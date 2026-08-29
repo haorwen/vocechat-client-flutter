@@ -52,6 +52,8 @@
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>VoceChat 需要访问你的相册，以便在聊天中发送图片和视频。</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>VoceChat 需要将下载的图片和视频保存到你的相册。</string>
 	<key>NSCameraUsageDescription</key>
 	<string>VoceChat 需要使用相机，以便拍摄照片或视频发送给聊天对象。</string>
 	<key>NSMicrophoneUsageDescription</key>

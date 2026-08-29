@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_store_plus/media_store_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:photo_manager/photo_manager.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/storage/media_cache.dart';
@@ -42,9 +43,57 @@ IconData iconForContentType(String type) {
   return Icons.insert_drive_file_outlined;
 }
 
-/// Subfolder name under the platform's shared Downloads directory that
-/// Android attachment downloads are saved into (`Downloads/vocechat/...`).
+/// Subfolder used for VoceChat files in Android shared storage.
 const String _kDownloadAppFolder = 'vocechat';
+
+enum DownloadFileKind { image, video, other }
+
+const _imageExtensions = <String>{
+  'avif',
+  'bmp',
+  'dng',
+  'gif',
+  'heic',
+  'heif',
+  'jpeg',
+  'jpg',
+  'png',
+  'svg',
+  'tif',
+  'tiff',
+  'webp',
+};
+
+const _videoExtensions = <String>{
+  '3g2',
+  '3gp',
+  'avi',
+  'm2ts',
+  'm4v',
+  'mkv',
+  'mov',
+  'mp4',
+  'mpeg',
+  'mpg',
+  'mts',
+  'ogv',
+  'ts',
+  'webm',
+};
+
+@visibleForTesting
+DownloadFileKind classifyDownloadFile(String filename, String? contentType) {
+  final mime = contentType?.trim().toLowerCase() ?? '';
+  if (mime.startsWith('image/')) return DownloadFileKind.image;
+  if (mime.startsWith('video/')) return DownloadFileKind.video;
+
+  final safeName = filename.split(RegExp(r'[?#]')).first.toLowerCase();
+  final dot = safeName.lastIndexOf('.');
+  final extension = dot < 0 ? '' : safeName.substring(dot + 1);
+  if (_imageExtensions.contains(extension)) return DownloadFileKind.image;
+  if (_videoExtensions.contains(extension)) return DownloadFileKind.video;
+  return DownloadFileKind.other;
+}
 
 bool _mediaStoreReady = false;
 
@@ -105,16 +154,125 @@ Future<void> _downloadToFile(
   }
 }
 
+Future<void> _withStagedDownload(
+  ProviderContainer container,
+  String url,
+  String filename,
+  File? localFile,
+  Future<void> Function(File file) save,
+) async {
+  final tempDir = await getTemporaryDirectory();
+  final stagingDir = await tempDir.createTemp('voce_download_');
+  try {
+    final tempFile = File('${stagingDir.path}/$filename');
+    await _downloadToFile(container, url, tempFile, localFile);
+    await save(tempFile);
+  } finally {
+    try {
+      if (await stagingDir.exists()) {
+        await stagingDir.delete(recursive: true);
+      }
+    } catch (e, st) {
+      AppLog.w(
+        LogTag.general,
+        () => 'download staging cleanup failed path=${stagingDir.path}',
+        error: e,
+        stackTrace: st,
+      );
+    }
+  }
+}
+
+Future<void> _saveToAndroidSharedStorage(
+  ProviderContainer container,
+  String url,
+  String filename,
+  DownloadFileKind kind,
+  File? localFile,
+) async {
+  await _ensureMediaStoreReady();
+  final (dirType, dirName) = switch (kind) {
+    DownloadFileKind.image => (DirType.photo, DirName.dcim),
+    DownloadFileKind.video => (DirType.video, DirName.dcim),
+    DownloadFileKind.other => (DirType.download, DirName.download),
+  };
+
+  await _withStagedDownload(
+    container,
+    url,
+    filename,
+    localFile,
+    (tempFile) async {
+      final mediaStore = MediaStore();
+      final saveInfo = await mediaStore.saveFile(
+        tempFilePath: tempFile.path,
+        dirType: dirType,
+        dirName: dirName,
+      );
+      if (saveInfo != null) return;
+
+      // Version 0.1.3 can save successfully but fail to decode SaveInfo in
+      // release builds, so verify the final MediaStore entry before failing.
+      final savedUri = await mediaStore.getFileUri(
+        fileName: filename,
+        dirType: dirType,
+        dirName: dirName,
+      );
+      if (savedUri == null) {
+        throw Exception('MediaStore save returned null');
+      }
+    },
+  );
+}
+
+Future<void> _saveToIosPhotoLibrary(
+  ProviderContainer container,
+  String url,
+  String filename,
+  DownloadFileKind kind,
+  File? localFile,
+) async {
+  final permission = await PhotoManager.requestPermissionExtend(
+    requestOption: const PermissionRequestOption(
+      iosAccessLevel: IosAccessLevel.addOnly,
+    ),
+  );
+  if (!permission.hasAccess) {
+    throw Exception('Photo library add permission denied');
+  }
+
+  await _withStagedDownload(
+    container,
+    url,
+    filename,
+    localFile,
+    (tempFile) async {
+      switch (kind) {
+        case DownloadFileKind.image:
+          await PhotoManager.editor.saveImageWithPath(
+            tempFile.path,
+            title: filename,
+          );
+        case DownloadFileKind.video:
+          await PhotoManager.editor.saveVideo(tempFile, title: filename);
+        case DownloadFileKind.other:
+          throw StateError('Non-media files cannot be saved to Photos');
+      }
+    },
+  );
+}
+
 /// Downloads [url] via the app's Dio client and saves the file.
 ///
 /// If [cachedFile] is available, or [cacheKey] resolves to a completed local
 /// media file, those bytes are reused instead of re-fetching over the network.
+/// [contentType] is preferred for media classification; the filename extension
+/// is used as a fallback.
 ///
-/// - Android: writes straight into `Downloads/vocechat` via [MediaStore] —
-///   no SAF picker, no permission prompt on API 29+.
-/// - iOS / desktop: no direct "Downloads" folder equivalent is exposed to
-///   apps, so this falls back to file_picker's native save-file dialog
-///   (document picker on iOS, save dialog on desktop).
+/// - Android images/videos: `DCIM/vocechat` via MediaStore.
+/// - Android other files: `Download/vocechat` via MediaStore.
+/// - iOS images/videos: the system Photos library.
+/// - iOS other files and desktop: the native save-file dialog.
 ///
 /// Shows a snackbar on success or failure.
 Future<void> downloadAndSave(
@@ -122,67 +280,43 @@ Future<void> downloadAndSave(
   ProviderContainer container,
   String url,
   String filename, {
+  String? contentType,
   String? cacheKey,
   File? cachedFile,
 }) async {
   final l = AppL10n.of(context);
   try {
+    final safeFilename = _safeDownloadFilename(filename);
+    final kind = classifyDownloadFile(safeFilename, contentType);
     final localFile = cachedFile ??
         (cacheKey == null ? null : await MediaCache.fileForKey(cacheKey));
 
     if (!kIsWeb && Platform.isAndroid) {
-      await _ensureMediaStoreReady();
-      // MediaStore copies then deletes its source. A unique subdirectory keeps
-      // simultaneous same-name downloads separate without changing the name
-      // shown in Downloads/vocechat.
-      final tempDir = await getTemporaryDirectory();
-      final stagingDir = await tempDir.createTemp('voce_download_');
-      try {
-        final safeFilename = _safeDownloadFilename(filename);
-        final tempFile = File('${stagingDir.path}/$safeFilename');
-        await _downloadToFile(container, url, tempFile, localFile);
-        final mediaStore = MediaStore();
-        final saveInfo = await mediaStore.saveFile(
-          tempFilePath: tempFile.path,
-          dirType: DirType.download,
-          dirName: DirName.download,
-        );
-        if (saveInfo == null) {
-          // media_store_plus 0.1.3 can save successfully but fail to decode
-          // SaveInfo in release builds. Verify the final MediaStore entry
-          // before reporting a failure to the user.
-          final savedUri = await mediaStore.getFileUri(
-            fileName: safeFilename,
-            dirType: DirType.download,
-            dirName: DirName.download,
-          );
-          if (savedUri == null) {
-            throw Exception('MediaStore save returned null');
-          }
-        }
-      } finally {
-        try {
-          if (await stagingDir.exists()) {
-            await stagingDir.delete(recursive: true);
-          }
-        } catch (e, st) {
-          // Saving has already completed. Cleanup failure must not turn a
-          // successful download into a user-visible failure.
-          AppLog.w(
-            LogTag.general,
-            () => 'download staging cleanup failed path=${stagingDir.path}',
-            error: e,
-            stackTrace: st,
-          );
-        }
-      }
+      await _saveToAndroidSharedStorage(
+        container,
+        url,
+        safeFilename,
+        kind,
+        localFile,
+      );
+    } else if (!kIsWeb && Platform.isIOS && kind != DownloadFileKind.other) {
+      await _saveToIosPhotoLibrary(
+        container,
+        url,
+        safeFilename,
+        kind,
+        localFile,
+      );
     } else if (kIsWeb || Platform.isIOS) {
       final data = await _downloadBytes(container, url, localFile);
-      await FilePicker.platform.saveFile(fileName: filename, bytes: data);
+      final path = await FilePicker.platform.saveFile(
+        fileName: safeFilename,
+        bytes: data,
+      );
+      if (path == null && !kIsWeb) return;
     } else {
-      // Desktop: saveFile returns the chosen path; copy or stream into it.
-      final path = await FilePicker.platform.saveFile(fileName: filename);
-      if (path == null) return; // user cancelled
+      final path = await FilePicker.platform.saveFile(fileName: safeFilename);
+      if (path == null) return;
       await _downloadToFile(container, url, File(path), localFile);
     }
 
