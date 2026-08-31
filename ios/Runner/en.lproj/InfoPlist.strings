@@ -1,0 +1,5 @@
+"NSPhotoLibraryUsageDescription" = "VoceChat needs access to your photo library so you can send photos and videos in chats.";
+"NSPhotoLibraryAddUsageDescription" = "VoceChat needs permission to save downloaded photos and videos to your photo library.";
+"NSCameraUsageDescription" = "VoceChat needs access to the camera so you can take photos or videos to send in chats.";
+"NSMicrophoneUsageDescription" = "VoceChat needs access to the microphone to record voice messages and make video calls.";
+"NSLocationWhenInUseUsageDescription" = "VoceChat does not actively collect your location. This permission is only required because system components such as the photo library or file picker may read location metadata embedded in photos, as required by the App Store.";

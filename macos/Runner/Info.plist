@@ -4,6 +4,11 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>zh-Hans</string>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIconFile</key>
@@ -34,8 +39,8 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>VoceChat 需要使用相机，以便在视频通话中共享你的画面。</string>
+	<string>VoceChat needs access to the camera to share your video during video calls.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>VoceChat 需要使用麦克风，以便进行语音/视频通话。</string>
+	<string>VoceChat needs access to the microphone for voice and video calls.</string>
 </dict>
 </plist>

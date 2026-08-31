@@ -4,6 +4,11 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>zh-Hans</string>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>VoceChat</string>
 	<key>CFBundleExecutable</key>
@@ -51,15 +56,15 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>VoceChat 需要访问你的相册，以便在聊天中发送图片和视频。</string>
+	<string>VoceChat needs access to your photo library so you can send photos and videos in chats.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>VoceChat 需要将下载的图片和视频保存到你的相册。</string>
+	<string>VoceChat needs permission to save downloaded photos and videos to your photo library.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>VoceChat 需要使用相机，以便拍摄照片或视频发送给聊天对象。</string>
+	<string>VoceChat needs access to the camera so you can take photos or videos to send in chats.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>VoceChat 需要使用麦克风，以便录制语音消息或进行视频通话。</string>
+	<string>VoceChat needs access to the microphone to record voice messages and make video calls.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>VoceChat 本身不会主动收集你的位置信息。此权限说明仅因所用系统组件（如相册/文件选择器）可能读取照片中的位置元数据而按 App Store 要求提供。</string>
+	<string>VoceChat does not actively collect your location. This permission is only required because system components such as the photo library or file picker may read location metadata embedded in photos, as required by the App Store.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSAppTransportSecurity</key>

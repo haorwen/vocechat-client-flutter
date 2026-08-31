@@ -1,0 +1,2 @@
+"NSCameraUsageDescription" = "VoceChat needs access to the camera to share your video during video calls.";
+"NSMicrophoneUsageDescription" = "VoceChat needs access to the microphone for voice and video calls.";
