@@ -644,6 +644,7 @@ class _MyAccountPane extends ConsumerStatefulWidget {
 
 class _MyAccountPaneState extends ConsumerState<_MyAccountPane> {
   bool _uploadingAvatar = false;
+  bool _deletingAccount = false;
 
   /// Mirrors `_friendlyError` in channel_settings_screen.dart: unwrap the
   /// shared Dio client's `ApiException` (set by the auth interceptor for any
@@ -727,6 +728,29 @@ class _MyAccountPaneState extends ConsumerState<_MyAccountPane> {
       _showSuccess(l.accountNameUpdated);
     } catch (e) {
       _showError(e);
+    }
+  }
+
+  Future<void> _deleteCurrentAccount() async {
+    if (_deletingAccount) return;
+    final l = AppL10n.of(context);
+    final confirmed = await showVoceConfirm(
+      context: context,
+      title: l.settingsDeleteAccountConfirmTitle,
+      body: l.settingsDeleteAccountConfirmContent,
+      confirmLabel: l.settingsDeleteAccount,
+      cancelLabel: l.actionCancel,
+      danger: true,
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deletingAccount = true);
+    try {
+      await ref.read(authControllerProvider.notifier).deleteCurrentAccount();
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _deletingAccount = false);
     }
   }
 
@@ -828,7 +852,7 @@ class _MyAccountPaneState extends ConsumerState<_MyAccountPane> {
           '$baseUrl/api/resource/avatar?uid=${widget.uid}&t=${widget.avatarUpdatedAt}';
     }
 
-    return _Card(
+    final accountCard = _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -925,6 +949,33 @@ class _MyAccountPaneState extends ConsumerState<_MyAccountPane> {
           ),
         ],
       ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        accountCard,
+        if (widget.uid != 1) ...[
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: _deletingAccount ? null : _deleteCurrentAccount,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTokens.error,
+              foregroundColor: Colors.white,
+            ),
+            icon: _deletingAccount
+                ? const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.person_remove_alt_1, size: 18),
+            label: Text(l.settingsDeleteAccount),
+          ),
+        ],
+      ],
     );
   }
 }

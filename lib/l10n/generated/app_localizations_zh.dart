@@ -280,6 +280,15 @@ class AppL10nZh extends AppL10n {
   String get settingsLogoutConfirmContent => '再次访问该服务器需要重新登录。';
 
   @override
+  String get settingsDeleteAccount => '注销账户';
+
+  @override
+  String get settingsDeleteAccountConfirmTitle => '注销该账户？';
+
+  @override
+  String get settingsDeleteAccountConfirmContent => '这会从当前服务器永久删除你的账户，且无法撤销。';
+
+  @override
   String get settingsSwitchAccount => '切换账户';
 
   @override

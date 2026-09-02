@@ -629,6 +629,24 @@ abstract class AppL10n {
   /// **'You will need to sign in again to access this server.'**
   String get settingsLogoutConfirmContent;
 
+  /// No description provided for @settingsDeleteAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get settingsDeleteAccount;
+
+  /// No description provided for @settingsDeleteAccountConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this account?'**
+  String get settingsDeleteAccountConfirmTitle;
+
+  /// No description provided for @settingsDeleteAccountConfirmContent.
+  ///
+  /// In en, this message translates to:
+  /// **'This permanently deletes your account from this server. This action cannot be undone.'**
+  String get settingsDeleteAccountConfirmContent;
+
   /// No description provided for @settingsSwitchAccount.
   ///
   /// In en, this message translates to:

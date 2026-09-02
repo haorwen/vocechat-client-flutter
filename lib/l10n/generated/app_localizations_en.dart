@@ -280,6 +280,15 @@ class AppL10nEn extends AppL10n {
   String get settingsLogoutConfirmContent => 'You will need to sign in again to access this server.';
 
   @override
+  String get settingsDeleteAccount => 'Delete account';
+
+  @override
+  String get settingsDeleteAccountConfirmTitle => 'Delete this account?';
+
+  @override
+  String get settingsDeleteAccountConfirmContent => 'This permanently deletes your account from this server. This action cannot be undone.';
+
+  @override
   String get settingsSwitchAccount => 'Switch account';
 
   @override

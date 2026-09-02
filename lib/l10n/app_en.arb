@@ -119,6 +119,9 @@
   "settingsLogout": "Log out",
   "settingsLogoutConfirmTitle": "Log out?",
   "settingsLogoutConfirmContent": "You will need to sign in again to access this server.",
+  "settingsDeleteAccount": "Delete account",
+  "settingsDeleteAccountConfirmTitle": "Delete this account?",
+  "settingsDeleteAccountConfirmContent": "This permanently deletes your account from this server. This action cannot be undone.",
   "settingsSwitchAccount": "Switch account",
 
   "accountSwitcherTitle": "Accounts",

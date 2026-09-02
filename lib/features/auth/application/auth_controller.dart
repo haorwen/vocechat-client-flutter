@@ -430,6 +430,28 @@ class AuthController extends _$AuthController {
     state = const AsyncData(AuthState.unauthenticated());
   }
 
+  /// Permanently delete the current user from the server. Local credentials
+  /// and the saved account entry are removed only after the server confirms
+  /// deletion, so a failed request leaves the current session recoverable.
+  Future<void> deleteCurrentAccount() async {
+    final account = _currentAccount();
+    if (account == null) return;
+
+    await ref.read(authApiProvider).deleteCurrentAccount();
+    await ref.read(secureTokenStoreProvider(account.accountId)).clear();
+
+    _suppressStoreReact = true;
+    try {
+      await ref
+          .read(accountStoreProvider.notifier)
+          .removeAccount(account.accountId);
+    } finally {
+      _suppressStoreReact = false;
+    }
+
+    state = const AsyncData(AuthState.unauthenticated());
+  }
+
   /// Remove a saved account entirely (clears its tokens and drops it from
   /// the switcher list). If it was the current account, resulting state is
   /// `unauthenticated`.

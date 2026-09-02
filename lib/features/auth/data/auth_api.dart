@@ -99,6 +99,10 @@ class AuthApi {
     await _dio.get('/api/token/logout');
   }
 
+  Future<void> deleteCurrentAccount() async {
+    await _dio.delete('/api/user/delete');
+  }
+
   Future<VoceUser> me() async {
     final resp = await _dio.get('/api/user/me');
     return VoceUser.fromJson(resp.data as Map<String, dynamic>);

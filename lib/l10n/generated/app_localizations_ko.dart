@@ -280,6 +280,15 @@ class AppL10nKo extends AppL10n {
   String get settingsLogoutConfirmContent => '이 서버에 다시 접속하려면 로그인이 필요합니다.';
 
   @override
+  String get settingsDeleteAccount => 'Delete account';
+
+  @override
+  String get settingsDeleteAccountConfirmTitle => 'Delete this account?';
+
+  @override
+  String get settingsDeleteAccountConfirmContent => 'This permanently deletes your account from this server. This action cannot be undone.';
+
+  @override
   String get settingsSwitchAccount => 'Switch account';
 
   @override

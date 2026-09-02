@@ -93,6 +93,9 @@
   "settingsLogout": "退出登录",
   "settingsLogoutConfirmTitle": "退出登录？",
   "settingsLogoutConfirmContent": "再次访问该服务器需要重新登录。",
+  "settingsDeleteAccount": "注销账户",
+  "settingsDeleteAccountConfirmTitle": "注销该账户？",
+  "settingsDeleteAccountConfirmContent": "这会从当前服务器永久删除你的账户，且无法撤销。",
   "settingsSwitchAccount": "切换账户",
 
   "accountSwitcherTitle": "账户",
