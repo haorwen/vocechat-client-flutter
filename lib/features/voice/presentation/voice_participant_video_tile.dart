@@ -34,8 +34,9 @@ class VoiceParticipantVideoTile extends ConsumerWidget {
     final engine = controller.engineOrNull;
     final channelName = controller.channelNameOrNull;
     final isLocal = uid == controller.localUidOrNull;
+    final isLocalScreenShare = isLocal && (callInfo?.shareScreen ?? false);
     final showVideo = isLocal
-        ? (callInfo?.video ?? false) || (callInfo?.shareScreen ?? false)
+        ? (callInfo?.video ?? false) || isLocalScreenShare
         : (memberInfo?.video ?? false) || (memberInfo?.shareScreen ?? false);
     final speaking = (memberInfo?.speakingVolume ?? 0) > 50;
 
@@ -56,7 +57,12 @@ class VoiceParticipantVideoTile extends ConsumerWidget {
               controller: isLocal
                   ? VideoViewController(
                       rtcEngine: engine,
-                      canvas: const VideoCanvas(uid: 0),
+                      canvas: VideoCanvas(
+                        uid: 0,
+                        sourceType: isLocalScreenShare
+                            ? VideoSourceType.videoSourceScreen
+                            : VideoSourceType.videoSourceCamera,
+                      ),
                     )
                   : VideoViewController.remote(
                       rtcEngine: engine,

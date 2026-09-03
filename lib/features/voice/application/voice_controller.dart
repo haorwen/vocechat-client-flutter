@@ -178,6 +178,26 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
         );
         _syncPictureInPictureEligibility();
       },
+      onLocalVideoStateChanged: (source, videoState, reason) {
+        if (!_isScreenSource(source)) return;
+        AppLog.d(
+          LogTag.voice,
+          () => 'screen capture state=$videoState reason=$reason',
+        );
+        if (videoState == LocalVideoStreamState.localVideoStreamStateFailed ||
+            videoState == LocalVideoStreamState.localVideoStreamStateStopped) {
+          final current = state;
+          if (current != null && current.shareScreen) {
+            state = current.copyWith(shareScreen: false);
+          }
+        }
+      },
+      onPermissionError: (permissionType) {
+        AppLog.w(
+          LogTag.voice,
+          () => 'Agora permission denied: $permissionType',
+        );
+      },
       onLeaveChannel: (connection, stats) {
         members.value = const VoicingMembers();
       },
@@ -454,6 +474,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
 
   Future<void> leave() async {
     final engine = _engine;
+    final current = state;
     _channelName = null;
     _localUid = null;
     state = null;
@@ -462,6 +483,9 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     await _pipOperations;
 
     if (engine != null) {
+      if (current?.shareScreen ?? false) {
+        await engine.stopScreenCapture();
+      }
       await engine.leaveChannel();
       await engine.stopPreview();
     }
@@ -504,7 +528,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     final engine = _engine;
     final current = state;
     if (engine == null || current == null) return;
-    if (current.shareScreen) await _stopShareScreenInternal(engine, current);
+    if (current.shareScreen) await _stopShareScreenInternal(engine);
     await engine.enableLocalVideo(true);
     await engine.muteLocalVideoStream(false);
     await engine.startPreview();
@@ -539,56 +563,121 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     if (engine == null || current == null) return;
     if (current.video) await closeCamera();
 
-    if (defaultTargetPlatform == TargetPlatform.windows ||
-        defaultTargetPlatform == TargetPlatform.macOS) {
-      await engine.startScreenCaptureByDisplayId(
-        displayId: 0,
-        regionRect: const Rectangle(),
-        captureParams: const ScreenCaptureParameters(),
+    final desktop = defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.macOS;
+    var captureStarted = false;
+    try {
+      if (desktop) {
+        // Display id 0 is not a portable primary-display id (on macOS it is
+        // normally invalid). Ask Agora for the actual shareable display list
+        // and prefer the primary monitor instead.
+        final sources = await engine.getScreenCaptureSources(
+          thumbSize: const SIZE(width: 1, height: 1),
+          iconSize: const SIZE(width: 1, height: 1),
+          includeScreen: true,
+        );
+        final screens = sources
+            .where(
+              (source) =>
+                  source.type ==
+                      ScreenCaptureSourceType.screencapturesourcetypeScreen &&
+                  source.sourceId != null,
+            )
+            .toList();
+        if (screens.isEmpty) {
+          throw StateError('Agora did not find a shareable display');
+        }
+        final primary = screens.firstWhere(
+          (source) => source.primaryMonitor == true,
+          orElse: () => screens.first,
+        );
+        AppLog.d(
+          LogTag.voice,
+          () => 'sharing display id=${primary.sourceId}',
+        );
+        await engine.startScreenCaptureByDisplayId(
+          displayId: primary.sourceId!,
+          regionRect: const Rectangle(),
+          captureParams: const ScreenCaptureParameters(
+            captureMouseCursor: true,
+            frameRate: 15,
+          ),
+        );
+        captureStarted = true;
+        await engine.updateChannelMediaOptions(
+          const ChannelMediaOptions(
+            publishScreenTrack: true,
+            publishCameraTrack: false,
+          ),
+        );
+      } else {
+        // Android/iOS: the SDK requests the platform's screen-capture consent
+        // (MediaProjection on Android, ReplayKit on iOS). Be explicit about
+        // the video flag; omitting it leaves the native SDK default-dependent.
+        await engine.startScreenCapture(
+          const ScreenCaptureParameters2(
+            captureAudio: false,
+            captureVideo: true,
+          ),
+        );
+        captureStarted = true;
+        await engine.updateChannelMediaOptions(
+          const ChannelMediaOptions(
+            publishScreenCaptureVideo: true,
+            publishCameraTrack: false,
+          ),
+        );
+      }
+      state = (state ?? current).copyWith(shareScreen: true, video: false);
+    } catch (error, stackTrace) {
+      if (captureStarted) {
+        try {
+          await engine.stopScreenCapture();
+        } catch (stopError, stopStackTrace) {
+          AppLog.w(
+            LogTag.voice,
+            () => 'failed to clean up screen capture after start failure',
+            error: stopError,
+            stackTrace: stopStackTrace,
+          );
+        }
+      }
+      AppLog.e(
+        LogTag.voice,
+        () => 'screen sharing failed',
+        error: error,
+        stackTrace: stackTrace,
       );
-      await engine.updateChannelMediaOptions(
-        const ChannelMediaOptions(
-            publishScreenTrack: true, publishCameraTrack: false),
-      );
-    } else {
-      // Android/iOS: in-app screen sharing via ReplayKit/MediaProjection.
-      await engine.startScreenCapture(const ScreenCaptureParameters2());
-      await engine.updateChannelMediaOptions(
-        const ChannelMediaOptions(
-          publishScreenCaptureVideo: true,
-          publishCameraTrack: false,
-        ),
-      );
+      rethrow;
     }
-    state = (state ?? current).copyWith(shareScreen: true, video: false);
   }
 
   Future<void> stopShareScreen() async {
     final engine = _engine;
     final current = state;
     if (engine == null || current == null) return;
-    await _stopShareScreenInternal(engine, current);
+    await _stopShareScreenInternal(engine);
     state = current.copyWith(shareScreen: false);
   }
 
-  Future<void> _stopShareScreenInternal(
-    RtcEngine engine,
-    VoicingInfo current,
-  ) async {
+  Future<void> _stopShareScreenInternal(RtcEngine engine) async {
+    await engine.stopScreenCapture();
     if (defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.macOS) {
-      await engine.stopScreenCapture();
       await engine.updateChannelMediaOptions(
         const ChannelMediaOptions(publishScreenTrack: false),
       );
     } else {
-      await engine
-          .stopScreenCaptureBySourceType(VideoSourceType.videoSourceScreen);
       await engine.updateChannelMediaOptions(
         const ChannelMediaOptions(publishScreenCaptureVideo: false),
       );
     }
   }
+
+  bool _isScreenSource(VideoSourceType source) =>
+      source == VideoSourceType.videoSourceScreen ||
+      source == VideoSourceType.videoSourceScreenPrimary ||
+      source == VideoSourceType.videoSourceScreenSecondary;
 
   // ---------------------------------------------------------------------------
   // Pin (fullscreen spotlight)

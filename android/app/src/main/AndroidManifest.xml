@@ -4,6 +4,11 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Agora MediaProjection screen sharing continues while this activity is
+         backgrounded behind the system capture dialog. Android 9+ requires
+         foreground-service permission for that capture lifecycle. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
     <!-- photo_manager gallery grid in the chat attachment sheet. Both
          IMAGES and VIDEO are required together on API 33+ even for
          images-only queries; VISUAL_USER_SELECTED backs the Android 14

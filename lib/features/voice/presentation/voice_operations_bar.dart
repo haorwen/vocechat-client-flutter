@@ -22,6 +22,7 @@ class VoiceOperationsBar extends ConsumerStatefulWidget {
 
 class _VoiceOperationsBarState extends ConsumerState<VoiceOperationsBar> {
   bool _openingFullscreen = false;
+  bool _screenShareBusy = false;
 
   @override
   Widget build(BuildContext context) {
@@ -123,9 +124,7 @@ class _VoiceOperationsBarState extends ConsumerState<VoiceOperationsBar> {
                     tooltip: l.voiceShareScreen,
                     icon: Icons.screen_share,
                     active: info.shareScreen,
-                    onTap: () => info.shareScreen
-                        ? controller.stopShareScreen()
-                        : controller.startShareScreen(),
+                    onTap: _screenShareBusy ? () {} : _toggleScreenShare,
                   ),
                 _ToolButton(
                   tooltip: widget.fullscreen
@@ -150,6 +149,28 @@ class _VoiceOperationsBarState extends ConsumerState<VoiceOperationsBar> {
         ),
       ),
     );
+  }
+
+  Future<void> _toggleScreenShare() async {
+    if (_screenShareBusy) return;
+    setState(() => _screenShareBusy = true);
+    try {
+      final controller = ref.read(voiceControllerProvider.notifier);
+      final info = ref.read(voiceControllerProvider);
+      if (info?.shareScreen ?? false) {
+        await controller.stopShareScreen();
+      } else {
+        await controller.startShareScreen();
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppL10n.of(context).errorPrefix('$error'))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _screenShareBusy = false);
+    }
   }
 
   Future<void> _toggleFullscreen() async {
