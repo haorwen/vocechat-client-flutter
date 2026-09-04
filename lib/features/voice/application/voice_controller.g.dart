@@ -6,7 +6,7 @@ part of 'voice_controller.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$voiceControllerHash() => r'3a2e58b35504c084ae1f9437302942952ecaee5b';
+String _$voiceControllerHash() => r'd83489aada95cebdeb7b2266bdee4dfe3fe97146';
 
 /// See also [VoiceController].
 @ProviderFor(VoiceController)

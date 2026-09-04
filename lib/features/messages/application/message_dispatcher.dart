@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -10,6 +11,7 @@ import '../../channels/application/muted_chats_provider.dart';
 import '../../channels/application/pinned_chats_provider.dart';
 import '../../channels/domain/pin_chat_models.dart';
 import '../../contacts/application/presence_provider.dart';
+import '../../contacts/application/user_directory_provider.dart';
 import '../data/message_cache.dart';
 import '../domain/message_models.dart';
 import '../../voice/application/incoming_call_provider.dart';
@@ -118,6 +120,13 @@ class MessageDispatcher extends _$MessageDispatcher {
         }
         if (event is ChatEventKick) {
           _handleKick(event.reason);
+          return;
+        }
+        if (event is ChatEventUnknown && (event.type == 'user_changed' || event.type == 'user_updated' || event.type == 'avo_changed')) {
+          final decoded = _decode(event.raw);
+          if (decoded != null) {
+            unawaited(ref.read(userDirectoryProvider.notifier).applyUserUpdate(decoded));
+          }
           return;
         }
         if (event is ChatEventUserCalling) {

@@ -6,8 +6,8 @@ import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/utils/app_log.dart';
-import '../../auth/application/auth_controller.dart';
 import '../data/agora_api.dart';
+import 'avo_interaction_controller.dart';
 import '../domain/voice_models.dart';
 import '../../messages/domain/message_models.dart';
 
@@ -105,7 +105,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
       _pipController = engine.createPipController();
     }
     await engine.enableAudioVolumeIndication(
-      interval: 2000,
+      interval: 150,
       smooth: 3,
       reportVad: false,
     );
@@ -164,7 +164,12 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
           // uid 0 in this callback means "the local user" — reflect it onto
           // our own VoicingInfo isn't needed (we don't render our own
           // speaking ring), so only track remotes here.
-          if (uid == 0) continue;
+          if (uid == 0) {
+            final current = state;
+            if (current != null)
+              state = current.copyWith(speakingVolume: volume);
+            continue;
+          }
           _patchMember(uid, (m) => m.copyWith(speakingVolume: volume));
         }
       },
@@ -408,12 +413,6 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     );
   }
 
-  int? _currentUid() {
-    final authState = ref.read(authControllerProvider).valueOrNull;
-    if (authState is AuthStateAuthenticated) return authState.user.uid;
-    return null;
-  }
-
   // ---------------------------------------------------------------------------
   // Join / leave
   // ---------------------------------------------------------------------------
@@ -450,7 +449,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
 
       _channelName = token.channelName;
       _localUid = token.uid;
-      final selfUid = _currentUid() ?? token.uid;
+      final selfUid = token.uid;
       _upsertMember(selfUid, const VoicingMemberInfo());
 
       state = VoicingInfo(
@@ -461,6 +460,9 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
         deafen: false,
       );
       _syncPictureInPictureEligibility();
+      unawaited(ref
+          .read(avoInteractionControllerProvider.notifier)
+          .joinRoom(context));
     } catch (e, st) {
       AppLog.e(LogTag.voice, () => 'join failed', error: e, stackTrace: st);
       _channelName = null;
@@ -475,6 +477,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   Future<void> leave() async {
     final engine = _engine;
     final current = state;
+    unawaited(ref.read(avoInteractionControllerProvider.notifier).leaveRoom());
     _channelName = null;
     _localUid = null;
     state = null;

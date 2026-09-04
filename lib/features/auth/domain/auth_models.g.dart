@@ -43,6 +43,7 @@ _$VoceUserImpl _$$VoceUserImplFromJson(Map<String, dynamic> json) =>
       email: json['email'] as String?,
       isAdmin: json['is_admin'] as bool? ?? false,
       avatarUpdatedAt: (json['avatar_updated_at'] as num?)?.toInt(),
+      avoParams: _avoParamsFromJson(json['avoParams']),
     );
 
 Map<String, dynamic> _$$VoceUserImplToJson(_$VoceUserImpl instance) =>
@@ -52,6 +53,7 @@ Map<String, dynamic> _$$VoceUserImplToJson(_$VoceUserImpl instance) =>
       'email': instance.email,
       'is_admin': instance.isAdmin,
       'avatar_updated_at': instance.avatarUpdatedAt,
+      'avoParams': _avoParamsToJson(instance.avoParams),
     };
 
 _$LoginRequestImpl _$$LoginRequestImplFromJson(Map<String, dynamic> json) =>

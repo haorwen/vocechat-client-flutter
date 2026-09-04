@@ -39,6 +39,7 @@ class VoicingInfo with _$VoicingInfo {
     @Default(false) bool deafen,
     @Default(false) bool video,
     @Default(false) bool shareScreen,
+    @Default(0) int speakingVolume,
   }) = _VoicingInfo;
 }
 

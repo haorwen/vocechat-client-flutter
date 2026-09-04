@@ -25,6 +25,7 @@ mixin _$VoicingInfo {
   bool get deafen => throw _privateConstructorUsedError;
   bool get video => throw _privateConstructorUsedError;
   bool get shareScreen => throw _privateConstructorUsedError;
+  int get speakingVolume => throw _privateConstructorUsedError;
 
   /// Create a copy of VoicingInfo
   /// with the given fields replaced by the non-null parameter values.
@@ -47,7 +48,8 @@ abstract class $VoicingInfoCopyWith<$Res> {
       bool muted,
       bool deafen,
       bool video,
-      bool shareScreen});
+      bool shareScreen,
+      int speakingVolume});
 
   $MessageTargetCopyWith<$Res> get context;
 }
@@ -75,6 +77,7 @@ class _$VoicingInfoCopyWithImpl<$Res, $Val extends VoicingInfo>
     Object? deafen = null,
     Object? video = null,
     Object? shareScreen = null,
+    Object? speakingVolume = null,
   }) {
     return _then(_value.copyWith(
       context: null == context
@@ -109,6 +112,10 @@ class _$VoicingInfoCopyWithImpl<$Res, $Val extends VoicingInfo>
           ? _value.shareScreen
           : shareScreen // ignore: cast_nullable_to_non_nullable
               as bool,
+      speakingVolume: null == speakingVolume
+          ? _value.speakingVolume
+          : speakingVolume // ignore: cast_nullable_to_non_nullable
+              as int,
     ) as $Val);
   }
 
@@ -139,7 +146,8 @@ abstract class _$$VoicingInfoImplCopyWith<$Res>
       bool muted,
       bool deafen,
       bool video,
-      bool shareScreen});
+      bool shareScreen,
+      int speakingVolume});
 
   @override
   $MessageTargetCopyWith<$Res> get context;
@@ -166,6 +174,7 @@ class __$$VoicingInfoImplCopyWithImpl<$Res>
     Object? deafen = null,
     Object? video = null,
     Object? shareScreen = null,
+    Object? speakingVolume = null,
   }) {
     return _then(_$VoicingInfoImpl(
       context: null == context
@@ -200,6 +209,10 @@ class __$$VoicingInfoImplCopyWithImpl<$Res>
           ? _value.shareScreen
           : shareScreen // ignore: cast_nullable_to_non_nullable
               as bool,
+      speakingVolume: null == speakingVolume
+          ? _value.speakingVolume
+          : speakingVolume // ignore: cast_nullable_to_non_nullable
+              as int,
     ));
   }
 }
@@ -215,7 +228,8 @@ class _$VoicingInfoImpl implements _VoicingInfo {
       this.muted = false,
       this.deafen = false,
       this.video = false,
-      this.shareScreen = false});
+      this.shareScreen = false,
+      this.speakingVolume = 0});
 
   @override
   final MessageTarget context;
@@ -238,10 +252,13 @@ class _$VoicingInfoImpl implements _VoicingInfo {
   @override
   @JsonKey()
   final bool shareScreen;
+  @override
+  @JsonKey()
+  final int speakingVolume;
 
   @override
   String toString() {
-    return 'VoicingInfo(context: $context, joining: $joining, connectionState: $connectionState, downlinkNetworkQuality: $downlinkNetworkQuality, muted: $muted, deafen: $deafen, video: $video, shareScreen: $shareScreen)';
+    return 'VoicingInfo(context: $context, joining: $joining, connectionState: $connectionState, downlinkNetworkQuality: $downlinkNetworkQuality, muted: $muted, deafen: $deafen, video: $video, shareScreen: $shareScreen, speakingVolume: $speakingVolume)';
   }
 
   @override
@@ -259,7 +276,9 @@ class _$VoicingInfoImpl implements _VoicingInfo {
             (identical(other.deafen, deafen) || other.deafen == deafen) &&
             (identical(other.video, video) || other.video == video) &&
             (identical(other.shareScreen, shareScreen) ||
-                other.shareScreen == shareScreen));
+                other.shareScreen == shareScreen) &&
+            (identical(other.speakingVolume, speakingVolume) ||
+                other.speakingVolume == speakingVolume));
   }
 
   @override
@@ -272,7 +291,8 @@ class _$VoicingInfoImpl implements _VoicingInfo {
       muted,
       deafen,
       video,
-      shareScreen);
+      shareScreen,
+      speakingVolume);
 
   /// Create a copy of VoicingInfo
   /// with the given fields replaced by the non-null parameter values.
@@ -292,7 +312,8 @@ abstract class _VoicingInfo implements VoicingInfo {
       final bool muted,
       final bool deafen,
       final bool video,
-      final bool shareScreen}) = _$VoicingInfoImpl;
+      final bool shareScreen,
+      final int speakingVolume}) = _$VoicingInfoImpl;
 
   @override
   MessageTarget get context;
@@ -310,6 +331,8 @@ abstract class _VoicingInfo implements VoicingInfo {
   bool get video;
   @override
   bool get shareScreen;
+  @override
+  int get speakingVolume;
 
   /// Create a copy of VoicingInfo
   /// with the given fields replaced by the non-null parameter values.

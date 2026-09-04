@@ -33,6 +33,7 @@ dependencies:
 
   # SSE
   flutter_client_sse: ^2.0.3
+  web_socket_channel: ^3.0.3
 
   # Storage
   shared_preferences: ^2.3.3

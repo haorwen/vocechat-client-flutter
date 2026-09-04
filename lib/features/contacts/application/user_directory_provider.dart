@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../messages/data/message_cache.dart';
+import '../../../shared/models/avo_params.dart';
 
 part 'user_directory_provider.g.dart';
 
@@ -15,22 +16,35 @@ class UserSummary {
     required this.uid,
     required this.name,
     this.avatarUpdatedAt,
+    this.avoParams,
   });
 
   final int uid;
   final String name;
   final int? avatarUpdatedAt;
+  final AvoParams? avoParams;
+
+  UserSummary copyWith({String? name, int? avatarUpdatedAt, AvoParams? avoParams}) => UserSummary(
+        uid: uid,
+        name: name ?? this.name,
+        avatarUpdatedAt: avatarUpdatedAt ?? this.avatarUpdatedAt,
+        avoParams: avoParams ?? this.avoParams,
+      );
 
   factory UserSummary.fromJson(Map<String, dynamic> j) => UserSummary(
         uid: (j['uid'] as num).toInt(),
         name: j['name'] as String? ?? 'Unknown',
         avatarUpdatedAt: (j['avatar_updated_at'] as num?)?.toInt(),
+        avoParams: j['avo_params'] is Map
+            ? AvoParams.normalize(Map<String, dynamic>.from(j['avo_params'] as Map))
+            : null,
       );
 
   Map<String, dynamic> toJson() => {
         'uid': uid,
         'name': name,
         if (avatarUpdatedAt != null) 'avatar_updated_at': avatarUpdatedAt,
+        if (avoParams != null) 'avo_params': avoParams!.toJson(),
       };
 }
 
@@ -178,6 +192,25 @@ class UserDirectory extends _$UserDirectory {
     final fresh = await _fetch(cache);
     if (fresh.isEmpty) return;
     state = AsyncData(fresh);
+  }
+
+  /// Applies a profile push without refetching the whole directory.
+  Future<void> applyUserUpdate(Map<String, dynamic> json) async {
+    final uid = (json['uid'] as num?)?.toInt();
+    if (uid == null) return;
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final previous = current[uid];
+    final next = UserSummary.fromJson({
+      'uid': uid,
+      'name': json['name'] ?? previous?.name ?? '#$uid',
+      'avatar_updated_at': json['avatar_updated_at'] ?? previous?.avatarUpdatedAt,
+      if (json['avo_params'] is Map) 'avo_params': json['avo_params'],
+    });
+    final updated = {...current, uid: next};
+    state = AsyncData(updated);
+    final cache = await ref.read(messageCacheProvider.future);
+    await cache.writeUserDirectory(updated.values.map((u) => u.toJson()).toList());
   }
 }
 

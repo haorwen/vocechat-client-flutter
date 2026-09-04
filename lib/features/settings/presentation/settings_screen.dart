@@ -21,6 +21,7 @@ import '../../channels/application/conversation_providers.dart';
 import '../../messages/data/message_cache.dart';
 import '../application/app_info_provider.dart';
 import '../data/user_api.dart';
+import 'avo_settings_screen.dart';
 
 void _showFeatureUnavailable(BuildContext context) {
   ScaffoldMessenger.of(context).showSnackBar(
@@ -955,6 +956,8 @@ class _MyAccountPaneState extends ConsumerState<_MyAccountPane> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         accountCard,
+        const SizedBox(height: 24),
+        const AvoSettingsCard(),
         if (widget.uid != 1) ...[
           const SizedBox(height: 24),
           FilledButton.icon(

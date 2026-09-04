@@ -7,6 +7,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/network/dio_client.dart';
 import '../../auth/data/auth_api.dart';
 import '../../auth/domain/auth_models.dart';
+import '../../../shared/models/avo_params.dart';
 
 part 'user_api.g.dart';
 
@@ -52,6 +53,27 @@ class UserApi {
       },
     );
     return VoceUser.fromJson(resp.data as Map<String, dynamic>);
+  }
+
+  Future<AvoParams> getAvo() async {
+    try {
+      final resp = await _dio.get('/api/user/avo');
+      final data = resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : <String, dynamic>{};
+      final raw = data['avo_params'] is Map ? data['avo_params'] as Map : data;
+      return AvoParams.normalize(Map<String, dynamic>.from(raw));
+    } on DioException {
+      // Older servers may only expose the field through /api/user/me.
+      final resp = await _dio.get('/api/user/me');
+      final data = resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : <String, dynamic>{};
+      return AvoParams.normalize(data['avo_params'] is Map ? Map<String, dynamic>.from(data['avo_params'] as Map) : null);
+    }
+  }
+
+  Future<VoceUser> updateAvo(AvoParams params) async {
+    final resp = await _dio.put('/api/user/avo', data: params.toJson());
+    final data = resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : <String, dynamic>{};
+    final userData = data['user'] is Map ? Map<String, dynamic>.from(data['user'] as Map) : data;
+    return VoceUser.fromJson(userData);
   }
 
   /// Upload a new avatar. Raw bytes, not multipart — matches the server's

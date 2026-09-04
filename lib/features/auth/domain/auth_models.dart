@@ -1,6 +1,8 @@
 // ignore_for_file: invalid_annotation_target
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../../shared/models/avo_params.dart';
+
 part 'auth_models.freezed.dart';
 part 'auth_models.g.dart';
 
@@ -39,11 +41,18 @@ class VoceUser with _$VoceUser {
     String? email,
     @JsonKey(name: 'is_admin') @Default(false) bool isAdmin,
     @JsonKey(name: 'avatar_updated_at') int? avatarUpdatedAt,
+    @JsonKey(fromJson: _avoParamsFromJson, toJson: _avoParamsToJson)
+    AvoParams? avoParams,
   }) = _VoceUser;
 
   factory VoceUser.fromJson(Map<String, dynamic> json) =>
       _$VoceUserFromJson(json);
 }
+
+AvoParams? _avoParamsFromJson(Object? value) =>
+    value is Map ? AvoParams.normalize(Map<String, dynamic>.from(value)) : null;
+
+Map<String, dynamic>? _avoParamsToJson(AvoParams? value) => value?.toJson();
 
 // ---------------------------------------------------------------------------
 // LoginRequest

@@ -467,6 +467,8 @@ mixin _$VoceUser {
   bool get isAdmin => throw _privateConstructorUsedError;
   @JsonKey(name: 'avatar_updated_at')
   int? get avatarUpdatedAt => throw _privateConstructorUsedError;
+  @JsonKey(fromJson: _avoParamsFromJson, toJson: _avoParamsToJson)
+  AvoParams? get avoParams => throw _privateConstructorUsedError;
 
   /// Serializes this VoceUser to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -488,7 +490,9 @@ abstract class $VoceUserCopyWith<$Res> {
       String name,
       String? email,
       @JsonKey(name: 'is_admin') bool isAdmin,
-      @JsonKey(name: 'avatar_updated_at') int? avatarUpdatedAt});
+      @JsonKey(name: 'avatar_updated_at') int? avatarUpdatedAt,
+      @JsonKey(fromJson: _avoParamsFromJson, toJson: _avoParamsToJson)
+      AvoParams? avoParams});
 }
 
 /// @nodoc
@@ -511,6 +515,7 @@ class _$VoceUserCopyWithImpl<$Res, $Val extends VoceUser>
     Object? email = freezed,
     Object? isAdmin = null,
     Object? avatarUpdatedAt = freezed,
+    Object? avoParams = freezed,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -533,6 +538,10 @@ class _$VoceUserCopyWithImpl<$Res, $Val extends VoceUser>
           ? _value.avatarUpdatedAt
           : avatarUpdatedAt // ignore: cast_nullable_to_non_nullable
               as int?,
+      avoParams: freezed == avoParams
+          ? _value.avoParams
+          : avoParams // ignore: cast_nullable_to_non_nullable
+              as AvoParams?,
     ) as $Val);
   }
 }
@@ -550,7 +559,9 @@ abstract class _$$VoceUserImplCopyWith<$Res>
       String name,
       String? email,
       @JsonKey(name: 'is_admin') bool isAdmin,
-      @JsonKey(name: 'avatar_updated_at') int? avatarUpdatedAt});
+      @JsonKey(name: 'avatar_updated_at') int? avatarUpdatedAt,
+      @JsonKey(fromJson: _avoParamsFromJson, toJson: _avoParamsToJson)
+      AvoParams? avoParams});
 }
 
 /// @nodoc
@@ -571,6 +582,7 @@ class __$$VoceUserImplCopyWithImpl<$Res>
     Object? email = freezed,
     Object? isAdmin = null,
     Object? avatarUpdatedAt = freezed,
+    Object? avoParams = freezed,
   }) {
     return _then(_$VoceUserImpl(
       uid: null == uid
@@ -593,6 +605,10 @@ class __$$VoceUserImplCopyWithImpl<$Res>
           ? _value.avatarUpdatedAt
           : avatarUpdatedAt // ignore: cast_nullable_to_non_nullable
               as int?,
+      avoParams: freezed == avoParams
+          ? _value.avoParams
+          : avoParams // ignore: cast_nullable_to_non_nullable
+              as AvoParams?,
     ));
   }
 }
@@ -605,7 +621,9 @@ class _$VoceUserImpl implements _VoceUser {
       required this.name,
       this.email,
       @JsonKey(name: 'is_admin') this.isAdmin = false,
-      @JsonKey(name: 'avatar_updated_at') this.avatarUpdatedAt});
+      @JsonKey(name: 'avatar_updated_at') this.avatarUpdatedAt,
+      @JsonKey(fromJson: _avoParamsFromJson, toJson: _avoParamsToJson)
+      this.avoParams});
 
   factory _$VoceUserImpl.fromJson(Map<String, dynamic> json) =>
       _$$VoceUserImplFromJson(json);
@@ -622,10 +640,13 @@ class _$VoceUserImpl implements _VoceUser {
   @override
   @JsonKey(name: 'avatar_updated_at')
   final int? avatarUpdatedAt;
+  @override
+  @JsonKey(fromJson: _avoParamsFromJson, toJson: _avoParamsToJson)
+  final AvoParams? avoParams;
 
   @override
   String toString() {
-    return 'VoceUser(uid: $uid, name: $name, email: $email, isAdmin: $isAdmin, avatarUpdatedAt: $avatarUpdatedAt)';
+    return 'VoceUser(uid: $uid, name: $name, email: $email, isAdmin: $isAdmin, avatarUpdatedAt: $avatarUpdatedAt, avoParams: $avoParams)';
   }
 
   @override
@@ -638,13 +659,15 @@ class _$VoceUserImpl implements _VoceUser {
             (identical(other.email, email) || other.email == email) &&
             (identical(other.isAdmin, isAdmin) || other.isAdmin == isAdmin) &&
             (identical(other.avatarUpdatedAt, avatarUpdatedAt) ||
-                other.avatarUpdatedAt == avatarUpdatedAt));
+                other.avatarUpdatedAt == avatarUpdatedAt) &&
+            (identical(other.avoParams, avoParams) ||
+                other.avoParams == avoParams));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, uid, name, email, isAdmin, avatarUpdatedAt);
+  int get hashCode => Object.hash(
+      runtimeType, uid, name, email, isAdmin, avatarUpdatedAt, avoParams);
 
   /// Create a copy of VoceUser
   /// with the given fields replaced by the non-null parameter values.
@@ -664,12 +687,13 @@ class _$VoceUserImpl implements _VoceUser {
 
 abstract class _VoceUser implements VoceUser {
   const factory _VoceUser(
-          {required final int uid,
-          required final String name,
-          final String? email,
-          @JsonKey(name: 'is_admin') final bool isAdmin,
-          @JsonKey(name: 'avatar_updated_at') final int? avatarUpdatedAt}) =
-      _$VoceUserImpl;
+      {required final int uid,
+      required final String name,
+      final String? email,
+      @JsonKey(name: 'is_admin') final bool isAdmin,
+      @JsonKey(name: 'avatar_updated_at') final int? avatarUpdatedAt,
+      @JsonKey(fromJson: _avoParamsFromJson, toJson: _avoParamsToJson)
+      final AvoParams? avoParams}) = _$VoceUserImpl;
 
   factory _VoceUser.fromJson(Map<String, dynamic> json) =
       _$VoceUserImpl.fromJson;
@@ -686,6 +710,9 @@ abstract class _VoceUser implements VoceUser {
   @override
   @JsonKey(name: 'avatar_updated_at')
   int? get avatarUpdatedAt;
+  @override
+  @JsonKey(fromJson: _avoParamsFromJson, toJson: _avoParamsToJson)
+  AvoParams? get avoParams;
 
   /// Create a copy of VoceUser
   /// with the given fields replaced by the non-null parameter values.
