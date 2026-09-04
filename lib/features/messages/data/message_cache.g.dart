@@ -22,12 +22,11 @@ final messageCacheProvider = FutureProvider<MessageCache>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef MessageCacheRef = FutureProviderRef<MessageCache>;
-String _$cacheUsageBytesHash() => r'b26cccf776b09a3b6f10f5acba84f0a04f4465ea';
+String _$cacheUsageBytesHash() => r'2caa28adf0d1e39ee4775ed16d6a9911e391195b';
 
 /// Total on-disk bytes used by the app's caches: the SQLite message/meta
-/// database plus the `flutter_cache_manager` image/file store. Recomputed on
-/// each watch (not kept alive) so the settings readout reflects clears and
-/// growth; `ref.invalidate` after "clear cache" drops it back to ~0.
+/// database plus cached images, videos, and streamed audio. Recomputed on each
+/// watch so the settings readout reflects cache growth and clears.
 ///
 /// Copied from [cacheUsageBytes].
 @ProviderFor(cacheUsageBytes)

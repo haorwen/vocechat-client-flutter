@@ -3,6 +3,7 @@ import 'dart:io' as io;
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -382,6 +383,11 @@ class MediaCache {
     } catch (_) {
       // A player closing concurrently must not block the rest of cache clear.
     }
+    // Disk eviction does not evict decoded Flutter images already held by the
+    // process. Clear both caches so a replaced server cannot briefly display
+    // an image from the old instance.
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
   }
 
   /// Total bytes occupied by cached images, video segments, and streamed audio.

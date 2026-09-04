@@ -32,7 +32,7 @@ Map<String, dynamic> _$$AccountConfigImplToJson(_$AccountConfigImpl instance) =>
 // RiverpodGenerator
 // **************************************************************************
 
-String _$accountStoreHash() => r'768758bd79c20def23a98cd763be25f5f5f0fd2b';
+String _$accountStoreHash() => r'664f3d8dac9f1e7802fb0ba1e1fd3ad37b558543';
 
 /// See also [AccountStore].
 @ProviderFor(AccountStore)

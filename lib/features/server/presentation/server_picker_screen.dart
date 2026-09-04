@@ -19,8 +19,7 @@ class ServerPickerScreen extends ConsumerStatefulWidget {
   const ServerPickerScreen({super.key});
 
   @override
-  ConsumerState<ServerPickerScreen> createState() =>
-      _ServerPickerScreenState();
+  ConsumerState<ServerPickerScreen> createState() => _ServerPickerScreenState();
 }
 
 class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
@@ -38,6 +37,9 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
     setState(() => _switching = true);
     final notifier = ref.read(serverStoreProvider.notifier);
     await notifier.selectServer(config.id);
+    await ref
+        .read(authControllerProvider.notifier)
+        .checkServerIdentity(config.baseUrl);
     // This flow always lands on /login regardless of any saved account on
     // the target server (the account-switcher screen is the path for
     // resuming a saved session without re-entering credentials) — clear the
@@ -63,6 +65,9 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
           final notifier = ref.read(serverStoreProvider.notifier);
           await notifier.addServer(config);
           await notifier.selectServer(config.id);
+          await ref
+              .read(authControllerProvider.notifier)
+              .checkServerIdentity(config.baseUrl);
           await ref.read(accountStoreProvider.notifier).clearCurrentAccount();
           // Wait for auth controller to re-bootstrap with new server
           await ref.read(authControllerProvider.future);
@@ -91,6 +96,9 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
           final notifier = ref.read(serverStoreProvider.notifier);
           await notifier.addServer(config);
           await notifier.selectServer(config.id);
+          await ref
+              .read(authControllerProvider.notifier)
+              .checkServerIdentity(config.baseUrl);
           await ref.read(accountStoreProvider.notifier).clearCurrentAccount();
           // Wait for auth controller to re-bootstrap with new server
           await ref.read(authControllerProvider.future);
@@ -107,10 +115,10 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
     final serverState = ref.watch(serverStoreProvider);
 
     return serverState.when(
-      loading: () => const Scaffold(
-          body: Center(child: CircularProgressIndicator())),
-      error: (e, _) =>
-          Scaffold(body: Center(child: Text(safeText(l.errorPrefix(e.toString()))))),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, _) => Scaffold(
+          body: Center(child: Text(safeText(l.errorPrefix(e.toString()))))),
       data: (state) {
         final servers = state.servers;
         final selectedIndex = _selectedId != null
@@ -153,14 +161,7 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                     ),
                   ),
                 )
-              : RadioGroup<int>(
-                  groupValue: effectiveIndex,
-                  onChanged: (v) {
-                    if (v != null) {
-                      setState(() => _selectedId = servers[v].id);
-                    }
-                  },
-                  child: ListView.separated(
+              : ListView.separated(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   itemCount: servers.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 4),
@@ -177,8 +178,7 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                         borderRadius: BorderRadius.circular(16),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(16),
-                          onTap: () =>
-                              setState(() => _selectedId = server.id),
+                          onTap: () => setState(() => _selectedId = server.id),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 14),
@@ -186,8 +186,7 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                               children: [
                                 CircleAvatar(
                                   radius: 22,
-                                  backgroundColor:
-                                      theme.colorScheme.primary,
+                                  backgroundColor: theme.colorScheme.primary,
                                   child: Text(
                                     safeText(server.name.isNotEmpty
                                         ? server.name[0].toUpperCase()
@@ -219,14 +218,14 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                                       const SizedBox(height: 2),
                                       Text(
                                         safeText(server.baseUrl),
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
+                                        style:
+                                            theme.textTheme.bodySmall?.copyWith(
                                           color: selected
                                               ? theme.colorScheme
                                                   .onPrimaryContainer
                                                   .withAlpha(180)
-                                              : theme.colorScheme
-                                                  .onSurfaceVariant,
+                                              : theme
+                                                  .colorScheme.onSurfaceVariant,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -234,7 +233,15 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                                     ],
                                   ),
                                 ),
-                                Radio<int>(value: i),
+                                Radio<int>(
+                                  value: i,
+                                  groupValue: effectiveIndex,
+                                  onChanged: (v) {
+                                    if (v != null)
+                                      setState(
+                                          () => _selectedId = servers[v].id);
+                                  },
+                                ),
                               ],
                             ),
                           ),
@@ -242,7 +249,6 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                       ),
                     );
                   },
-                ),
                 ),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: _showAddSheet,
@@ -403,10 +409,9 @@ class _AddServerSheetState extends ConsumerState<_AddServerSheet> {
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Icon(_tested
-                      ? Icons.check_circle_outline
-                      : Icons.wifi),
-              label: Text(safeText(_testing ? l.serverTesting : l.serverTestConnection)),
+                  : Icon(_tested ? Icons.check_circle_outline : Icons.wifi),
+              label: Text(safeText(
+                  _testing ? l.serverTesting : l.serverTestConnection)),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 44),
               ),

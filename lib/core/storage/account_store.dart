@@ -109,10 +109,33 @@ class AccountStore extends _$AccountStore {
     state = AsyncData(current.copyWith(currentAccountId: null));
   }
 
+  /// Remove every saved account belonging to [serverId]. The server may have
+  /// been replaced at the same URL, so retaining these accounts would leave
+  /// tokens and account-scoped message databases pointing at the old server.
+  Future<List<AccountConfig>> removeAccountsForServer(String serverId) async {
+    final current = await future;
+    final removed = current.accounts
+        .where((account) => account.serverId == serverId)
+        .toList();
+    if (removed.isEmpty) return const [];
+
+    final removedIds = removed.map((account) => account.accountId).toSet();
+    final updated = current.accounts
+        .where((account) => !removedIds.contains(account.accountId))
+        .toList();
+    final newCurrentId = removedIds.contains(current.currentAccountId)
+        ? null
+        : current.currentAccountId;
+    await _persist(updated, newCurrentId);
+    state = AsyncData(
+      current.copyWith(accounts: updated, currentAccountId: newCurrentId),
+    );
+    return removed;
+  }
+
   List<AccountConfig> get list => state.valueOrNull?.accounts ?? [];
 
-  Future<void> _persist(
-      List<AccountConfig> accounts, String? currentId) async {
+  Future<void> _persist(List<AccountConfig> accounts, String? currentId) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = accounts.map((a) => jsonEncode(a.toJson())).toList();
     await prefs.setStringList(_kAccountsKey, raw);

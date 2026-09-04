@@ -1,13 +1,16 @@
+import 'package:dio/dio.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/notifications/fcm_service.dart';
 import '../../../core/storage/account_store.dart';
+import '../../../core/storage/media_cache.dart';
 import '../../../core/storage/secure_token_store.dart';
 import '../../../core/storage/server_store.dart';
 import '../../../core/utils/app_log.dart';
 import '../data/auth_api.dart';
+import '../../messages/data/message_cache.dart';
 import '../domain/auth_models.dart';
 
 part 'auth_controller.freezed.dart';
@@ -75,9 +78,20 @@ class AuthController extends _$AuthController {
     bootLog('6 AuthController.build: await stores.future');
     await ref.read(serverStoreProvider.notifier).future;
     await ref.read(accountStoreProvider.notifier).future;
+    // Organization info is public, so this also detects a server replacement
+    // when the app is currently logged out and before any account cache opens.
+    // Identity cleanup mutates AccountStore, so suppress the listener while
+    // this build is still deciding the initial auth state.
+    _suppressStoreReact = true;
+    try {
+      await checkServerIdentity();
+    } finally {
+      _suppressStoreReact = false;
+    }
     bootLog('7 AuthController.build: stores ready, calling _bootstrap');
     final result = await _bootstrap();
-    bootLog('8 AuthController.build: _bootstrap returned ${result.runtimeType}');
+    bootLog(
+        '8 AuthController.build: _bootstrap returned ${result.runtimeType}');
     return result;
   }
 
@@ -85,7 +99,9 @@ class AuthController extends _$AuthController {
     final accountState = ref.read(accountStoreProvider).valueOrNull;
     final accountId = accountState?.currentAccountId;
     if (accountId == null) return null;
-    return accountState?.accounts.where((a) => a.accountId == accountId).firstOrNull;
+    return accountState?.accounts
+        .where((a) => a.accountId == accountId)
+        .firstOrNull;
   }
 
   /// Called at startup: reads stored tokens for the current account, refreshes
@@ -106,7 +122,9 @@ class AuthController extends _$AuthController {
     // from serverStore, not accountStore.
     final serverState = ref.read(serverStoreProvider).valueOrNull;
     if (serverState?.currentServerId != account.serverId) {
-      await ref.read(serverStoreProvider.notifier).selectServer(account.serverId);
+      await ref
+          .read(serverStoreProvider.notifier)
+          .selectServer(account.serverId);
     }
 
     final tokenStore = ref.read(secureTokenStoreProvider(account.accountId));
@@ -126,7 +144,8 @@ class AuthController extends _$AuthController {
       now.add(const Duration(seconds: 60)),
     );
     if (almostExpired) {
-      AppLog.d(LogTag.auth, () => '🟦 bootstrap: token expired/near, refreshing');
+      AppLog.d(
+          LogTag.auth, () => '🟦 bootstrap: token expired/near, refreshing');
       final refreshed = await _tryRefresh(api, tokenStore, tokens.refreshToken);
       AppLog.d(LogTag.auth, () => '🟦 bootstrap: refresh result=$refreshed');
       if (!refreshed) return const AuthState.unauthenticated();
@@ -139,7 +158,8 @@ class AuthController extends _$AuthController {
       await _syncAccountProfile(account, user);
       return AuthState.authenticated(user: user);
     } catch (e) {
-      AppLog.d(LogTag.auth, () => '🟦 bootstrap: me() failed: $e — trying refresh');
+      AppLog.d(
+          LogTag.auth, () => '🟦 bootstrap: me() failed: $e — trying refresh');
       final refreshed = await _tryRefresh(api, tokenStore, tokens.refreshToken);
       if (!refreshed) return const AuthState.unauthenticated();
       try {
@@ -221,6 +241,112 @@ class AuthController extends _$AuthController {
         ref.read(authApiProvider), tokenStore, tokens.refreshToken);
   }
 
+  Future<bool>? _serverIdentityCheck;
+
+  /// Probe the server before auth bootstrap, because an URL can now point at a
+  /// different VoceChat installation while retaining all of the app's local
+  /// state. This mirrors the web client's organization/server_id check, but
+  /// clears only accounts tied to the replaced server and the global media
+  /// cache (media files are not currently partitioned by server on disk).
+  /// Returns true when local accounts were removed because the server instance
+  /// changed. Callers switching to a saved account can then require login.
+  Future<bool> checkServerIdentity([String? requestedBaseUrl]) {
+    return _serverIdentityCheck ??= _doCheckServerIdentity(requestedBaseUrl)
+        .whenComplete(() => _serverIdentityCheck = null);
+  }
+
+  Future<bool> _doCheckServerIdentity(String? requestedBaseUrl) async {
+    final serverState = ref.read(serverStoreProvider).valueOrNull;
+    if (serverState == null) return false;
+    final normalizedRequested =
+        requestedBaseUrl?.trim().replaceAll(RegExp(r'/+$'), '');
+    final config = serverState.servers.where((server) {
+      if (normalizedRequested != null && normalizedRequested.isNotEmpty) {
+        return server.baseUrl.trim().replaceAll(RegExp(r'/+$'), '') ==
+            normalizedRequested;
+      }
+      return server.id == serverState.currentServerId;
+    }).firstOrNull;
+    if (config == null) return false;
+
+    final baseUrl = config.baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    try {
+      // This endpoint is intentionally public on the server, so identity can
+      // be checked before a token exists (the same as the web client). Use the
+      // shared VoceDioClient stack for referer injection, response sanitizing,
+      // and consistent timeout/error handling, but never refresh an old token
+      // just because an identity probe returned 401.
+      final response = await VoceDioClient(baseUrl: baseUrl, ref: ref).dio.get(
+            '/api/admin/system/organization',
+            options: Options(
+              extra: {kSkipRefreshOn401: true},
+              headers: {'X-API-Key': null},
+            ),
+          );
+      final body = response.data;
+      final remoteId =
+          body is Map ? body['server_id']?.toString().trim() : null;
+      // Old servers/databases may return null. Keep their existing behavior.
+      if (remoteId == null || remoteId.isEmpty || remoteId == config.id) {
+        return false;
+      }
+
+      final accountState = ref.read(accountStoreProvider).valueOrNull;
+      final accounts = accountState?.accounts
+              .where((account) => account.serverId == config.id)
+              .toList() ??
+          const <AccountConfig>[];
+      final oldServerStore = ref.read(secureTokenStoreProvider(config.id));
+      final oldRemembered = await oldServerStore.readRememberedCredential();
+      final oldTokens = await oldServerStore.readTokens();
+      final hadServerLocalData = accounts.isNotEmpty || oldTokens != null;
+
+      if (hadServerLocalData) {
+        // Clear every account on the replaced server, not only the active one.
+        // Otherwise a later account switch would resurrect old messages/tokens.
+        final currentAccountId = accountState?.currentAccountId;
+        final activeCache = ref.read(messageCacheProvider).valueOrNull;
+        for (final account in accounts) {
+          await ref.read(secureTokenStoreProvider(account.accountId)).clear();
+          if (account.accountId == currentAccountId && activeCache != null) {
+            // Reuse the provider's open connection for the active account;
+            // opening a second SQLite handle here can race with SSE writes.
+            await activeCache.clearAll();
+          } else {
+            await MessageCache.clearForAccount(account.accountId);
+          }
+        }
+        await oldServerStore.clear();
+        await oldServerStore.clearRememberedCredential();
+        await MediaCache.clear();
+        await ref
+            .read(accountStoreProvider.notifier)
+            .removeAccountsForServer(config.id);
+      } else if (oldRemembered != null) {
+        // Remembered credentials belong to the old server identity too. Do
+        // not carry them across an instance replacement, or the next login
+        // could submit an old server's credentials to the new installation.
+        await oldServerStore.clearRememberedCredential();
+      }
+
+      await ref.read(serverStoreProvider.notifier).replaceServerId(
+            oldId: config.id,
+            newId: remoteId,
+          );
+      AppLog.w(
+        LogTag.auth,
+        () =>
+            'server identity changed: ${config.id} -> $remoteId; local data cleared',
+      );
+      return hadServerLocalData;
+    } catch (e) {
+      // Identity probing must not make an otherwise reachable old server
+      // unusable, especially during offline startup.
+      AppLog.d(LogTag.auth, () => 'server identity probe skipped: $e');
+      return false;
+    }
+  }
+
   /// Align the local server entry with the server-issued id, so token
   /// namespace and currentServerId stay in sync — and we never grow the
   /// servers list with a duplicate on every login.
@@ -288,7 +414,8 @@ class AuthController extends _$AuthController {
     // must not let the currently-active account's session be replaced by a
     // global AsyncError — see below.
     final previousAuthenticated = state.valueOrNull;
-    final isAddingSecondAccount = previousAuthenticated is AuthStateAuthenticated;
+    final isAddingSecondAccount =
+        previousAuthenticated is AuthStateAuthenticated;
 
     // Preserve the previous value (hasValue stays true) instead of a bare
     // AsyncLoading(). The router's redirect uses `authAsync.hasValue` to
@@ -313,10 +440,9 @@ class AuthController extends _$AuthController {
                 .firstOrNull
                 ?.baseUrl ??
             '';
-        final targetBaseUrl =
-            (serverUrl != null && serverUrl.trim().isNotEmpty)
-                ? serverUrl.trim().replaceAll(RegExp(r'/+$'), '')
-                : currentBaseUrl;
+        final targetBaseUrl = (serverUrl != null && serverUrl.trim().isNotEmpty)
+            ? serverUrl.trim().replaceAll(RegExp(r'/+$'), '')
+            : currentBaseUrl;
         final api = targetBaseUrl == currentBaseUrl
             ? ref.read(authApiProvider)
             : AuthApi(VoceDioClient(baseUrl: targetBaseUrl, ref: ref).dio);
@@ -332,6 +458,10 @@ class AuthController extends _$AuthController {
         );
         final response = await api.login(request);
 
+        // The login response is a second identity signal. The organization
+        // probe normally catches this earlier, but checking here also covers
+        // a server replacement that happened while the app stayed open.
+        await checkServerIdentity(targetBaseUrl);
         await _reconcileServerEntry(response.serverId, targetBaseUrl);
 
         // Save tokens under an account-scoped key so the same server can
@@ -342,8 +472,7 @@ class AuthController extends _$AuthController {
         await tokenStore.saveTokens(
           access: response.token,
           refresh: response.refreshToken,
-          expiresAt:
-              DateTime.now().add(Duration(seconds: response.expiredIn)),
+          expiresAt: DateTime.now().add(Duration(seconds: response.expiredIn)),
         );
         AppLog.d(
           LogTag.auth,
@@ -480,8 +609,9 @@ class AuthController extends _$AuthController {
   /// `unauthenticated` and the caller is expected to route to `/login`.
   Future<void> switchAccount(String accountId) async {
     final accountState = ref.read(accountStoreProvider).valueOrNull;
-    final target =
-        accountState?.accounts.where((a) => a.accountId == accountId).firstOrNull;
+    final target = accountState?.accounts
+        .where((a) => a.accountId == accountId)
+        .firstOrNull;
     if (target == null) return;
     if (accountState?.currentAccountId == accountId) return;
 
@@ -489,7 +619,21 @@ class AuthController extends _$AuthController {
 
     _suppressStoreReact = true;
     try {
-      await ref.read(serverStoreProvider.notifier).selectServer(target.serverId);
+      final server = ref
+          .read(serverStoreProvider)
+          .valueOrNull
+          ?.servers
+          .where((s) => s.id == target.serverId)
+          .firstOrNull;
+      final identityChanged = await checkServerIdentity(server?.baseUrl);
+      if (identityChanged) {
+        await ref.read(accountStoreProvider.notifier).clearCurrentAccount();
+        state = const AsyncData(AuthState.unauthenticated());
+        return;
+      }
+      await ref
+          .read(serverStoreProvider.notifier)
+          .selectServer(target.serverId);
       await ref.read(accountStoreProvider.notifier).selectAccount(accountId);
     } finally {
       _suppressStoreReact = false;
@@ -548,6 +692,9 @@ class AuthController extends _$AuthController {
                 .firstOrNull
                 ?.baseUrl ??
             '';
+        // Registration responses also carry server_id; use the same
+        // replacement check as password login before creating new local data.
+        await checkServerIdentity(currentBaseUrl);
         await _reconcileServerEntry(response.serverId, currentBaseUrl);
 
         final accountId =
@@ -556,8 +703,7 @@ class AuthController extends _$AuthController {
         await tokenStore.saveTokens(
           access: response.token,
           refresh: response.refreshToken,
-          expiresAt:
-              DateTime.now().add(Duration(seconds: response.expiredIn)),
+          expiresAt: DateTime.now().add(Duration(seconds: response.expiredIn)),
         );
 
         await ref.read(accountStoreProvider.notifier).upsertAccount(

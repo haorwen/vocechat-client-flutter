@@ -316,7 +316,6 @@ class MessageCache {
     return (count: count, mention: mention);
   }
 
-
   /// Schedule a coalesced write of the given snapshot for [target].
   /// We only persist the head [_maxPerConversation] (newest first).
   void scheduleWrite(MessageTarget target, List<ChatMessage> messages) {
@@ -484,6 +483,26 @@ class MessageCache {
     return null;
   }
 
+  /// Clear the cache for an account without changing the currently selected
+  /// account. This is used when a saved server is found to be a replacement
+  /// while the user is signing into another server.
+  static Future<void> clearForAccount(String accountId) async {
+    try {
+      final (db, dbPath) = await _openDbWithPath(accountId);
+      final cache = MessageCache._(db, dbPath);
+      try {
+        await cache.clearAll();
+      } finally {
+        await db.close();
+      }
+    } catch (e) {
+      AppLog.w(
+        LogTag.chat,
+        () => '⚠️ cache.clearForAccount failed for $accountId: $e',
+      );
+    }
+  }
+
   /// Wipe all cached messages and directory/meta snapshots, leaving the table
   /// structure intact. Used by the "clear cache" action in settings. Pending
   /// in-memory writes are dropped first so a debounced flush can't repopulate
@@ -542,8 +561,7 @@ Future<(Database, String)> _openDbWithPath(String accountId) async {
   bootLog('10 _openDb: enter (account=$accountId)');
   // sqflite uses platform-native sqlite on Android/iOS/macOS, but Linux/
   // Windows need the FFI implementation explicitly.
-  if (!kIsWeb &&
-      (Platform.isLinux || Platform.isWindows)) {
+  if (!kIsWeb && (Platform.isLinux || Platform.isWindows)) {
     bootLog('11 _openDb: sqfliteFfiInit');
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
