@@ -1,0 +1,13 @@
+{
+  "name": "avo-original-js-reference",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic fixtures from the original Avo Creature and bundled p5 renderer",
+  "scripts": {
+    "generate": "node generate.mjs"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "0.1.97",
+    "jsdom": "28.1.0"
+  }
+}

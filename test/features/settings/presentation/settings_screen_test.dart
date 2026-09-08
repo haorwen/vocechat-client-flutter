@@ -29,14 +29,18 @@ void main() {
         child: _localizedApp(),
       ),
     );
-    await tester.pumpAndSettle();
+    // The Avo preview animates continuously; only pump the finite UI transition.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     final deleteButton = find.text('Delete account');
     expect(deleteButton, findsOneWidget);
 
     await tester.ensureVisible(deleteButton);
     await tester.tap(deleteButton);
-    await tester.pumpAndSettle();
+    // The Avo preview animates continuously; only pump the finite UI transition.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('Delete this account?'), findsOneWidget);
     final confirmLabel = find.descendant(
@@ -66,7 +70,9 @@ void main() {
         child: _localizedApp(),
       ),
     );
-    await tester.pumpAndSettle();
+    // The Avo preview animates continuously; only pump the finite UI transition.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('Delete account'), findsNothing);
   });

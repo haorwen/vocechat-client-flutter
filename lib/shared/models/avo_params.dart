@@ -77,13 +77,16 @@ class AvoParams {
         if (energy != null) 'energy': energy,
       });
 
-  /// Deterministic seed used by the painter; never use dart:math Random()
-  /// without a seed for avatar appearance.
+  /// The reference's unsigned FNV-1a hash over UTF-16 code units.
+  /// Split multiplication keeps Math.imul's low 32 bits exact on Flutter Web.
   int get stableSeed {
     var hash = 0x811c9dc5;
-    for (final codeUnit in '$name#$variant'.codeUnits) {
-      hash ^= codeUnit;
-      hash = (hash * 0x01000193) & 0x7fffffff;
+    final referenceName = name.isEmpty ? 'guest' : name;
+    for (final unit in '$referenceName#${variant.toSigned(32)}'.codeUnits) {
+      hash ^= unit;
+      hash = (((hash & 0xffff) * 0x01000193) +
+              (((hash >> 16) * 0x0193 & 0xffff) << 16)) &
+          0xffffffff;
     }
     return hash;
   }

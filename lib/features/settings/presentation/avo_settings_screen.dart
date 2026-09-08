@@ -108,10 +108,21 @@ class _AvoSettingsCardState extends ConsumerState<AvoSettingsCard> {
           const Text('Customize the avatar shown when your camera is off.'),
           const SizedBox(height: 18),
           Center(
-              child: SizedBox(
-                  width: 150,
-                  height: 150,
-                  child: AvoAvatar(params: _params, level: .35))),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: AspectRatio(
+                aspectRatio: 4 / 3,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: ColoredBox(
+                    color: const Color(0xFF101214),
+                    child: AvoAvatar(params: _params, interactive: true),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
           if (_loading)
             const LinearProgressIndicator()
           else ...[
