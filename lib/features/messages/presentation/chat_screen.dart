@@ -1716,9 +1716,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
     final displayContentType = msg.displayContentType;
     // Burn-after-read: server stamps `expires_in` (seconds) onto normal/reply
     // messages based on the sender's own auto-delete setting for this
-    // target. Static icon + tooltip only — no countdown/auto-delete-on-expiry
-    // (that's out of scope; see web's ExpireTimer.tsx for the fuller
-    // behaviour this intentionally does not replicate).
+    // target. ChatController removes rows at their absolute expiry.
     final expiresIn = switch (detail) {
       NormalMessageDetail() => detail.expiresIn,
       ReplyMessageDetail() => detail.expiresIn,

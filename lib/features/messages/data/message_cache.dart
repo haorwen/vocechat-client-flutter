@@ -81,7 +81,12 @@ class MessageCache {
       try {
         final raw = row['payload'] as String;
         final map = jsonDecode(raw) as Map<String, dynamic>;
-        out.add(ChatMessage.fromJson(map));
+        final message = ChatMessage.fromJson(map);
+        if (message.isExpiredAt(DateTime.now().millisecondsSinceEpoch)) {
+          await deleteMid(target, message.mid);
+        } else {
+          out.add(message);
+        }
       } catch (_) {
         // Skip corrupt rows.
       }
@@ -340,6 +345,10 @@ class MessageCache {
   Future<void> appendOne(MessageTarget target, ChatMessage msg) async {
     if (msg.mid <= 0) return;
     if (msg.detail is ReactionMessageDetail) return;
+    if (msg.isExpiredAt(DateTime.now().millisecondsSinceEpoch)) {
+      await deleteMid(target, msg.mid);
+      return;
+    }
     final key = _keyFor(target);
     try {
       await _db.insert(
@@ -376,6 +385,10 @@ class MessageCache {
   /// and the row would otherwise resurface on the next cache read.
   Future<void> deleteMid(MessageTarget target, int mid) async {
     final key = _keyFor(target);
+    final pending = _pendingWrites[key];
+    if (pending != null) {
+      _pendingWrites[key] = pending.where((m) => m.mid != mid).toList();
+    }
     try {
       await _db.delete(
         'messages',
@@ -421,7 +434,13 @@ class MessageCache {
     // Replace-then-trim approach: upsert all, then delete anything outside
     // the most recent _maxPerConversation by mid.
     final batch = _db.batch();
+    final now = DateTime.now().millisecondsSinceEpoch;
     for (final m in trimmed) {
+      if (m.isExpiredAt(now)) {
+        batch.delete('messages',
+            where: 'target_key = ? AND mid = ?', whereArgs: [key, m.mid]);
+        continue;
+      }
       batch.insert(
         'messages',
         {

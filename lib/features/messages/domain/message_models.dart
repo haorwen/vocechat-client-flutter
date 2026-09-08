@@ -180,6 +180,20 @@ class ChatMessage with _$ChatMessage {
   factory ChatMessage.fromJson(Map<String, dynamic> json) =>
       _$ChatMessageFromJson(json);
 
+  /// Absolute expiry, matching the server/web send-time based contract.
+  /// Pending/failed optimistic rows do not expire before they are sent.
+  int? get expiresAt {
+    final seconds = switch (detail) {
+      NormalMessageDetail(:final expiresIn) => expiresIn,
+      ReplyMessageDetail(:final expiresIn) => expiresIn,
+      _ => null,
+    };
+    if (mid <= 0 || seconds == null || seconds <= 0) return null;
+    return createdAt + seconds * 1000;
+  }
+
+  bool isExpiredAt(int now) => expiresAt != null && expiresAt! <= now;
+
   /// True when an edit echo has been applied client-side.
   bool get isEdited => editedContent != null;
 
@@ -224,8 +238,8 @@ sealed class ChatEvent with _$ChatEvent {
     required int version,
   }) = ChatEventUsersSnapshot;
 
-  const factory ChatEvent.groupChanged(
-      {required Map<String, dynamic> data}) = ChatEventGroupChanged;
+  const factory ChatEvent.groupChanged({required Map<String, dynamic> data}) =
+      ChatEventGroupChanged;
 
   const factory ChatEvent.userJoinedGroup({
     required int gid,
@@ -244,8 +258,8 @@ sealed class ChatEvent with _$ChatEvent {
   /// user's persisted preferences — read-marks, mutes, pinned chats, etc.
   /// We keep the raw map so consumers can pick out only the fields they care
   /// about without adding a Freezed field per setting.
-  const factory ChatEvent.userSettings(
-      {required Map<String, dynamic> data}) = ChatEventUserSettings;
+  const factory ChatEvent.userSettings({required Map<String, dynamic> data}) =
+      ChatEventUserSettings;
 
   /// Delta updates to user settings — emits when another device toggles a
   /// pin / read-mark / mute. Same payload shape as `userSettings` but

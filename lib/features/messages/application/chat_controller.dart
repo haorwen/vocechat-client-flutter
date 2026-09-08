@@ -1,14 +1,17 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/sse_client.dart';
 import '../../../core/utils/app_log.dart';
 import '../../../features/auth/application/auth_controller.dart';
+import 'burn_after_read_provider.dart';
 import '../data/message_api.dart';
 import '../data/message_cache.dart';
 import '../domain/message_models.dart';
@@ -23,6 +26,56 @@ part 'chat_controller.g.dart';
 @Riverpod(keepAlive: true)
 class ChatController extends _$ChatController {
   static const _initialLimit = 50;
+  Timer? _expiryTimer;
+
+  int? _outgoingExpiresIn() {
+    final settings = ref.read(burnAfterReadProvider);
+    final seconds = target.map(
+      user: (t) => settings.userExpiresIn(t.uid),
+      group: (t) => settings.groupExpiresIn(t.gid),
+    );
+    return seconds > 0 ? seconds : null;
+  }
+
+  void _scheduleExpiry(List<ChatMessage>? messages) {
+    _expiryTimer?.cancel();
+    int? earliest;
+    for (final message in messages ?? const <ChatMessage>[]) {
+      final deadline = message.expiresAt;
+      if (deadline != null && (earliest == null || deadline < earliest)) {
+        earliest = deadline;
+      }
+    }
+    if (earliest == null) return;
+    final delay = earliest - DateTime.now().millisecondsSinceEpoch;
+    _expiryTimer =
+        Timer(Duration(milliseconds: delay > 0 ? delay : 0), _expireMessages);
+  }
+
+  void _expireMessages() {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final next = _withoutExpired(current);
+    if (next.length != current.length) {
+      state = AsyncData(next);
+      _persist(next);
+    }
+    _scheduleExpiry(next);
+  }
+
+  List<ChatMessage> _withoutExpired(List<ChatMessage> messages) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return messages.where((m) {
+      if (!m.isExpiredAt(now)) return true;
+      _seenMids.remove(m.mid);
+      _statuses.remove(m.mid);
+      _localAttachments.remove(m.mid);
+      _pendingFiles.remove(m.mid);
+      _progress.remove(m.mid);
+      _cache?.deleteMid(target, m.mid);
+      return false;
+    }).toList();
+  }
 
   /// UI-only send status keyed by mid (negative for optimistic, then real mid).
   final Map<int, MessageSendStatus> _statuses = {};
@@ -98,10 +151,9 @@ class ChatController extends _$ChatController {
     final matches = msg.target.map(
       user: (t) => target.map(
         user: (tt) {
-          final peerUid =
-              currentUid != null && msg.fromUid != currentUid
-                  ? msg.fromUid
-                  : t.uid;
+          final peerUid = currentUid != null && msg.fromUid != currentUid
+              ? msg.fromUid
+              : t.uid;
           return tt.uid == peerUid;
         },
         group: (_) => false,
@@ -110,8 +162,6 @@ class ChatController extends _$ChatController {
           target.map(user: (_) => false, group: (tt) => tt.gid == t.gid),
     );
     if (!matches) return;
-
-    if (msg.mid > 0 && _seenMids.contains(msg.mid)) return;
 
     final current = state.valueOrNull;
     if (current == null) {
@@ -157,7 +207,18 @@ class ChatController extends _$ChatController {
     int maxMid = 0;
 
     for (final m in batch) {
-      if (m.mid > 0 && _seenMids.contains(m.mid)) continue;
+      if (m.mid > 0 && _seenMids.contains(m.mid)) {
+        // HTTP acknowledgements only return a mid. Keep the authoritative
+        // SSE timestamp/expiry even when that mid was already confirmed.
+        final idx = updated.indexWhere((row) => row.mid == m.mid);
+        if (idx >= 0) {
+          updated[idx] = m.copyWith(
+            editedContent: updated[idx].editedContent,
+            editedContentType: updated[idx].editedContentType,
+          );
+        }
+        continue;
+      }
 
       // Optimistic-merge path: this is OUR send, echoed back via SSE. Find
       // a same-target placeholder row (negative mid, same content, status
@@ -263,6 +324,13 @@ class ChatController extends _$ChatController {
 
   @override
   Future<List<ChatMessage>> build(MessageTarget target) async {
+    listenSelf((_, next) => _scheduleExpiry(next.valueOrNull));
+    final lifecycle = AppLifecycleListener(onResume: _expireMessages);
+    ref.onDispose(() {
+      _expiryTimer?.cancel();
+      lifecycle.dispose();
+    });
+
     // Subscribe to SSE for live updates.
     ref.listen(sseEventsProvider, (_, next) {
       next.whenData((event) {
@@ -281,7 +349,7 @@ class ChatController extends _$ChatController {
     // the cache from earlier builds; strip them on read so they never reach
     // the chat list as "unsupported" rows.
     final cachedRaw = await cache.read(target);
-    final cached = cachedRaw
+    final cached = _withoutExpired(cachedRaw)
         .where((m) => m.detail is! ReactionMessageDetail)
         .toList(growable: false);
     _seenMids
@@ -306,7 +374,7 @@ class ChatController extends _$ChatController {
 
     // 2. No cache: fetch history from server.
     final messagesRaw = await _loadHistory();
-    final messages = messagesRaw
+    final messages = _withoutExpired(messagesRaw)
         .where((m) => m.detail is! ReactionMessageDetail)
         .toList(growable: false);
     _seenMids.addAll(messages.where((m) => m.mid > 0).map((m) => m.mid));
@@ -337,17 +405,30 @@ class ChatController extends _$ChatController {
 
       final current = state.valueOrNull ?? const <ChatMessage>[];
       final additions = <ChatMessage>[];
+      final updated = List<ChatMessage>.from(current);
+      var changed = false;
       for (final m in fresh) {
-        if (m.mid > 0 && _seenMids.contains(m.mid)) continue;
+        if (m.mid > 0 && _seenMids.contains(m.mid)) {
+          final idx = updated.indexWhere((row) => row.mid == m.mid);
+          if (idx >= 0) {
+            final replacement = m.copyWith(
+              editedContent: updated[idx].editedContent,
+              editedContentType: updated[idx].editedContentType,
+            );
+            changed = changed || replacement != updated[idx];
+            updated[idx] = replacement;
+          }
+          continue;
+        }
         additions.add(m);
         if (m.mid > 0) _seenMids.add(m.mid);
       }
-      if (additions.isEmpty) return;
+      if (additions.isEmpty && !changed) return;
 
       // Merge new items with current, then re-sort so any interleaving with
       // existing rows lands in the right place (server "newest first" is not a
       // safe assumption once cache/history/SSE batches mix).
-      final next = _sortedNewestFirst([...additions, ...current]);
+      final next = _sortedNewestFirst([...additions, ...updated]);
       state = AsyncData(next);
       cache.scheduleWrite(target, next);
       final maxMid = additions
@@ -367,7 +448,8 @@ class ChatController extends _$ChatController {
   /// Edit a previously-sent text/markdown message authored by the current user.
   /// On success the row is mutated in place and persisted; the server will also
   /// fan out an edit-reaction event, but [applyEditEcho] is idempotent.
-  Future<void> editText(int mid, String newText, {bool markdown = false}) async {
+  Future<void> editText(int mid, String newText,
+      {bool markdown = false}) async {
     if (mid <= 0) return;
     final current = state.valueOrNull;
     if (current == null) return;
@@ -428,6 +510,7 @@ class ChatController extends _$ChatController {
         contentType: markdown ? 'text/markdown' : 'text/plain',
         content: text,
         properties: properties,
+        expiresIn: _outgoingExpiresIn(),
       ),
     );
 
@@ -436,14 +519,15 @@ class ChatController extends _$ChatController {
     state = AsyncData([optimistic, ...current]);
 
     try {
-      final realMid = await ref
-          .read(messageApiProvider)
-          .replyMessage(targetMid, text, markdown: markdown, mentions: mentions);
+      final realMid = await ref.read(messageApiProvider).replyMessage(
+          targetMid, text,
+          markdown: markdown, mentions: mentions);
 
       final after = state.valueOrNull ?? [];
       final idx = after.indexWhere((m) => m.mid == tempMid);
       if (idx >= 0) {
-        final confirmed = optimistic.copyWith(mid: realMid);
+        final confirmed = optimistic.copyWith(
+            mid: realMid, createdAt: DateTime.now().millisecondsSinceEpoch);
         final updated = List<ChatMessage>.from(after);
         updated[idx] = confirmed;
         state = AsyncData(updated);
@@ -527,7 +611,7 @@ class ChatController extends _$ChatController {
   ///     themselves by `createdAt` descending.
   /// The sort is stable, so equal keys keep their relative input order.
   List<ChatMessage> _sortedNewestFirst(List<ChatMessage> input) {
-    final out = List<ChatMessage>.from(input);
+    final out = _withoutExpired(input);
     out.sort((a, b) {
       final aOptimistic = a.mid < 0;
       final bOptimistic = b.mid < 0;
@@ -587,6 +671,7 @@ class ChatController extends _$ChatController {
         contentType: markdown ? 'text/markdown' : 'text/plain',
         content: text,
         properties: properties,
+        expiresIn: _outgoingExpiresIn(),
       ),
     );
 
@@ -615,7 +700,8 @@ class ChatController extends _$ChatController {
       final after = state.valueOrNull ?? [];
       final idx = after.indexWhere((m) => m.mid == tempMid);
       if (idx >= 0) {
-        final confirmed = optimistic.copyWith(mid: realMid);
+        final confirmed = optimistic.copyWith(
+            mid: realMid, createdAt: DateTime.now().millisecondsSinceEpoch);
         final updated = List<ChatMessage>.from(after);
         updated[idx] = confirmed;
         state = AsyncData(updated);
@@ -676,6 +762,7 @@ class ChatController extends _$ChatController {
         // Placeholder content; the real {"path": ...} arrives via the echo.
         content: jsonEncode({'path': 'local:$localId'}),
         properties: properties,
+        expiresIn: _outgoingExpiresIn(),
       ),
     );
 
@@ -739,10 +826,12 @@ class ChatController extends _$ChatController {
         final placeholder = after[idx];
         final confirmed = placeholder.copyWith(
           mid: result.mid,
+          createdAt: DateTime.now().millisecondsSinceEpoch,
           detail: MessageDetail.normal(
             contentType: 'vocechat/file',
             content: jsonEncode({'path': result.path}),
             properties: _propertiesOf(placeholder),
+            expiresIn: _outgoingExpiresIn(),
           ),
         );
         final updated = List<ChatMessage>.from(after);
@@ -820,16 +909,19 @@ class ChatController extends _$ChatController {
       final isMarkdown = detail.contentType == 'text/markdown';
       final int realMid;
       if (isMarkdown) {
-        realMid =
-            await ref.read(messageApiProvider).sendMarkdown(target, detail.content);
+        realMid = await ref
+            .read(messageApiProvider)
+            .sendMarkdown(target, detail.content);
       } else {
-        realMid = await ref.read(messageApiProvider).sendText(target, detail.content);
+        realMid =
+            await ref.read(messageApiProvider).sendText(target, detail.content);
       }
 
       final after = state.valueOrNull ?? [];
       final idx = after.indexWhere((m) => m.mid == tempMid);
       if (idx >= 0) {
-        final confirmed = msg.copyWith(mid: realMid);
+        final confirmed = msg.copyWith(
+            mid: realMid, createdAt: DateTime.now().millisecondsSinceEpoch);
         final updated = List<ChatMessage>.from(after);
         updated[idx] = confirmed;
         state = AsyncData(updated);
@@ -851,10 +943,8 @@ class ChatController extends _$ChatController {
     final current = state.valueOrNull ?? [];
     if (current.isEmpty) return;
 
-    final oldestMid = current
-        .where((m) => m.mid > 0)
-        .fold<int?>(
-            null, (prev, m) => prev == null || m.mid < prev ? m.mid : prev);
+    final oldestMid = current.where((m) => m.mid > 0).fold<int?>(
+        null, (prev, m) => prev == null || m.mid < prev ? m.mid : prev);
     if (oldestMid == null) return;
 
     try {
