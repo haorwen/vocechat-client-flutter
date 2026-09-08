@@ -741,6 +741,12 @@ class ChatController extends _$ChatController {
     final resolvedType =
         contentType ?? MessageApi.inferContentType(filename, bytes: bytes);
 
+    filename = MessageApi.resolveFilename(
+      filename,
+      bytes: bytes,
+      contentType: resolvedType,
+    );
+
     final dims = await _decodeImageSize(bytes);
 
     final properties = <String, dynamic>{

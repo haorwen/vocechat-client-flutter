@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:mime/mime.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -128,6 +129,8 @@ class MessageApi {
   }) async {
     final resolvedType =
         contentType ?? _inferContentType(filename, bytes: bytes);
+
+    filename = resolveFilename(filename, bytes: bytes, contentType: resolvedType);
 
     // Step 1: prepare
     // Server contract: POST /api/resource/file/prepare returns the file_id as a
@@ -391,6 +394,26 @@ class MessageApi {
   static String inferContentType(String filename, {Uint8List? bytes}) =>
       _inferContentType(filename, bytes: bytes);
 
+  /// Preserve supplied names; give unnamed attachments a type-based name.
+  static String resolveFilename(
+    String? filename, {
+    required Uint8List bytes,
+    String? contentType,
+  }) {
+    if (filename != null && filename.trim().isNotEmpty) return filename;
+    final type = contentType?.split(';').first.trim().toLowerCase();
+    final resolvedType = type == null ||
+            type.isEmpty ||
+            type == 'application/octet-stream'
+        ? _inferContentType('', bytes: bytes)
+        : type;
+    final prefix = resolvedType.startsWith('image/') ? 'image' : 'file';
+    final extension = resolvedType == 'image/jpeg'
+        ? 'jpg'
+        : extensionFromMime(resolvedType) ?? 'bin';
+    return '$prefix.$extension';
+  }
+
   static String _inferContentType(String filename, {Uint8List? bytes}) {
     final ext = filename.contains('.') ? filename.split('.').last.toLowerCase() : '';
     const map = {
@@ -409,7 +432,9 @@ class MessageApi {
 
     // Clipboard images often arrive with no extension — sniff magic numbers.
     final sniffed = bytes == null ? null : _sniffImageType(bytes);
-    return sniffed ?? 'application/octet-stream';
+    return sniffed ??
+        lookupMimeType(filename, headerBytes: bytes) ??
+        'application/octet-stream';
   }
 
   /// Detect common image types from their leading bytes. Returns null when the

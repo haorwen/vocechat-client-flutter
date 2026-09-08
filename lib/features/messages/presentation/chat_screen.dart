@@ -358,6 +358,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// deferred until the user taps send — matches the web `addStageFile` flow.
   void _stageFile(Uint8List bytes, String filename) {
     final contentType = MessageApi.inferContentType(filename, bytes: bytes);
+    filename = MessageApi.resolveFilename(
+      filename,
+      bytes: bytes,
+      contentType: contentType,
+    );
     setState(() {
       _staged.add(_StagedFile(
         bytes: bytes,
@@ -565,19 +570,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
       // Fast path: raw image bytes on the clipboard (no filename available).
       Uint8List? bytes;
-      String filename = 'pasted.png';
+      String filename = 'image.png';
       if (reader.canProvide(Formats.png)) {
         bytes = await _readClipboardFormat(reader, Formats.png);
-        filename = 'pasted.png';
+        filename = 'image.png';
       } else if (reader.canProvide(Formats.jpeg)) {
         bytes = await _readClipboardFormat(reader, Formats.jpeg);
-        filename = 'pasted.jpg';
+        filename = 'image.jpg';
       } else if (reader.canProvide(Formats.gif)) {
         bytes = await _readClipboardFormat(reader, Formats.gif);
-        filename = 'pasted.gif';
+        filename = 'image.gif';
       } else if (reader.canProvide(Formats.webp)) {
         bytes = await _readClipboardFormat(reader, Formats.webp);
-        filename = 'pasted.webp';
+        filename = 'image.webp';
       }
       if (bytes != null && bytes.isNotEmpty) {
         _stageFile(bytes, filename);
@@ -2934,7 +2939,7 @@ class _AttachmentSheetState extends State<_AttachmentSheet> {
         if (bytes == null || bytes.isEmpty) continue;
         images.add(_StagedImage(
           bytes: bytes,
-          filename: asset.title ?? '${asset.id}.jpg',
+          filename: MessageApi.resolveFilename(asset.title, bytes: bytes),
         ));
       }
       if (mounted) Navigator.of(context).pop(_AttachmentImagesResult(images));
@@ -4027,7 +4032,10 @@ Future<(Uint8List, String)?> _readFileFromReader(DataReader item) async {
   final progress = item.getFile(null, (file) async {
     try {
       final bytes = await file.readAll();
-      final name = file.fileName ?? suggested ?? 'file';
+      final name = MessageApi.resolveFilename(
+        file.fileName?.trim().isNotEmpty == true ? file.fileName : suggested,
+        bytes: bytes,
+      );
       if (!completer.isCompleted) completer.complete((bytes, name));
     } catch (_) {
       if (!completer.isCompleted) completer.complete(null);
