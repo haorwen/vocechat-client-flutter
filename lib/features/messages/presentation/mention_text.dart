@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+
+import 'message_links.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/safe_text.dart';
@@ -16,16 +19,18 @@ import '../domain/mention_utils.dart';
 // numeric id via `chatUserFallback` rather than hiding content).
 // ---------------------------------------------------------------------------
 
-class MentionText extends StatelessWidget {
+class MentionText extends StatefulWidget {
   const MentionText({
     super.key,
     required this.text,
     required this.userDir,
     required this.style,
+    this.selectable = false,
     this.maxLines,
     this.overflow,
   });
 
+  final bool selectable;
   final String text;
   final Map<int, UserSummary> userDir;
   final TextStyle style;
@@ -33,17 +38,63 @@ class MentionText extends StatelessWidget {
   final TextOverflow? overflow;
 
   @override
-  Widget build(BuildContext context) {
-    final matches = findMentions(text);
-    if (matches.isEmpty) {
-      return Text(
-        safeText(text),
-        style: style,
-        maxLines: maxLines,
-        overflow: overflow,
-      );
-    }
+  State<MentionText> createState() => _MentionTextState();
+}
 
+class _MentionTextState extends State<MentionText> {
+  final _recognizers = <TapGestureRecognizer>[];
+
+  void _disposeRecognizers() {
+    for (final recognizer in _recognizers) {
+      recognizer.dispose();
+    }
+    _recognizers.clear();
+  }
+
+  @override
+  void dispose() {
+    _disposeRecognizers();
+    super.dispose();
+  }
+
+  List<InlineSpan> _plainSpans(String text) {
+    final spans = <InlineSpan>[];
+    var cursor = 0;
+    for (final match in messageLinkPattern.allMatches(text)) {
+      final label = trimMessageLink(match.group(0)!);
+      final href =
+          label.toLowerCase().startsWith('www.') ? 'https://$label' : label;
+      if (match.start > cursor) {
+        spans
+            .add(TextSpan(text: safeText(text.substring(cursor, match.start))));
+      }
+      final recognizer = TapGestureRecognizer()
+        ..onTap = () => openMessageLink(href);
+      _recognizers.add(recognizer);
+      spans.add(TextSpan(
+        text: safeText(label),
+        style: TextStyle(
+          color: AppTokens.primary500,
+          decoration: TextDecoration.underline,
+        ),
+        mouseCursor: SystemMouseCursors.click,
+        recognizer: recognizer,
+      ));
+      cursor = match.start + label.length;
+    }
+    if (cursor < text.length) {
+      spans.add(TextSpan(text: safeText(text.substring(cursor))));
+    }
+    return spans;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _disposeRecognizers();
+    final text = widget.text;
+    final style = widget.style;
+    final userDir = widget.userDir;
+    final matches = findMentions(text);
     final mentionStyle = style.copyWith(
       color: AppTokens.primary500,
       fontWeight: FontWeight.w600,
@@ -53,7 +104,7 @@ class MentionText extends StatelessWidget {
     var cursor = 0;
     for (final m in matches) {
       if (m.start > cursor) {
-        spans.add(TextSpan(text: safeText(text.substring(cursor, m.start))));
+        spans.addAll(_plainSpans(text.substring(cursor, m.start)));
       }
       final name = userDir[m.uid]?.name;
       spans.add(TextSpan(
@@ -63,13 +114,16 @@ class MentionText extends StatelessWidget {
       cursor = m.end;
     }
     if (cursor < text.length) {
-      spans.add(TextSpan(text: safeText(text.substring(cursor))));
+      spans.addAll(_plainSpans(text.substring(cursor)));
     }
 
+    if (widget.selectable) {
+      return SelectableText.rich(TextSpan(style: style, children: spans));
+    }
     return Text.rich(
       TextSpan(style: style, children: spans),
-      maxLines: maxLines,
-      overflow: overflow,
+      maxLines: widget.maxLines,
+      overflow: widget.overflow,
     );
   }
 }

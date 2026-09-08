@@ -14,6 +14,8 @@ import '../../../shared/widgets/voce_avatar.dart';
 import '../data/message_api.dart';
 import '../domain/message_models.dart';
 import 'file_display_utils.dart';
+import 'message_links.dart';
+import 'mention_text.dart';
 import 'file_message_content.dart' show ImagePreviewScreen;
 
 part 'archive_message_content.g.dart';
@@ -438,6 +440,7 @@ class _ArchiveDetailBody extends ConsumerWidget {
 
     if (c.contentType == 'text/markdown') {
       return MarkdownBody(
+        onTapLink: (text, href, title) => openMessageLink(href),
         data: safeText(c.content ?? ''),
         styleSheet: MarkdownStyleSheet(
           p: TextStyle(
@@ -459,8 +462,10 @@ class _ArchiveDetailBody extends ConsumerWidget {
 
     // text/plain and anything unknown-but-textual — show the full content,
     // selectable so long forwarded texts can be copied out.
-    return SelectableText(
-      safeText(c.content ?? ''),
+    return MentionText(
+      text: c.content ?? '',
+      userDir: const {},
+      selectable: true,
       style: TextStyle(
         fontSize: 14,
         color: AppTokens.textBody,

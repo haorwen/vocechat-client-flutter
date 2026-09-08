@@ -43,6 +43,7 @@ import '../domain/message_status.dart';
 import 'archive_message_content.dart';
 import 'chat_tool_panels.dart';
 import 'file_display_utils.dart';
+import 'message_links.dart';
 import 'file_message_content.dart';
 import 'forward_sheet.dart';
 import 'mention_overlay.dart';
@@ -1754,6 +1755,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         );
       } else if (displayContentType == 'text/markdown') {
         content = MarkdownBody(
+          onTapLink: (text, href, title) => openMessageLink(href),
           data: safeText(displayContent),
           styleSheet: MarkdownStyleSheet(
             p: TextStyle(
