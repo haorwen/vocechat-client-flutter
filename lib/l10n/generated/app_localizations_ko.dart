@@ -1093,4 +1093,52 @@ class AppL10nKo extends AppL10n {
 
   @override
   String get voiceReconnecting => 'Reconnecting...';
+
+  @override
+  String get avoDescription => 'Customize the avatar shown when your camera is off.';
+
+  @override
+  String get avoNameLabel => 'Name';
+
+  @override
+  String get avoStyleLabel => 'Style';
+
+  @override
+  String get avoStyleBlob => 'Blob';
+
+  @override
+  String get avoStyleRing => 'Ring';
+
+  @override
+  String get avoStyleWave => 'Wave';
+
+  @override
+  String avoEnergy(int percent) {
+    return 'Energy $percent%';
+  }
+
+  @override
+  String get avoSave => 'Save';
+
+  @override
+  String get avoSaved => 'Avo saved';
+
+  @override
+  String avoSaveFailed(String error) {
+    return 'Unable to save Avo: $error';
+  }
+
+  @override
+  String get avoPreviewHint => 'Move over a creature, rub across its body, or click it.';
+
+  @override
+  String get avoPreviewNameLabel => 'Name (default Han)';
+
+  @override
+  String avoVoiceLevel(int percent) {
+    return 'Voice level $percent%';
+  }
+
+  @override
+  String get avoNextVariant => 'Next variant';
 }

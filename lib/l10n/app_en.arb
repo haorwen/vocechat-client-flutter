@@ -462,5 +462,40 @@
   "voiceFullscreen": "Fullscreen",
   "voiceLeave": "Leave call",
   "voiceConnected": "Voice connected",
-  "voiceReconnecting": "Reconnecting..."
+  "voiceReconnecting": "Reconnecting...",
+  "avoDescription": "Customize the avatar shown when your camera is off.",
+  "avoNameLabel": "Name",
+  "avoStyleLabel": "Style",
+  "avoStyleBlob": "Blob",
+  "avoStyleRing": "Ring",
+  "avoStyleWave": "Wave",
+  "avoEnergy": "Energy {percent}%",
+  "@avoEnergy": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "avoSave": "Save",
+  "avoSaved": "Avo saved",
+  "avoSaveFailed": "Unable to save Avo: {error}",
+  "@avoSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "avoPreviewHint": "Move over a creature, rub across its body, or click it.",
+  "avoPreviewNameLabel": "Name (default Han)",
+  "avoVoiceLevel": "Voice level {percent}%",
+  "@avoVoiceLevel": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "avoNextVariant": "Next variant"
 }

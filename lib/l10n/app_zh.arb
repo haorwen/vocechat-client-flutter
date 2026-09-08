@@ -382,5 +382,19 @@
   "voiceFullscreen": "全屏",
   "voiceLeave": "结束通话",
   "voiceConnected": "语音已连接",
-  "voiceReconnecting": "正在重新连接..."
+  "voiceReconnecting": "正在重新连接...",
+  "avoDescription": "自定义关闭摄像头时显示的 Avo 虚拟形象。",
+  "avoNameLabel": "名称",
+  "avoStyleLabel": "样式",
+  "avoStyleBlob": "团子",
+  "avoStyleRing": "圆环",
+  "avoStyleWave": "波浪",
+  "avoEnergy": "活力 {percent}%",
+  "avoSave": "保存",
+  "avoSaved": "Avo 已保存",
+  "avoSaveFailed": "无法保存 Avo：{error}",
+  "avoPreviewHint": "将指针移到 Avo 上，轻抚它的身体，或点击它。",
+  "avoPreviewNameLabel": "名称（默认 Han）",
+  "avoVoiceLevel": "音量 {percent}%",
+  "avoNextVariant": "换个造型"
 }

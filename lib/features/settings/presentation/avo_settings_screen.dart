@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/storage/account_store.dart';
 import '../../../core/storage/secure_token_store.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/models/avo_params.dart';
 import '../../../shared/widgets/avo_avatar.dart';
 import '../../auth/application/auth_controller.dart';
@@ -72,15 +73,15 @@ class _AvoSettingsCardState extends ConsumerState<AvoSettingsCard> {
       // in the message cache.
       await ref.read(authControllerProvider.notifier).refreshUser();
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Avo saved')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(AppL10n.of(context).avoSaved)));
       }
       // Some compatible servers return a partial user without avo_params; the
       // authenticated refresh above remains the source of truth in that case.
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Unable to save Avo: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(AppL10n.of(context).avoSaveFailed(e.toString()))));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -95,6 +96,7 @@ class _AvoSettingsCardState extends ConsumerState<AvoSettingsCard> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppL10n.of(context);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -105,7 +107,7 @@ class _AvoSettingsCardState extends ConsumerState<AvoSettingsCard> {
                   .titleMedium
                   ?.copyWith(fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
-          const Text('Customize the avatar shown when your camera is off.'),
+          Text(l.avoDescription),
           const SizedBox(height: 18),
           Center(
             child: ConstrainedBox(
@@ -129,18 +131,18 @@ class _AvoSettingsCardState extends ConsumerState<AvoSettingsCard> {
             TextField(
               key: const Key('avo-name'),
               maxLength: 20,
-              decoration: const InputDecoration(labelText: 'Name'),
+              decoration: InputDecoration(labelText: l.avoNameLabel),
               controller: _nameController,
               onChanged: (v) =>
                   setState(() => _params = _params.copyWith(name: v)),
             ),
             DropdownButtonFormField<String>(
               value: _params.style,
-              decoration: const InputDecoration(labelText: 'Style'),
-              items: const [
-                DropdownMenuItem(value: 'blob', child: Text('Blob')),
-                DropdownMenuItem(value: 'ring', child: Text('Ring')),
-                DropdownMenuItem(value: 'wave', child: Text('Wave'))
+              decoration: InputDecoration(labelText: l.avoStyleLabel),
+              items: [
+                DropdownMenuItem(value: 'blob', child: Text(l.avoStyleBlob)),
+                DropdownMenuItem(value: 'ring', child: Text(l.avoStyleRing)),
+                DropdownMenuItem(value: 'wave', child: Text(l.avoStyleWave))
               ],
               onChanged: (v) {
                 if (v != null) {
@@ -149,7 +151,7 @@ class _AvoSettingsCardState extends ConsumerState<AvoSettingsCard> {
               },
             ),
             const SizedBox(height: 12),
-            Text('Energy ${(100 * _params.energy).round()}%'),
+            Text(l.avoEnergy((100 * _params.energy).round())),
             Slider(
               key: const Key('avo-energy'),
               min: .1,
@@ -176,7 +178,7 @@ class _AvoSettingsCardState extends ConsumerState<AvoSettingsCard> {
                         ? const SizedBox.square(
                             dimension: 18,
                             child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Text('Save'))),
+                        : Text(l.avoSave))),
           ],
         ]),
       ),

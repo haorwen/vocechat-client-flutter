@@ -1093,4 +1093,52 @@ class AppL10nZh extends AppL10n {
 
   @override
   String get voiceReconnecting => '正在重新连接...';
+
+  @override
+  String get avoDescription => '自定义关闭摄像头时显示的 Avo 虚拟形象。';
+
+  @override
+  String get avoNameLabel => '名称';
+
+  @override
+  String get avoStyleLabel => '样式';
+
+  @override
+  String get avoStyleBlob => '团子';
+
+  @override
+  String get avoStyleRing => '圆环';
+
+  @override
+  String get avoStyleWave => '波浪';
+
+  @override
+  String avoEnergy(int percent) {
+    return '活力 $percent%';
+  }
+
+  @override
+  String get avoSave => '保存';
+
+  @override
+  String get avoSaved => 'Avo 已保存';
+
+  @override
+  String avoSaveFailed(String error) {
+    return '无法保存 Avo：$error';
+  }
+
+  @override
+  String get avoPreviewHint => '将指针移到 Avo 上，轻抚它的身体，或点击它。';
+
+  @override
+  String get avoPreviewNameLabel => '名称（默认 Han）';
+
+  @override
+  String avoVoiceLevel(int percent) {
+    return '音量 $percent%';
+  }
+
+  @override
+  String get avoNextVariant => '换个造型';
 }

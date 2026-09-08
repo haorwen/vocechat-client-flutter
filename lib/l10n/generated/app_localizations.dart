@@ -2170,6 +2170,90 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Reconnecting...'**
   String get voiceReconnecting;
+
+  /// No description provided for @avoDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize the avatar shown when your camera is off.'**
+  String get avoDescription;
+
+  /// No description provided for @avoNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get avoNameLabel;
+
+  /// No description provided for @avoStyleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Style'**
+  String get avoStyleLabel;
+
+  /// No description provided for @avoStyleBlob.
+  ///
+  /// In en, this message translates to:
+  /// **'Blob'**
+  String get avoStyleBlob;
+
+  /// No description provided for @avoStyleRing.
+  ///
+  /// In en, this message translates to:
+  /// **'Ring'**
+  String get avoStyleRing;
+
+  /// No description provided for @avoStyleWave.
+  ///
+  /// In en, this message translates to:
+  /// **'Wave'**
+  String get avoStyleWave;
+
+  /// No description provided for @avoEnergy.
+  ///
+  /// In en, this message translates to:
+  /// **'Energy {percent}%'**
+  String avoEnergy(int percent);
+
+  /// No description provided for @avoSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get avoSave;
+
+  /// No description provided for @avoSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Avo saved'**
+  String get avoSaved;
+
+  /// No description provided for @avoSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to save Avo: {error}'**
+  String avoSaveFailed(String error);
+
+  /// No description provided for @avoPreviewHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Move over a creature, rub across its body, or click it.'**
+  String get avoPreviewHint;
+
+  /// No description provided for @avoPreviewNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name (default Han)'**
+  String get avoPreviewNameLabel;
+
+  /// No description provided for @avoVoiceLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice level {percent}%'**
+  String avoVoiceLevel(int percent);
+
+  /// No description provided for @avoNextVariant.
+  ///
+  /// In en, this message translates to:
+  /// **'Next variant'**
+  String get avoNextVariant;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
