@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -27,6 +28,18 @@ part 'chat_controller.g.dart';
 class ChatController extends _$ChatController {
   static const _initialLimit = 50;
   Timer? _expiryTimer;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  int? _historyBeforeMid;
+  int _generation = 0;
+  // Riverpod retains previous AsyncValue data during dependency reloads.
+  // Track this account's rows separately so a new cache cannot merge them.
+  List<ChatMessage>? _messages;
+
+  void _publish(List<ChatMessage> messages) {
+    _messages = messages;
+    state = AsyncData(messages);
+  }
 
   int? _outgoingExpiresIn() {
     final settings = ref.read(burnAfterReadProvider);
@@ -53,11 +66,11 @@ class ChatController extends _$ChatController {
   }
 
   void _expireMessages() {
-    final current = state.valueOrNull;
+    final current = _messages;
     if (current == null) return;
     final next = _withoutExpired(current);
     if (next.length != current.length) {
-      state = AsyncData(next);
+      _publish(next);
       _persist(next);
     }
     _scheduleExpiry(next);
@@ -163,7 +176,7 @@ class ChatController extends _$ChatController {
     );
     if (!matches) return;
 
-    final current = state.valueOrNull;
+    final current = _messages;
     if (current == null) {
       _pendingIncoming.add(msg);
       return;
@@ -179,7 +192,7 @@ class ChatController extends _$ChatController {
     _applyScheduled = false;
     if (_pendingApply.isEmpty) return;
 
-    final current = state.valueOrNull;
+    final current = _messages;
     if (current == null) {
       // Still bootstrapping (build() hasn't resolved yet). DO NOT
       // self-reschedule — microtasks have priority over normal events, and a
@@ -192,31 +205,32 @@ class ChatController extends _$ChatController {
     final batch = List<ChatMessage>.from(_pendingApply);
     _pendingApply.clear();
 
+    final next = _mergeIncoming(current, batch);
+    if (listEquals(next, current)) return;
+    _publish(next);
+    _persist(next);
+    final maxMid = batch.fold<int>(0, (mid, m) => m.mid > mid ? m.mid : mid);
+    if (maxMid > 0) _cache?.setCursor(maxMid);
+  }
+
+  List<ChatMessage> _mergeIncoming(
+      List<ChatMessage> current, List<ChatMessage> batch,
+      {bool matchOptimistic = true}) {
     final currentUid = _currentUid();
 
-    // Two output piles:
-    //   - `merged` mutates `current` in place by upgrading an optimistic row
-    //     to its server-confirmed mid (only ever fired when this client is
-    //     the original sender).
-    //   - `fresh` is prepended (newest-first).
-    // We can mix both in one batch: optimistic-merge for SSE echoes of our
-    // own `sendText`, fresh-insert for messages from other clients (incl.
-    // the same account on a different device).
+    // Merge against the rows themselves so cache, history and repeated live
+    // events share the same deduplication and optimistic confirmation rules.
     final updated = List<ChatMessage>.from(current);
-    final fresh = <ChatMessage>[];
-    int maxMid = 0;
-
     for (final m in batch) {
-      if (m.mid > 0 && _seenMids.contains(m.mid)) {
+      if (m.detail is ReactionMessageDetail) continue;
+      final existingIndex = updated.indexWhere((row) => row.mid == m.mid);
+      if (m.mid > 0 && existingIndex >= 0) {
         // HTTP acknowledgements only return a mid. Keep the authoritative
         // SSE timestamp/expiry even when that mid was already confirmed.
-        final idx = updated.indexWhere((row) => row.mid == m.mid);
-        if (idx >= 0) {
-          updated[idx] = m.copyWith(
-            editedContent: updated[idx].editedContent,
-            editedContentType: updated[idx].editedContentType,
-          );
-        }
+        updated[existingIndex] = m.copyWith(
+          editedContent: updated[existingIndex].editedContent,
+          editedContentType: updated[existingIndex].editedContentType,
+        );
         continue;
       }
 
@@ -224,7 +238,10 @@ class ChatController extends _$ChatController {
       // a same-target placeholder row (negative mid, same content, status
       // sending/sent) and replace it in place so we don't duplicate.
       bool mergedInPlace = false;
-      if (currentUid != null && m.fromUid == currentUid && m.mid > 0) {
+      if ((matchOptimistic || _localIdOf(m) != null) &&
+          currentUid != null &&
+          m.fromUid == currentUid &&
+          m.mid > 0) {
         final idx = _findOptimisticMatch(updated, m, currentUid);
         if (idx >= 0) {
           final placeholder = updated[idx];
@@ -243,36 +260,21 @@ class ChatController extends _$ChatController {
         }
       }
 
-      if (!mergedInPlace) fresh.add(m);
-
-      if (m.mid > 0) {
-        _seenMids.add(m.mid);
-        if (m.mid > maxMid) maxMid = m.mid;
-      }
+      if (!mergedInPlace) updated.add(m);
     }
-
-    if (fresh.isEmpty && identical(updated, current)) return;
-
-    // Re-sort the whole list newest-first. `fresh` alone being ordered isn't
-    // enough: an SSE batch can carry mids that interleave with rows already in
-    // `updated`, so we order the merged result rather than just prepending.
-    final next = _sortedNewestFirst([...fresh, ...updated]);
-
-    state = AsyncData(next);
-    _persist(next);
-    if (maxMid > 0) {
-      _cache?.setCursor(maxMid);
-    }
+    final next = _sortedNewestFirst(updated);
+    _seenMids
+      ..clear()
+      ..addAll(next.where((m) => m.mid > 0).map((m) => m.mid));
+    return next;
   }
 
   /// Find the index of an optimistic placeholder row that [echo] should
   /// replace. Match criteria, in order:
   ///   1. Same author (already filtered by caller).
   ///   2. Negative mid (placeholder; real rows have positive mids).
-  ///   3. Same surface content (text/markdown/file URL) and content-type —
-  ///      this is the only signal we have since temp mids aren't echoed by
-  ///      the server.
-  ///   4. Reply target mid matches if [echo] is a reply.
+  ///   3. The sender-generated local_id echoed in properties must match.
+  ///      Content/reply matching is only used for legacy rows without an id.
   /// Returns -1 if no candidate found.
   int _findOptimisticMatch(
       List<ChatMessage> rows, ChatMessage echo, int currentUid) {
@@ -282,25 +284,21 @@ class ChatController extends _$ChatController {
       ReplyMessageDetail(mid: final m) => m,
       _ => null,
     };
-    // For file messages the optimistic content is a local temp path while the
-    // echo's content is the server `{"path": <serverPath>}` — they never match
-    // by surface content. Instead match on the `local_id` we wrote into
-    // X-Properties (which the server echoes back) so the placeholder upgrades
-    // in place instead of duplicating.
-    final echoLocalId =
-        echoContentType == 'vocechat/file' ? _localIdOf(echo) : null;
+    final echoLocalId = _localIdOf(echo);
 
     for (int i = 0; i < rows.length; i++) {
       final r = rows[i];
       if (r.mid >= 0) continue;
       if (r.fromUid != currentUid) continue;
+      if (r.displayContentType != echoContentType) continue;
       if (echoLocalId != null) {
-        if (r.displayContentType != 'vocechat/file') continue;
         if (_localIdOf(r) != echoLocalId) continue;
         return i;
       }
+      // A message sent from another device with the same text is a distinct
+      // send. It cannot acknowledge one of this client's identified rows.
+      if (_localIdOf(r) != null) continue;
       if (r.displayContent != echoContent) continue;
-      if (r.displayContentType != echoContentType) continue;
       final rReplyMid = switch (r.detail) {
         ReplyMessageDetail(mid: final m) => m,
         _ => null,
@@ -311,7 +309,7 @@ class ChatController extends _$ChatController {
     return -1;
   }
 
-  /// Extract the `local_id` property (sender-generated dedup key) from a file
+  /// Extract the `local_id` property (sender-generated dedup key) from a
   /// message, if present.
   static int? _localIdOf(ChatMessage m) {
     final props = switch (m.detail) {
@@ -324,10 +322,29 @@ class ChatController extends _$ChatController {
 
   @override
   Future<List<ChatMessage>> build(MessageTarget target) async {
+    final generation = ++_generation;
+    _cache = null;
+    _messages = null;
+    _loadingMore = false;
+    _hasMore = true;
+    _historyBeforeMid = null;
+    // The cache dependency changes when switching accounts. Previous rows
+    // must not become the base for the new account's initial history merge.
+    state = const AsyncLoading();
+    _pendingIncoming.clear();
+    _pendingApply.clear();
+    _seenMids.clear();
+    _statuses.clear();
+    _localAttachments.clear();
+    _pendingFiles.clear();
+    _progress.clear();
     listenSelf((_, next) => _scheduleExpiry(next.valueOrNull));
     final lifecycle = AppLifecycleListener(onResume: _expireMessages);
     ref.onDispose(() {
+      ++_generation;
       _expiryTimer?.cancel();
+      _pendingIncoming.clear();
+      _pendingApply.clear();
       lifecycle.dispose();
     });
 
@@ -342,6 +359,7 @@ class ChatController extends _$ChatController {
 
     // Resolve cache (single-shot await — provider is keepAlive).
     final cache = await ref.watch(messageCacheProvider.future);
+    if (generation != _generation) return const [];
     _cache = cache;
 
     // 1. Seed from disk (single async query — sqlite is fast).
@@ -349,6 +367,7 @@ class ChatController extends _$ChatController {
     // the cache from earlier builds; strip them on read so they never reach
     // the chat list as "unsupported" rows.
     final cachedRaw = await cache.read(target);
+    if (generation != _generation) return const [];
     final cached = _withoutExpired(cachedRaw)
         .where((m) => m.detail is! ReactionMessageDetail)
         .toList(growable: false);
@@ -360,10 +379,9 @@ class ChatController extends _$ChatController {
       // background. The state is observably "data" so the UI can show it
       // right away; the network fetch will overlay newer items via SSE +
       // pagination as needed.
-      state = AsyncData(cached);
-      _backgroundRefresh(cache);
-      // Drain any SSE events that arrived during this await.
       final drained = _drainPending(cached);
+      _publish(drained);
+      _backgroundRefresh(cache);
       // Persist the filtered snapshot so the cache stops carrying reaction
       // rows forward across launches.
       if (cachedRaw.length != cached.length) {
@@ -374,6 +392,7 @@ class ChatController extends _$ChatController {
 
     // 2. No cache: fetch history from server.
     final messagesRaw = await _loadHistory();
+    if (generation != _generation) return const [];
     final messages = _withoutExpired(messagesRaw)
         .where((m) => m.detail is! ReactionMessageDetail)
         .toList(growable: false);
@@ -381,6 +400,7 @@ class ChatController extends _$ChatController {
 
     // Drain pending SSE messages that arrived during the await.
     final merged = _drainPending(messages);
+    _messages = merged;
     if (merged.isNotEmpty) cache.scheduleWrite(target, merged);
     return merged;
   }
@@ -390,10 +410,12 @@ class ChatController extends _$ChatController {
   /// `after_mid` already covers most of this, so this is purely a safety
   /// net for missed deltas.
   Future<void> _backgroundRefresh(MessageCache cache) async {
+    final generation = _generation;
     try {
       final freshRaw = await ref
           .read(messageApiProvider)
           .getHistory(target, limit: _initialLimit);
+      if (generation != _generation) return;
       if (freshRaw.isEmpty) return;
       // Strip reaction rows: they're sidecar events, not displayable history.
       // The dispatcher applies their effect (edit content / delete row) via
@@ -403,35 +425,12 @@ class ChatController extends _$ChatController {
           .toList(growable: false);
       if (fresh.isEmpty) return;
 
-      final current = state.valueOrNull ?? const <ChatMessage>[];
-      final additions = <ChatMessage>[];
-      final updated = List<ChatMessage>.from(current);
-      var changed = false;
-      for (final m in fresh) {
-        if (m.mid > 0 && _seenMids.contains(m.mid)) {
-          final idx = updated.indexWhere((row) => row.mid == m.mid);
-          if (idx >= 0) {
-            final replacement = m.copyWith(
-              editedContent: updated[idx].editedContent,
-              editedContentType: updated[idx].editedContentType,
-            );
-            changed = changed || replacement != updated[idx];
-            updated[idx] = replacement;
-          }
-          continue;
-        }
-        additions.add(m);
-        if (m.mid > 0) _seenMids.add(m.mid);
-      }
-      if (additions.isEmpty && !changed) return;
-
-      // Merge new items with current, then re-sort so any interleaving with
-      // existing rows lands in the right place (server "newest first" is not a
-      // safe assumption once cache/history/SSE batches mix).
-      final next = _sortedNewestFirst([...additions, ...updated]);
-      state = AsyncData(next);
+      final current = _messages ?? const <ChatMessage>[];
+      final next = _mergeIncoming(current, fresh, matchOptimistic: false);
+      if (listEquals(next, current)) return;
+      _publish(next);
       cache.scheduleWrite(target, next);
-      final maxMid = additions
+      final maxMid = fresh
           .map((m) => m.mid)
           .where((m) => m > 0)
           .fold<int>(0, (a, b) => a > b ? a : b);
@@ -450,8 +449,9 @@ class ChatController extends _$ChatController {
   /// fan out an edit-reaction event, but [applyEditEcho] is idempotent.
   Future<void> editText(int mid, String newText,
       {bool markdown = false}) async {
+    final generation = _generation;
     if (mid <= 0) return;
-    final current = state.valueOrNull;
+    final current = _messages;
     if (current == null) return;
     final idx = current.indexWhere((m) => m.mid == mid);
     if (idx < 0) return;
@@ -462,6 +462,7 @@ class ChatController extends _$ChatController {
     } else {
       await api.editMessage(mid, newText);
     }
+    if (generation != _generation) return;
     applyEditEcho(
       mid,
       newText,
@@ -472,6 +473,7 @@ class ChatController extends _$ChatController {
   /// Delete a message. On success the row is removed locally and persisted.
   /// Treats a 404 as already-deleted (still removes locally).
   Future<void> deleteMessage(int mid) async {
+    final generation = _generation;
     if (mid <= 0) return;
     try {
       await ref.read(messageApiProvider).deleteMessage(mid);
@@ -482,6 +484,7 @@ class ChatController extends _$ChatController {
       // 404 = already gone on the server; fall through to local removal so
       // our state catches up.
     }
+    if (generation != _generation) return;
     applyDeleteEcho(mid);
   }
 
@@ -493,12 +496,14 @@ class ChatController extends _$ChatController {
     bool markdown = false,
     List<int>? mentions,
   }) async {
+    final generation = _generation;
     if (targetMid <= 0) return;
     final currentUid = _currentUid() ?? -1;
     final tempMid = -DateTime.now().microsecondsSinceEpoch;
-    final properties = (mentions == null || mentions.isEmpty)
-        ? null
-        : <String, dynamic>{'mentions': mentions};
+    final properties = <String, dynamic>{
+      'local_id': -tempMid,
+      if (mentions != null && mentions.isNotEmpty) 'mentions': mentions,
+    };
 
     final optimistic = ChatMessage(
       mid: tempMid,
@@ -514,33 +519,25 @@ class ChatController extends _$ChatController {
       ),
     );
 
-    final current = state.valueOrNull ?? [];
+    final current = _messages ?? [];
     _statuses[tempMid] = MessageSendStatus.sending;
-    state = AsyncData([optimistic, ...current]);
+    _publish([optimistic, ...current]);
 
     try {
       final realMid = await ref.read(messageApiProvider).replyMessage(
           targetMid, text,
-          markdown: markdown, mentions: mentions);
+          markdown: markdown, mentions: mentions, localId: -tempMid);
+      if (generation != _generation) return;
 
-      final after = state.valueOrNull ?? [];
-      final idx = after.indexWhere((m) => m.mid == tempMid);
-      if (idx >= 0) {
-        final confirmed = optimistic.copyWith(
-            mid: realMid, createdAt: DateTime.now().millisecondsSinceEpoch);
-        final updated = List<ChatMessage>.from(after);
-        updated[idx] = confirmed;
-        state = AsyncData(updated);
-        _seenMids.add(realMid);
-        _persist(updated);
-        _cache?.setCursor(realMid);
-      }
-      _statuses.remove(tempMid);
-      _statuses[realMid] = MessageSendStatus.sent;
+      _confirmSent(
+          tempMid,
+          optimistic.copyWith(
+              mid: realMid, createdAt: DateTime.now().millisecondsSinceEpoch));
     } catch (_) {
+      if (generation != _generation) return;
       _statuses[tempMid] = MessageSendStatus.failed;
-      final snapshot = state.valueOrNull;
-      if (snapshot != null) state = AsyncData(List.from(snapshot));
+      final snapshot = _messages;
+      if (snapshot != null) _publish(List.from(snapshot));
       rethrow;
     }
   }
@@ -548,7 +545,7 @@ class ChatController extends _$ChatController {
   /// Apply an edit echo (from SSE or local optimistic). Idempotent: re-applying
   /// the same edit is a no-op.
   void applyEditEcho(int targetMid, String content, String contentType) {
-    final current = state.valueOrNull;
+    final current = _messages;
     if (current == null) return;
     final idx = current.indexWhere((m) => m.mid == targetMid);
     if (idx < 0) return;
@@ -562,18 +559,18 @@ class ChatController extends _$ChatController {
       editedContent: content,
       editedContentType: contentType,
     );
-    state = AsyncData(updated);
+    _publish(updated);
     _persist(updated);
   }
 
   /// Apply a delete echo (from SSE or local optimistic). Idempotent.
   void applyDeleteEcho(int targetMid) {
-    final current = state.valueOrNull;
+    final current = _messages;
     if (current == null) return;
     final idx = current.indexWhere((m) => m.mid == targetMid);
     if (idx < 0) return;
     final updated = List<ChatMessage>.from(current)..removeAt(idx);
-    state = AsyncData(updated);
+    _publish(updated);
     _seenMids.remove(targetMid);
     _statuses.remove(targetMid);
     _persist(updated);
@@ -581,15 +578,15 @@ class ChatController extends _$ChatController {
   }
 
   List<ChatMessage> _drainPending(List<ChatMessage> base) {
-    if (_pendingIncoming.isEmpty) return _sortedNewestFirst(base);
-    final extras = <ChatMessage>[];
-    for (final m in _pendingIncoming.reversed) {
-      if (m.mid > 0 && _seenMids.contains(m.mid)) continue;
-      extras.add(m);
-      if (m.mid > 0) _seenMids.add(m.mid);
-    }
+    // A send or live event may already have published state while disk or
+    // history was loading. Merge into that latest state, never overwrite it.
+    final history =
+        _mergeIncoming(_messages ?? const [], base, matchOptimistic: false);
+    final next =
+        _mergeIncoming(history, [..._pendingIncoming, ..._pendingApply]);
     _pendingIncoming.clear();
-    return _sortedNewestFirst(extras.isEmpty ? base : [...extras, ...base]);
+    _pendingApply.clear();
+    return next;
   }
 
   /// Single source of truth for chat-list ordering. The whole app (the
@@ -626,6 +623,22 @@ class ChatController extends _$ChatController {
     return out;
   }
 
+  void _confirmSent(int tempMid, ChatMessage confirmed) {
+    _statuses.remove(tempMid);
+    _statuses[confirmed.mid] = MessageSendStatus.sent;
+    final current = _messages ?? const <ChatMessage>[];
+    if (!current.any((m) => m.mid == tempMid)) return;
+    // History or SSE may already carry the authoritative row. Preserve it,
+    // remove the placeholder, and sort by server mid after HTTP confirmation.
+    final rows = current.where((m) => m.mid != tempMid).toList();
+    if (!rows.any((m) => m.mid == confirmed.mid)) rows.add(confirmed);
+    final next = _sortedNewestFirst(rows);
+    _seenMids.add(confirmed.mid);
+    _publish(next);
+    _persist(next);
+    _cache?.setCursor(confirmed.mid);
+  }
+
   void _persist(List<ChatMessage> snapshot) {
     _cache?.scheduleWrite(target, snapshot);
   }
@@ -656,11 +669,13 @@ class ChatController extends _$ChatController {
     List<int>? mentions,
     bool markdown = false,
   }) async {
+    final generation = _generation;
     final currentUid = _currentUid() ?? -1;
     final tempMid = -DateTime.now().microsecondsSinceEpoch;
-    final properties = (mentions == null || mentions.isEmpty)
-        ? null
-        : <String, dynamic>{'mentions': mentions};
+    final properties = <String, dynamic>{
+      'local_id': -tempMid,
+      if (mentions != null && mentions.isNotEmpty) 'mentions': mentions,
+    };
 
     final optimistic = ChatMessage(
       mid: tempMid,
@@ -675,9 +690,9 @@ class ChatController extends _$ChatController {
       ),
     );
 
-    final current = state.valueOrNull ?? [];
+    final current = _messages ?? [];
     _statuses[tempMid] = MessageSendStatus.sending;
-    state = AsyncData([optimistic, ...current]);
+    _publish([optimistic, ...current]);
     AppLog.d(
       LogTag.chat,
       () =>
@@ -689,33 +704,25 @@ class ChatController extends _$ChatController {
       if (markdown) {
         realMid = await ref
             .read(messageApiProvider)
-            .sendMarkdown(target, text, mentions: mentions);
+            .sendMarkdown(target, text, mentions: mentions, localId: -tempMid);
       } else {
         realMid = await ref
             .read(messageApiProvider)
-            .sendText(target, text, mentions: mentions);
+            .sendText(target, text, mentions: mentions, localId: -tempMid);
       }
 
       // Replace placeholder with server-confirmed mid.
-      final after = state.valueOrNull ?? [];
-      final idx = after.indexWhere((m) => m.mid == tempMid);
-      if (idx >= 0) {
-        final confirmed = optimistic.copyWith(
-            mid: realMid, createdAt: DateTime.now().millisecondsSinceEpoch);
-        final updated = List<ChatMessage>.from(after);
-        updated[idx] = confirmed;
-        state = AsyncData(updated);
-        _seenMids.add(realMid);
-        _persist(updated);
-        _cache?.setCursor(realMid);
-      }
-      _statuses.remove(tempMid);
-      _statuses[realMid] = MessageSendStatus.sent;
+      if (generation != _generation) return;
+      _confirmSent(
+          tempMid,
+          optimistic.copyWith(
+              mid: realMid, createdAt: DateTime.now().millisecondsSinceEpoch));
     } catch (_) {
+      if (generation != _generation) return;
       _statuses[tempMid] = MessageSendStatus.failed;
       // Notify listeners that statuses changed (state value unchanged).
-      final snapshot = state.valueOrNull;
-      if (snapshot != null) state = AsyncData(List.from(snapshot));
+      final snapshot = _messages;
+      if (snapshot != null) _publish(List.from(snapshot));
     }
   }
 
@@ -728,11 +735,12 @@ class ChatController extends _$ChatController {
     required String filename,
     String? contentType,
   }) async {
+    final generation = _generation;
     final currentUid = _currentUid() ?? -1;
     final tempMid = -DateTime.now().microsecondsSinceEpoch;
     // local_id doubles as the dedup key the server echoes back via X-Properties
     // (see _findOptimisticMatch). Use a stable positive int.
-    final localId = DateTime.now().millisecondsSinceEpoch;
+    final localId = -tempMid;
 
     // Always resolve a concrete content_type: the optimistic row renders by
     // properties['content_type'], and a missing/empty value makes _isImage()
@@ -748,6 +756,7 @@ class ChatController extends _$ChatController {
     );
 
     final dims = await _decodeImageSize(bytes);
+    if (generation != _generation) return;
 
     final properties = <String, dynamic>{
       'name': filename,
@@ -782,21 +791,23 @@ class ChatController extends _$ChatController {
       height: dims?.$2,
     );
 
-    final current = state.valueOrNull ?? [];
+    final current = _messages ?? [];
     _statuses[tempMid] = MessageSendStatus.sending;
     _progress[tempMid] = 0.0;
-    state = AsyncData([optimistic, ...current]);
+    _publish([optimistic, ...current]);
 
     await _runFileUpload(tempMid, _pendingFiles[tempMid]!);
   }
 
   /// Shared upload+confirm path used by [sendImage] and [retrySend] for files.
   Future<void> _runFileUpload(int tempMid, _PendingFile pending) async {
+    final generation = _generation;
     // Throttle progress emissions: byte-level callbacks fire very often and a
     // full state rebuild per byte would hitch the list. Only emit when the
     // rounded percentage advances.
     int lastPct = -1;
     void onProgress(int sent, int total) {
+      if (generation != _generation) return;
       if (total <= 0) return;
       final ratio = sent / total;
       final pct = (ratio * 100).floor();
@@ -805,8 +816,8 @@ class ChatController extends _$ChatController {
       // Cap optimistic progress at 0.99 — the row only flips to "sent" once the
       // follow-up send request returns, so never show a full 100% mid-flight.
       _progress[tempMid] = ratio.clamp(0.0, 0.99);
-      final snap = state.valueOrNull;
-      if (snap != null) state = AsyncData(List.from(snap));
+      final snap = _messages;
+      if (snap != null) _publish(List.from(snap));
     }
 
     try {
@@ -826,7 +837,10 @@ class ChatController extends _$ChatController {
       // the network-backed _ImageBubble — identical to a received image
       // (tap-to-fullscreen, thumbnail, etc.). The brief thumbnail load is
       // covered by _ImageBubble's own spinner placeholder.
-      final after = state.valueOrNull ?? [];
+      if (generation != _generation) return;
+      _statuses.remove(tempMid);
+      _statuses[result.mid] = MessageSendStatus.sent;
+      final after = _messages ?? [];
       final idx = after.indexWhere((m) => m.mid == tempMid);
       if (idx >= 0) {
         final placeholder = after[idx];
@@ -840,24 +854,18 @@ class ChatController extends _$ChatController {
             expiresIn: _outgoingExpiresIn(),
           ),
         );
-        final updated = List<ChatMessage>.from(after);
-        updated[idx] = confirmed;
-        state = AsyncData(updated);
-        _seenMids.add(result.mid);
         _localAttachments.remove(tempMid);
         _pendingFiles.remove(tempMid);
         _progress.remove(tempMid);
-        _persist(updated);
-        _cache?.setCursor(result.mid);
+        _confirmSent(tempMid, confirmed);
       }
-      _statuses.remove(tempMid);
       _progress.remove(tempMid);
-      _statuses[result.mid] = MessageSendStatus.sent;
     } catch (_) {
+      if (generation != _generation) return;
       _statuses[tempMid] = MessageSendStatus.failed;
       _progress.remove(tempMid);
-      final snapshot = state.valueOrNull;
-      if (snapshot != null) state = AsyncData(List.from(snapshot));
+      final snapshot = _messages;
+      if (snapshot != null) _publish(List.from(snapshot));
     }
   }
 
@@ -888,18 +896,19 @@ class ChatController extends _$ChatController {
 
   /// Retry a previously failed send identified by [tempMid].
   Future<void> retrySend(int tempMid) async {
+    final generation = _generation;
     // File retry: re-run the upload from the cached bytes.
     final pendingFile = _pendingFiles[tempMid];
     if (pendingFile != null) {
       _statuses[tempMid] = MessageSendStatus.sending;
       _progress[tempMid] = 0.0;
-      final snap = state.valueOrNull;
-      if (snap != null) state = AsyncData(List.from(snap));
+      final snap = _messages;
+      if (snap != null) _publish(List.from(snap));
       await _runFileUpload(tempMid, pendingFile);
       return;
     }
 
-    final current = state.valueOrNull ?? [];
+    final current = _messages ?? [];
     final msg = current.firstWhere(
       (m) => m.mid == tempMid,
       orElse: () => throw StateError('Message $tempMid not found'),
@@ -908,53 +917,68 @@ class ChatController extends _$ChatController {
     if (detail is! NormalMessageDetail) return;
 
     _statuses[tempMid] = MessageSendStatus.sending;
-    final snapshot = state.valueOrNull;
-    if (snapshot != null) state = AsyncData(List.from(snapshot));
+    final snapshot = _messages;
+    if (snapshot != null) _publish(List.from(snapshot));
 
     try {
       final isMarkdown = detail.contentType == 'text/markdown';
+      final localId = _localIdOf(msg);
+      final mentions = (detail.properties?['mentions'] as List?)
+          ?.whereType<num>()
+          .map((uid) => uid.toInt())
+          .toList();
       final int realMid;
       if (isMarkdown) {
-        realMid = await ref
-            .read(messageApiProvider)
-            .sendMarkdown(target, detail.content);
+        realMid = await ref.read(messageApiProvider).sendMarkdown(
+            target, detail.content,
+            mentions: mentions, localId: localId);
       } else {
-        realMid =
-            await ref.read(messageApiProvider).sendText(target, detail.content);
+        realMid = await ref.read(messageApiProvider).sendText(
+            target, detail.content,
+            mentions: mentions, localId: localId);
       }
 
-      final after = state.valueOrNull ?? [];
-      final idx = after.indexWhere((m) => m.mid == tempMid);
-      if (idx >= 0) {
-        final confirmed = msg.copyWith(
-            mid: realMid, createdAt: DateTime.now().millisecondsSinceEpoch);
-        final updated = List<ChatMessage>.from(after);
-        updated[idx] = confirmed;
-        state = AsyncData(updated);
-        _seenMids.add(realMid);
-        _persist(updated);
-        _cache?.setCursor(realMid);
-      }
-      _statuses.remove(tempMid);
-      _statuses[realMid] = MessageSendStatus.sent;
+      if (generation != _generation) return;
+      _confirmSent(
+          tempMid,
+          msg.copyWith(
+              mid: realMid, createdAt: DateTime.now().millisecondsSinceEpoch));
     } catch (_) {
+      if (generation != _generation) return;
       _statuses[tempMid] = MessageSendStatus.failed;
-      final snapshot2 = state.valueOrNull;
-      if (snapshot2 != null) state = AsyncData(List.from(snapshot2));
+      final snapshot2 = _messages;
+      if (snapshot2 != null) _publish(List.from(snapshot2));
     }
   }
 
   /// Load older messages (pull-up pagination).
   Future<void> loadMore() async {
-    final current = state.valueOrNull ?? [];
+    final generation = _generation;
+    if (_loadingMore || !_hasMore) return;
+    final current = _messages ?? [];
     if (current.isEmpty) return;
 
     final oldestMid = current.where((m) => m.mid > 0).fold<int?>(
         null, (prev, m) => prev == null || m.mid < prev ? m.mid : prev);
     if (oldestMid == null) return;
-
+    final beforeMid =
+        _historyBeforeMid != null && _historyBeforeMid! < oldestMid
+            ? _historyBeforeMid!
+            : oldestMid;
+    _loadingMore = true;
     try {
-      final olderRaw = await _loadHistory(beforeMid: oldestMid);
+      // A failed request must remain retryable; only a successful empty page
+      // means we have reached the start of the conversation.
+      final olderRaw = await ref
+          .read(messageApiProvider)
+          .getHistory(target, beforeMid: beforeMid, limit: _initialLimit);
+      if (generation != _generation) return;
+      if (olderRaw.isEmpty) {
+        _hasMore = false;
+        return;
+      }
+      _historyBeforeMid = olderRaw.fold<int>(
+          beforeMid, (mid, m) => m.mid > 0 && m.mid < mid ? m.mid : mid);
       final older = olderRaw
           .where((m) => m.detail is! ReactionMessageDetail)
           .toList(growable: false);
@@ -970,13 +994,16 @@ class ChatController extends _$ChatController {
         if (fresh.isNotEmpty) {
           // Older rows append at the tail, but re-sort the whole list so the
           // pagination boundary can't leave an out-of-order seam.
-          final next = _sortedNewestFirst([...current, ...fresh]);
-          state = AsyncData(next);
+          final latest = _messages ?? const <ChatMessage>[];
+          final next = _sortedNewestFirst([...latest, ...fresh]);
+          _publish(next);
           _persist(next);
         }
       }
     } catch (_) {
       // awaits live server; falls back gracefully
+    } finally {
+      if (generation == _generation) _loadingMore = false;
     }
   }
 }

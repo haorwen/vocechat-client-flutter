@@ -47,19 +47,22 @@ class MessageApi {
   /// [mentions] (group chats only, per web's `enableMention` gating) is sent
   /// as `properties.mentions` via the same `X-Properties` base64-JSON header
   /// mechanism already used by `uploadBytesAndSend` — confirmed accepted on
-  /// this endpoint server-side (group.rs:1012 / user.rs:1401 both read
+  /// this endpoint server-side (group.rs / user.rs both read
   /// X-Properties on /send, not just file uploads).
+  /// [localId] is echoed unchanged by the server so identical concurrent
+  /// messages can confirm their own optimistic rows unambiguously.
   Future<int> sendText(
     MessageTarget target,
     String text, {
     List<int>? mentions,
+    int? localId,
   }) async {
     final resp = await _dio.post(
       _sendPath(target),
       data: text,
       options: Options(
         contentType: 'text/plain',
-        headers: _propertiesHeader(mentions),
+        headers: _propertiesHeader(mentions, localId: localId),
       ),
     );
     // Server returns raw i64 as JSON body (e.g. 602475), not {"mid": 602475}.
@@ -70,25 +73,31 @@ class MessageApi {
     MessageTarget target,
     String md, {
     List<int>? mentions,
+    int? localId,
   }) async {
     final resp = await _dio.post(
       _sendPath(target),
       data: md,
       options: Options(
         contentType: 'text/markdown',
-        headers: _propertiesHeader(mentions),
+        headers: _propertiesHeader(mentions, localId: localId),
       ),
     );
     // Server returns raw i64 as JSON body.
     return (resp.data as num).toInt();
   }
 
-  /// Builds the `X-Properties` header map carrying `{"mentions": [...]}` when
-  /// [mentions] is non-empty, or null (no header) otherwise.
-  static Map<String, dynamic>? _propertiesHeader(List<int>? mentions) {
-    if (mentions == null || mentions.isEmpty) return null;
+  /// The server accepts arbitrary properties for text, Markdown and replies.
+  /// Omit the header when neither mentions nor a local confirmation ID exists.
+  static Map<String, dynamic>? _propertiesHeader(List<int>? mentions,
+      {int? localId}) {
+    final properties = <String, dynamic>{
+      if (mentions != null && mentions.isNotEmpty) 'mentions': mentions,
+      if (localId != null) 'local_id': localId,
+    };
+    if (properties.isEmpty) return null;
     return {
-      'X-Properties': base64Encode(utf8.encode(jsonEncode({'mentions': mentions}))),
+      'X-Properties': base64Encode(utf8.encode(jsonEncode(properties))),
     };
   }
 
@@ -272,13 +281,14 @@ class MessageApi {
     String text, {
     bool markdown = false,
     List<int>? mentions,
+    int? localId,
   }) async {
     final resp = await _dio.post(
       '/api/message/$targetMid/reply',
       data: text,
       options: Options(
         contentType: markdown ? 'text/markdown' : 'text/plain',
-        headers: _propertiesHeader(mentions),
+        headers: _propertiesHeader(mentions, localId: localId),
       ),
     );
     return (resp.data as num).toInt();
