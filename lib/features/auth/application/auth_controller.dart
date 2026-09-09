@@ -105,8 +105,9 @@ class AuthController extends _$AuthController {
   }
 
   /// Called at startup: reads stored tokens for the current account, refreshes
-  /// if expired, then validates via /api/user/me. Falls back to refresh on
-  /// 401.
+  /// if expired, then validates via /api/user/me. The shared Dio client retries
+  /// temporary failures before we fall back to the saved account profile.
+  /// Only a confirmed credential rejection should return the user to login.
   Future<AuthState> _bootstrap() async {
     final account = _currentAccount();
     AppLog.d(
@@ -138,46 +139,47 @@ class AuthController extends _$AuthController {
 
     final api = ref.read(authApiProvider);
 
-    // Proactively refresh if access token is expired or about to expire (<60s).
-    final now = DateTime.now();
-    final almostExpired = tokens.expiresAt.isBefore(
-      now.add(const Duration(seconds: 60)),
-    );
-    if (almostExpired) {
-      AppLog.d(
-          LogTag.auth, () => '🟦 bootstrap: token expired/near, refreshing');
-      final refreshed = await _tryRefresh(api, tokenStore, tokens.refreshToken);
-      AppLog.d(LogTag.auth, () => '🟦 bootstrap: refresh result=$refreshed');
-      if (!refreshed) return const AuthState.unauthenticated();
-    }
-
-    // Try fetching the current user; on 401 fall back to refresh once more.
     try {
+      // Keep renewal failures distinguishable from rejected credentials. A
+      // phone may still be reconnecting to Wi-Fi when the process restarts.
+      if (tokens.expiresAt.isBefore(
+        DateTime.now().add(const Duration(seconds: 60)),
+      )) {
+        await _refreshTokens(api, tokenStore, tokens.refreshToken);
+      }
+
+      // Dio already refreshes on 401 and retries this request once. Starting
+      // another refresh here can reuse the old, already-rotated refresh token.
       final user = await api.me();
       AppLog.d(LogTag.auth, () => '🟦 bootstrap: me() ok uid=${user.uid}');
       await _syncAccountProfile(account, user);
       return AuthState.authenticated(user: user);
-    } catch (e) {
-      AppLog.d(
-          LogTag.auth, () => '🟦 bootstrap: me() failed: $e — trying refresh');
-      final refreshed = await _tryRefresh(api, tokenStore, tokens.refreshToken);
-      if (!refreshed) return const AuthState.unauthenticated();
-      try {
-        final user = await api.me();
-        AppLog.d(
-          LogTag.auth,
-          () => '🟦 bootstrap: me() ok after refresh uid=${user.uid}',
-        );
-        await _syncAccountProfile(account, user);
-        return AuthState.authenticated(user: user);
-      } catch (e2) {
-        AppLog.w(
-          LogTag.auth,
-          () => '🟦 bootstrap: me() still failed after refresh: $e2',
-        );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        await tokenStore.clear();
         return const AuthState.unauthenticated();
       }
+      AppLog.w(LogTag.auth,
+          () => '🟦 bootstrap: server unavailable; keeping saved session: $e');
+    } catch (e) {
+      // An unexpected response or local profile-write failure is not proof
+      // that the credentials are invalid either. Keep them for recovery.
+      AppLog.w(LogTag.auth,
+          () => '🟦 bootstrap: validation failed; keeping saved session: $e');
     }
+
+    // Local access to the existing account/cache remains available offline.
+    // Network requests still require the stored tokens, and the SSE reconnect
+    // path renews expired tokens when connectivity returns.
+    return AuthState.authenticated(
+      user: VoceUser(
+        uid: account.uid,
+        name: account.name,
+        email: account.email,
+        isAdmin: account.isAdmin,
+        avatarUpdatedAt: account.avatarUpdatedAt,
+      ),
+    );
   }
 
   /// Keep the saved [AccountConfig]'s display fields (name/email/avatar) in
@@ -201,24 +203,36 @@ class AuthController extends _$AuthController {
   }
 
   /// Exchange refresh token for a new access token; persist on success.
+  Future<void> _refreshTokens(
+    AuthApi api,
+    SecureTokenStore tokenStore,
+    String refreshToken,
+  ) async {
+    final renew = await api.renew(refreshToken);
+    await tokenStore.saveTokens(
+      access: renew.token,
+      refresh: renew.refreshToken,
+      expiresAt: DateTime.now().add(Duration(seconds: renew.expiredIn)),
+    );
+  }
+
   Future<bool> _tryRefresh(
     AuthApi api,
     SecureTokenStore tokenStore,
     String refreshToken,
   ) async {
     try {
-      final renew = await api.renew(refreshToken);
-      await tokenStore.saveTokens(
-        access: renew.token,
-        refresh: renew.refreshToken,
-        expiresAt: DateTime.now().add(Duration(seconds: renew.expiredIn)),
-      );
-      AppLog.d(
-        LogTag.auth,
-        () =>
-            '🟦 _tryRefresh: success, new expires=${DateTime.now().add(Duration(seconds: renew.expiredIn))}',
-      );
+      await _refreshTokens(api, tokenStore, refreshToken);
       return true;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        await tokenStore.clear();
+        if (_currentAccount()?.accountId == tokenStore.id) {
+          state = const AsyncData(AuthState.unauthenticated());
+        }
+      }
+      AppLog.w(LogTag.auth, () => '🟦 _tryRefresh: failed: $e');
+      return false;
     } catch (e) {
       AppLog.w(LogTag.auth, () => '🟦 _tryRefresh: failed: $e');
       return false;

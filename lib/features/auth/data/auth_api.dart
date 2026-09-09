@@ -84,6 +84,12 @@ class AuthApi {
     final resp = await _dio.post(
       '/api/token/renew',
       data: {'refresh_token': refreshToken},
+      // A rejected refresh token must reach the caller directly. Trying to
+      // refresh this request itself repeats renewal with the same credential.
+      options: Options(
+        headers: {'X-API-Key': null},
+        extra: {kSkipRefreshOn401: true},
+      ),
     );
     return RenewResponse.fromJson(resp.data as Map<String, dynamic>);
   }

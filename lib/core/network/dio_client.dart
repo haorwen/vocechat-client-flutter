@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:dio/dio.dart';
 import 'package:dio_smart_retry/dio_smart_retry.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -105,11 +103,22 @@ class VoceDioClient {
           Duration(milliseconds: 500),
           Duration(milliseconds: 1500),
         ],
-        retryEvaluator: (error, attempt) =>
-            error.type == DioExceptionType.connectionError ||
-            error.type == DioExceptionType.receiveTimeout ||
-            (error.response?.statusCode != null &&
-                error.response!.statusCode! >= 500),
+        retryEvaluator: (error, attempt) {
+          final request = error.requestOptions;
+          // A send/upload may have reached the server before its response
+          // timed out. Automatically replay only reads and token renewal,
+          // whose server endpoint accepts the same refresh token again.
+          final canReplay =
+              const {'GET', 'HEAD', 'OPTIONS'}.contains(request.method) ||
+                  request.path == '/api/token/renew';
+          return canReplay &&
+              (error.type == DioExceptionType.connectionError ||
+                  error.type == DioExceptionType.connectionTimeout ||
+                  error.type == DioExceptionType.sendTimeout ||
+                  error.type == DioExceptionType.receiveTimeout ||
+                  (error.response?.statusCode != null &&
+                      error.response!.statusCode! >= 500));
+        },
       ),
     );
     // Body dumps are intentionally OFF. A single /api/group or /api/user
@@ -140,6 +149,10 @@ class VoceDioClient {
 /// refresh logic when the renew itself returns 401 (dead refresh token).
 const String _kRenewRequest = '__voce_renew_request__';
 
+/// A freshly renewed token must only be tried once. A second 401 should be
+/// returned to the caller instead of starting an unbounded renewal loop.
+const String _kRetriedAfterRefresh = '__voce_retried_after_refresh__';
+
 /// Marker key set in `RequestOptions.extra` on requests where a 401 means a
 /// definitive rejection (e.g. wrong credentials on `/api/token/login`)
 /// rather than an expired access token. Without this, the interceptor would
@@ -153,7 +166,7 @@ class _AuthInterceptor extends Interceptor {
 
   final Dio _dio;
   final Ref _ref;
-  Completer<void>? _refreshing;
+  Future<String>? _refreshing;
 
   @override
   Future<void> onRequest(
@@ -178,7 +191,9 @@ class _AuthInterceptor extends Interceptor {
 
     final accountId =
         _ref.read(accountStoreProvider).valueOrNull?.currentAccountId;
-    if (accountId != null) {
+    final skipAuthHeader = options.headers.containsKey('X-API-Key') &&
+        options.headers['X-API-Key'] == null;
+    if (accountId != null && !skipAuthHeader) {
       final store = _ref.read(secureTokenStoreProvider(accountId));
       final tokens = await store.readTokens();
       if (tokens != null) {
@@ -192,7 +207,7 @@ class _AuthInterceptor extends Interceptor {
     } else {
       AppLog.d(
         LogTag.network,
-        () => '🌐 ${options.method} ${options.path} NO_ACCOUNT',
+        () => '🌐 ${options.method} ${options.path} no auth header',
       );
     }
     handler.next(options);
@@ -241,129 +256,65 @@ class _AuthInterceptor extends Interceptor {
       // `/api/token/renew` returns 401 (server: RenewTokenApiResponse maps
       // IllegalToken → 401). If we let that 401 re-enter the refresh logic it
       // sees `_refreshing != null` (the outer renew still holds the lock) and
-      // does `await _refreshing!.future` — i.e. the renew awaits ITSELF and
+      // awaits `_refreshing` — i.e. the renew awaits ITSELF and
       // deadlocks forever, wedging the whole client. So a 401 ON the renew
       // request must skip refresh handling entirely and fall through to the
       // normal error mapping.
       if (err.requestOptions.extra[_kRenewRequest] == true) {
         AppLog.w(LogTag.token,
             () => '🔑 renew request itself returned 401 — refresh token dead');
-      } else if (err.requestOptions.extra[kSkipRefreshOn401] == true) {
+      } else if (err.requestOptions.extra[kSkipRefreshOn401] == true ||
+          err.requestOptions.extra[_kRetriedAfterRefresh] == true) {
         // e.g. wrong email/password on login — nothing to refresh, and
         // retrying would just resend the same bad credentials.
       } else {
-      final accountId =
-          _ref.read(accountStoreProvider).valueOrNull?.currentAccountId;
-      if (accountId == null) {
-        handler.next(err);
-        return;
-      }
-      final store = _ref.read(secureTokenStoreProvider(accountId));
+        final accountId =
+            _ref.read(accountStoreProvider).valueOrNull?.currentAccountId;
+        if (accountId == null) {
+          handler.next(err);
+          return;
+        }
+        final store = _ref.read(secureTokenStoreProvider(accountId));
+        final tokens = await store.readTokens();
+        if (tokens == null) {
+          handler.next(err);
+          return;
+        }
 
-      // If a refresh is already in progress, await it then retry. Capture the
-      // completer into a local first: the owning renew clears [_refreshing] in
-      // its finally, so reading the field again after the await could NPE.
-      final inFlight = _refreshing;
-      if (inFlight != null) {
+        // All concurrent 401s await the same success OR failure. In particular,
+        // a timeout during renewal must not be reported as the original 401:
+        // bootstrap would interpret that as invalid credentials and log out.
+        final refreshing = _refreshing ??= _renewToken(store, tokens);
+        late String newAccess;
         try {
-          await inFlight.future;
-          final tokens = await store.readTokens();
-          if (tokens != null) {
-            final retryOptions = err.requestOptions;
-            retryOptions.headers['X-API-Key'] = tokens.accessToken;
-            final retryResponse = await _dio.fetch(retryOptions);
-            handler.resolve(retryResponse);
-            return;
-          }
-        } catch (_) {
-          // refresh failed; fall through to reject
+          newAccess = await refreshing;
+        } on DioException catch (renewErr) {
+          // The renewal request has already exhausted the shared retries.
+          // resolve/reject here must not run those retries a second time on
+          // the original request with the renewal's RequestOptions.
+          handler.reject(renewErr);
+          return;
+        } catch (e, stackTrace) {
+          handler.reject(DioException(
+            requestOptions: err.requestOptions,
+            error: e,
+            stackTrace: stackTrace,
+          ));
+          return;
+        } finally {
+          if (identical(_refreshing, refreshing)) _refreshing = null;
         }
-        handler.next(err);
-        return;
-      }
 
-      final tokens = await store.readTokens();
-      if (tokens == null) {
-        handler.next(err);
-        return;
-      }
-
-      // Critical section: exactly one in-flight renew, guarded by
-      // [_refreshing]. The cardinal rule here is that the completer MUST be
-      // settled and cleared on EVERY exit path — otherwise a leaked pending
-      // completer wedges the whole client: every later 401 awaits a future
-      // that never completes, and all token-requiring requests hang forever
-      // (observed as "after idling a while, nothing can be sent"). The renew
-      // body does unguarded `as` casts on the response shape, which throw
-      // *non-DioException* TypeErrors on an unexpected body — a path the old
-      // `on DioException catch` missed, leaking the lock. We therefore catch
-      // *everything* and settle the completer in a finally.
-      final refreshing = _refreshing = Completer<void>();
-      bool renewed = false;
-      String? newAccess;
-      try {
-        final renewResp = await _dio.post(
-          '/api/token/renew',
-          data: {'refresh_token': tokens.refreshToken},
-          options: Options(
-            headers: {'X-API-Key': null},
-            extra: {_kRenewRequest: true},
-          ),
-        );
-        final data = renewResp.data;
-        final access = data is Map ? data['token'] : null;
-        final refresh = data is Map ? data['refresh_token'] : null;
-        final expiredIn = data is Map ? data['expired_in'] : null;
-        if (access is String &&
-            access.isNotEmpty &&
-            refresh is String &&
-            expiredIn is int) {
-          await store.saveTokens(
-            access: access,
-            refresh: refresh,
-            expiresAt: DateTime.now().add(Duration(seconds: expiredIn)),
-          );
-          newAccess = access;
-          renewed = true;
-        } else {
-          AppLog.w(
-            LogTag.token,
-            () => '🔑 token renew returned unexpected body shape; treating as failure',
-          );
+        try {
+          final retryOptions = err.requestOptions;
+          retryOptions.headers['X-API-Key'] = newAccess;
+          retryOptions.extra[_kRetriedAfterRefresh] = true;
+          final retryResponse = await _dio.fetch(retryOptions);
+          handler.resolve(retryResponse);
+        } on DioException catch (retryErr) {
+          handler.reject(retryErr);
         }
-      } on DioException catch (renewErr) {
-        AppLog.w(LogTag.token, () => '🔑 token renew failed: ${renewErr.type}');
-        // A 401 on the renew call itself means the refresh token is dead.
-        if (renewErr.response?.statusCode == 401) {
-          await store.clear();
-        }
-      } catch (e) {
-        // Cast/Type errors on an unexpected renew body, or anything else.
-        AppLog.w(LogTag.token, () => '🔑 token renew threw: $e');
-      } finally {
-        // ALWAYS settle + clear, no matter how we exited above.
-        if (!refreshing.isCompleted) refreshing.complete();
-        if (identical(_refreshing, refreshing)) _refreshing = null;
-      }
-
-      if (!renewed || newAccess == null) {
-        // Renew failed — reject the original request. Do NOT loop.
-        handler.next(err);
         return;
-      }
-
-      // Renew succeeded. Retry the original request with the fresh token.
-      // This is OUTSIDE the lock: a failure here must not clear auth or be
-      // mistaken for a renew failure.
-      try {
-        final retryOptions = err.requestOptions;
-        retryOptions.headers['X-API-Key'] = newAccess;
-        final retryResponse = await _dio.fetch(retryOptions);
-        handler.resolve(retryResponse);
-      } on DioException catch (retryErr) {
-        handler.next(retryErr);
-      }
-      return;
       } // end else (not the renew request's own 401)
     }
 
@@ -381,7 +332,9 @@ class _AuthInterceptor extends Interceptor {
       } else if (data is String && data.isNotEmpty) {
         message = data;
       }
-      handler.reject(
+      // Continue through the error chain so RetryInterceptor can handle
+      // transient server failures. reject() would skip it entirely.
+      handler.next(
         DioException(
           requestOptions: err.requestOptions,
           error: ApiException(
@@ -400,21 +353,57 @@ class _AuthInterceptor extends Interceptor {
     final friendly = switch (err.type) {
       DioExceptionType.connectionTimeout =>
         'Connection timed out. Check your network or server URL.',
-      DioExceptionType.receiveTimeout =>
-        'Server took too long to respond.',
+      DioExceptionType.receiveTimeout => 'Server took too long to respond.',
       DioExceptionType.connectionError =>
         'Cannot reach server. Verify the URL is correct and reachable.',
       DioExceptionType.badCertificate =>
         'TLS certificate is invalid for this server.',
       _ => err.message ?? 'Network error',
     };
-    handler.reject(
+    handler.next(
       DioException(
         requestOptions: err.requestOptions,
         error: ApiException(status: 0, message: friendly),
         type: err.type,
       ),
     );
+  }
+
+  Future<String> _renewToken(SecureTokenStore store, TokenData tokens) async {
+    try {
+      final response = await _dio.post(
+        '/api/token/renew',
+        data: {'refresh_token': tokens.refreshToken},
+        options: Options(
+          headers: {'X-API-Key': null},
+          extra: {_kRenewRequest: true},
+        ),
+      );
+      final data = response.data;
+      final access = data is Map ? data['token'] : null;
+      final refresh = data is Map ? data['refresh_token'] : null;
+      final expiredIn = data is Map ? data['expired_in'] : null;
+      if (access is! String ||
+          access.isEmpty ||
+          refresh is! String ||
+          refresh.isEmpty ||
+          expiredIn is! int) {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          error: const FormatException('Invalid token renewal response'),
+        );
+      }
+      await store.saveTokens(
+        access: access,
+        refresh: refresh,
+        expiresAt: DateTime.now().add(Duration(seconds: expiredIn)),
+      );
+      return access;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) await store.clear();
+      rethrow;
+    }
   }
 }
 
