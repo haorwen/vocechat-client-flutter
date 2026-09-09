@@ -277,8 +277,19 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     required String baseUrl,
     required bool showStatus,
   }) {
-    final unreadInfo = ref.watch(unreadInfoProvider(item.key)).valueOrNull ??
-        (count: 0, mention: false);
+    final readMid = ref.watch(readIndexProvider.select((value) {
+      final reads = value.valueOrNull;
+      return switch (item.key) {
+        UserConversationKey(uid: final uid) => reads?.readUser(uid) ?? 0,
+        GroupConversationKey(gid: final gid) => reads?.readGroup(gid) ?? 0,
+      };
+    }));
+    final cachedUnread = ref.watch(unreadInfoProvider(item.key)).valueOrNull;
+    // FutureProvider retains its previous count while recalculating. A local
+    // read of the conversation head must clear that stale badge immediately.
+    final unreadInfo = readMid >= (item.lastMid ?? 0)
+        ? (count: 0, mention: false)
+        : cachedUnread ?? (count: 0, mention: false);
 
     String routeId;
     switch (item.key) {
@@ -474,7 +485,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         await _togglePin(item);
       case 'markRead':
         try {
-          final api = ref.read(sessionActionsApiProvider);
           final mid = item.lastMid;
           if (mid == null || mid <= 0) {
             // Nothing to mark — surface a clear message instead of silently
@@ -488,10 +498,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           final readNotifier = ref.read(readIndexProvider.notifier);
           switch (item.key) {
             case UserConversationKey(uid: final uid):
-              await api.markReadUser(uid, mid);
               readNotifier.setUser(uid, mid);
             case GroupConversationKey(gid: final gid):
-              await api.markReadGroup(gid, mid);
               readNotifier.setGroup(gid, mid);
           }
           if (mounted) {

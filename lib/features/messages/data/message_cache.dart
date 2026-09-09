@@ -44,6 +44,8 @@ class MessageCache {
   static const String _kPinnedChatsKey = 'pinned_chats';
   static const String _kReadIndexUsersKey = 'read_index_users';
   static const String _kReadIndexGroupsKey = 'read_index_groups';
+  static const String _kPendingReadIndexUsersKey = 'pending_read_index_users';
+  static const String _kPendingReadIndexGroupsKey = 'pending_read_index_groups';
 
   /// In-memory write coalescing per target.
   final Map<String, Timer> _flushTimers = {};
@@ -252,6 +254,20 @@ class MessageCache {
 
   Future<void> writeReadIndexGroups(Map<int, int> map) =>
       _writeIntMap(_kReadIndexGroupsKey, map);
+
+  /// Only explicit local reads enter this queue; automatically established
+  /// baselines remain local. Retain unsent reads across process restarts.
+  Future<Map<int, int>> readPendingReadIndexUsers() =>
+      _readIntMap(_kPendingReadIndexUsersKey);
+
+  Future<Map<int, int>> readPendingReadIndexGroups() =>
+      _readIntMap(_kPendingReadIndexGroupsKey);
+
+  Future<void> writePendingReadIndexUsers(Map<int, int> map) =>
+      _writeIntMap(_kPendingReadIndexUsersKey, map);
+
+  Future<void> writePendingReadIndexGroups(Map<int, int> map) =>
+      _writeIntMap(_kPendingReadIndexGroupsKey, map);
 
   Future<Map<int, int>> _readIntMap(String key) async {
     final raw = await _readMeta(key);

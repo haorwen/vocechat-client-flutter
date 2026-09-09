@@ -6,7 +6,7 @@ part of 'read_index_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$readIndexHash() => r'7aa68158bfd8a4c18472f05fce4b1a00a53b8c1f';
+String _$readIndexHash() => r'8bf06e385e0003b399ffdb463d574281c011fcc5';
 
 /// See also [ReadIndex].
 @ProviderFor(ReadIndex)
