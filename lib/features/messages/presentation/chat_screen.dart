@@ -48,6 +48,7 @@ import 'file_message_content.dart';
 import 'forward_sheet.dart';
 import 'mention_overlay.dart';
 import 'mention_text.dart';
+import 'message_expiry_countdown.dart';
 import 'reaction_widgets.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -1601,30 +1602,6 @@ class _DateSeparator extends StatelessWidget {
 // the right of the row (Emoji / Reply / Bookmark / More).
 // ---------------------------------------------------------------------------
 
-/// Friendly label for a burn-after-read `expiresIn` (seconds) value, for the
-/// message-row timer tooltip. Covers the real option set (0/300/600/3600/
-/// 86400/604800, matching web's AutoDeleteMessages.tsx) plus a generic
-/// fallback in case the server ever returns an arbitrary value.
-String _formatExpiresIn(int seconds) {
-  if (seconds >= 604800 && seconds % 604800 == 0) {
-    final weeks = seconds ~/ 604800;
-    return weeks == 1 ? '1 week' : '$weeks weeks';
-  }
-  if (seconds >= 86400 && seconds % 86400 == 0) {
-    final days = seconds ~/ 86400;
-    return days == 1 ? '1 day' : '$days days';
-  }
-  if (seconds >= 3600 && seconds % 3600 == 0) {
-    final hours = seconds ~/ 3600;
-    return hours == 1 ? '1 hour' : '$hours hours';
-  }
-  if (seconds >= 60 && seconds % 60 == 0) {
-    final minutes = seconds ~/ 60;
-    return minutes == 1 ? '1 minute' : '$minutes minutes';
-  }
-  return '$seconds seconds';
-}
-
 class _MessageRow extends ConsumerStatefulWidget {
   const _MessageRow({
     required this.message,
@@ -1714,6 +1691,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
       ReplyMessageDetail() => detail.expiresIn,
       _ => null,
     };
+    final hasExpiry = expiresIn != null && expiresIn > 0;
     Widget content;
     if (widget.isEditing && widget.editController != null) {
       content = _EditForm(
@@ -1891,11 +1869,17 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
     final highlighted = widget.highlighted;
     final selecting = widget.selecting;
     final selectable = selecting && msg.mid > 0;
+    // Match the web message's red-200 background (40% in dark mode).
+    final expiryBg = Theme.of(context).brightness == Brightness.dark
+        ? const Color(0x66FECACA)
+        : const Color(0xFFFECACA);
     final rowBg = highlighted
         ? AppTokens.gray200
         : (widget.selected
             ? AppTokens.primary50
-            : (pinned ? AppTokens.primary50 : Colors.transparent));
+            : (hasExpiry
+                ? expiryBg
+                : (pinned ? AppTokens.primary50 : Colors.transparent)));
 
     final mainRow = AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -1995,15 +1979,6 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                             ),
                           ),
                         ],
-                        if (expiresIn != null && expiresIn > 0) ...[
-                          const SizedBox(width: 6),
-                          Tooltip(
-                            message: l.chatExpiresTooltip(
-                                _formatExpiresIn(expiresIn)),
-                            child: Icon(Icons.timer_outlined,
-                                size: 12, color: AppTokens.gray400),
-                          ),
-                        ],
                         if (widget.status == MessageSendStatus.sending) ...[
                           const SizedBox(width: 8),
                           Icon(Icons.access_time,
@@ -2019,6 +1994,17 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                     const SizedBox(height: 8),
                     content,
                     if (msg.mid > 0) ReactionBar(mid: msg.mid),
+                    if (hasExpiry)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: MessageExpiryCountdown(
+                            durationSeconds: expiresIn,
+                            expiresAt: msg.expiresAt,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

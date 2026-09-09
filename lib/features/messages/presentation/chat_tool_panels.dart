@@ -665,10 +665,9 @@ class _MembersListPanel extends ConsumerWidget {
 // {"users":[{"uid","expires_in"}]} or {"groups":[{"gid","expires_in"}]}.
 // Options mirror the web reference's AutoDeleteMessages.tsx exactly: Off (0),
 // 5 min (300), 10 min (600), 1 hour (3600), 1 day (86400), 1 week (604800).
-// No countdown/deletion animation here — the task scopes that out even
-// though the web reference's ExpireTimer.tsx implements a live countdown;
-// this panel only sets the sender-side setting, which the server then stamps
-// onto subsequently-sent messages' `expires_in` automatically.
+// This panel sets the sender-side setting, which the server stamps onto
+// subsequently-sent messages' `expires_in`. Message rows display the countdown;
+// ChatController handles deletion at the absolute expiry.
 // ---------------------------------------------------------------------------
 
 class _AutoDeletePanel extends ConsumerStatefulWidget {
