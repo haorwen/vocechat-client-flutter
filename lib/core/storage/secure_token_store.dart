@@ -35,8 +35,7 @@ bool _keyringFailureLogged = false;
 
 class _TokenLogShim {
   void w(String msg, {Object? error, StackTrace? stackTrace}) =>
-      AppLog.w(LogTag.token, () => msg,
-          error: error, stackTrace: stackTrace);
+      AppLog.w(LogTag.token, () => msg, error: error, stackTrace: stackTrace);
 }
 
 // File-based fallback when the OS keyring is unavailable
@@ -106,9 +105,12 @@ Future<void> _persistFallback() async {
 ///     session tokens, so the same server can hold multiple logged-in
 ///     accounts side by side without clobbering each other's tokens.
 class SecureTokenStore {
-  SecureTokenStore({required this.id})
-      : _storage = const FlutterSecureStorage(
+  SecureTokenStore({required this.id, File? legacyFallbackFile})
+      : _legacyFallbackFile = legacyFallbackFile,
+        _storage = const FlutterSecureStorage(
           aOptions: AndroidOptions(encryptedSharedPreferences: true),
+          iOptions:
+              IOSOptions(accessibility: KeychainAccessibility.first_unlock),
         ) {
     if (kIsWeb && !_webWarningLogged) {
       _webWarningLogged = true;
@@ -119,6 +121,14 @@ class SecureTokenStore {
 
   final String id;
   final FlutterSecureStorage _storage;
+  final File? _legacyFallbackFile;
+
+  bool get _isIOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
+  File get _iosLegacyFile =>
+      _legacyFallbackFile ??
+      File(
+          '${Platform.environment['HOME'] ?? '.'}/.vocechat-client/tokens.json');
 
   String _key(String suffix) => 'voce_${id}_$suffix';
 
@@ -132,6 +142,9 @@ class SecureTokenStore {
   }
 
   Future<void> _writeOne(String key, String value) async {
+    // A locked/unavailable iOS Keychain is not a missing desktop keyring.
+    // Never silently report a successful login backed only by a file/cache.
+    if (_isIOS) return _storage.write(key: key, value: value);
     if (_useFileFallback) {
       await _loadFallbackCacheOnce();
       _fallbackCache[key] = value;
@@ -149,6 +162,7 @@ class SecureTokenStore {
   }
 
   Future<String?> _readOne(String key) async {
+    if (_isIOS) return _storage.read(key: key);
     if (_useFileFallback) {
       await _loadFallbackCacheOnce();
       return _fallbackCache[key];
@@ -163,6 +177,15 @@ class SecureTokenStore {
   }
 
   Future<void> _deleteOne(String key) async {
+    if (_isIOS) {
+      // Include entries written with the old `unlocked` accessibility too.
+      await _storage.delete(
+        key: key,
+        iOptions: const IOSOptions(accessibility: null),
+      );
+      await _removeIOSLegacyValues([key]);
+      return;
+    }
     _fallbackCache.remove(key);
     if (_useFileFallback) {
       await _persistFallback();
@@ -181,6 +204,19 @@ class SecureTokenStore {
     required String refresh,
     required DateTime expiresAt,
   }) async {
+    if (_isIOS) {
+      // One Keychain operation commits the entire session. Killing the app
+      // between three independent writes must not leave a mixed token pair.
+      await _writeOne(
+          _key('session'),
+          jsonEncode({
+            'access': access,
+            'refresh': refresh,
+            'expires_at': expiresAt.toIso8601String(),
+          }));
+      await _clearIOSLegacyTokens();
+      return;
+    }
     // Serial writes — flutter_secure_storage on Windows (DPAPI) and Linux
     // (libsecret) is not concurrency-safe; parallel writes can drop entries.
     await _writeOne(_key('access'), access);
@@ -194,6 +230,33 @@ class SecureTokenStore {
   }
 
   Future<TokenData?> readTokens() async {
+    if (_isIOS) {
+      final session = await _readOne(_key('session'));
+      if (session != null) {
+        final decoded = jsonDecode(session);
+        // A durable logout marker prevents legacy credentials from being
+        // resurrected if the process exits during their cleanup.
+        if (decoded == null) return null;
+        return _decodeSession(decoded as Map<String, dynamic>);
+      }
+
+      // Older builds switched to a plaintext file after ANY Keychain error,
+      // but forgot that choice on restart. Recover those entries (including
+      // a write split between Keychain and file) and migrate to Keychain.
+      final legacy = await _readIOSLegacyValues();
+      final values = <String, dynamic>{};
+      for (final suffix in ['access', 'refresh', 'expires_at']) {
+        values[suffix] = legacy[_key(suffix)] ?? await _readOne(_key(suffix));
+      }
+      if (values.values.any((value) => value == null)) return null;
+      final tokens = _decodeSession(values);
+      await saveTokens(
+        access: tokens.accessToken,
+        refresh: tokens.refreshToken,
+        expiresAt: tokens.expiresAt,
+      );
+      return tokens;
+    }
     // Serial reads to avoid platform concurrency hazards.
     final access = await _readOne(_key('access'));
     final refresh = await _readOne(_key('refresh'));
@@ -212,9 +275,51 @@ class SecureTokenStore {
   }
 
   Future<void> clear() async {
+    if (_isIOS) {
+      await _writeOne(_key('session'), 'null');
+      await _clearIOSLegacyTokens();
+      return;
+    }
     await _deleteOne(_key('access'));
     await _deleteOne(_key('refresh'));
     await _deleteOne(_key('expires_at'));
+  }
+
+  TokenData _decodeSession(Map<String, dynamic> values) => TokenData(
+        accessToken: values['access'] as String,
+        refreshToken: values['refresh'] as String,
+        expiresAt: DateTime.parse(values['expires_at'] as String),
+      );
+
+  Future<Map<String, dynamic>> _readIOSLegacyValues() async {
+    final file = _iosLegacyFile;
+    if (!await file.exists()) return {};
+    final raw = await file.readAsString();
+    return raw.isEmpty ? {} : jsonDecode(raw) as Map<String, dynamic>;
+  }
+
+  Future<void> _removeIOSLegacyValues(List<String> keys) async {
+    final values = await _readIOSLegacyValues();
+    if (!keys.any(values.containsKey)) return;
+    for (final key in keys) {
+      values.remove(key);
+    }
+    final file = _iosLegacyFile;
+    final pending = File('${file.path}.tmp');
+    await pending.writeAsString(jsonEncode(values), flush: true);
+    await pending.rename(file.path);
+  }
+
+  Future<void> _clearIOSLegacyTokens() async {
+    // The authoritative session/marker has already been committed. Cleanup
+    // failure must not turn a durable login into an apparent login failure.
+    try {
+      for (final suffix in ['access', 'refresh', 'expires_at']) {
+        await _deleteOne(_key(suffix));
+      }
+    } catch (e) {
+      _log.w('iOS legacy token cleanup deferred', error: e);
+    }
   }
 
   Future<void> saveRememberedCredential({

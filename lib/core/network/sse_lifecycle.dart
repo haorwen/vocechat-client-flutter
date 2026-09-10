@@ -69,15 +69,26 @@ class SseTokenWatcher extends _$SseTokenWatcher {
   void _start(String accountId) {
     _stop();
     final tokenStore = ref.read(secureTokenStoreProvider(accountId));
+    Future<TokenData?> readTokens() async {
+      try {
+        return await tokenStore.readTokens();
+      } catch (e) {
+        // A locked iOS Keychain can recover on the next poll after unlock.
+        AppLog.d(LogTag.token, () => 'token polling deferred: $e');
+        return null;
+      }
+    }
+
     // Seed the baseline so we don't trip an invalidate on first tick.
     Future<void> seed() async {
-      final t = await tokenStore.readTokens();
+      final t = await readTokens();
       _lastAccess = t?.accessToken;
       _lastExpiresAt = t?.expiresAt;
     }
+
     seed();
     _timer = Timer.periodic(const Duration(seconds: 30), (_) async {
-      final t = await tokenStore.readTokens();
+      final t = await readTokens();
       if (t == null) return;
       if (t.accessToken != _lastAccess ||
           (_lastExpiresAt != null && t.expiresAt != _lastExpiresAt)) {
@@ -130,14 +141,18 @@ class SseConnectivityWatcher extends _$SseConnectivityWatcher {
       if (!online) {
         AppLog.w(LogTag.sse, () => '📵 connectivity lost');
         _wasOffline = true;
-        ref.read(sseConnectionStatusProvider.notifier).set(SseStatus.disconnected);
+        ref
+            .read(sseConnectionStatusProvider.notifier)
+            .set(SseStatus.disconnected);
         return;
       }
       if (_wasOffline) {
-        AppLog.w(LogTag.sse,
-            () => '📶 connectivity restored → reconnecting SSE');
+        AppLog.w(
+            LogTag.sse, () => '📶 connectivity restored → reconnecting SSE');
         _wasOffline = false;
-        ref.read(sseConnectionStatusProvider.notifier).set(SseStatus.reconnecting);
+        ref
+            .read(sseConnectionStatusProvider.notifier)
+            .set(SseStatus.reconnecting);
         ref.invalidate(sseEventsProvider);
       }
     });
@@ -180,7 +195,9 @@ class SseLifecycleWatcher extends _$SseLifecycleWatcher {
       onResumeAfterLongPause: () {
         AppLog.w(LogTag.sse,
             () => '⏰ app resumed after long pause → reconnecting SSE');
-        ref.read(sseConnectionStatusProvider.notifier).set(SseStatus.reconnecting);
+        ref
+            .read(sseConnectionStatusProvider.notifier)
+            .set(SseStatus.reconnecting);
         ref.invalidate(sseEventsProvider);
       },
     );

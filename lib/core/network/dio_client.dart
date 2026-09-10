@@ -195,7 +195,17 @@ class _AuthInterceptor extends Interceptor {
         options.headers['X-API-Key'] == null;
     if (accountId != null && !skipAuthHeader) {
       final store = _ref.read(secureTokenStoreProvider(accountId));
-      final tokens = await store.readTokens();
+      final TokenData? tokens;
+      try {
+        tokens = await store.readTokens();
+      } catch (e, stackTrace) {
+        handler.reject(DioException(
+          requestOptions: options,
+          error: e,
+          stackTrace: stackTrace,
+        ));
+        return;
+      }
       if (tokens != null) {
         options.headers['X-API-Key'] = tokens.accessToken;
       }
@@ -275,7 +285,17 @@ class _AuthInterceptor extends Interceptor {
           return;
         }
         final store = _ref.read(secureTokenStoreProvider(accountId));
-        final tokens = await store.readTokens();
+        final TokenData? tokens;
+        try {
+          tokens = await store.readTokens();
+        } catch (e, stackTrace) {
+          handler.reject(DioException(
+            requestOptions: err.requestOptions,
+            error: e,
+            stackTrace: stackTrace,
+          ));
+          return;
+        }
         if (tokens == null) {
           handler.next(err);
           return;

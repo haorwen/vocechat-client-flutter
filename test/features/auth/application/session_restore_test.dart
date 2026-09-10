@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vocechat_client/core/network/dio_client.dart';
 import 'package:vocechat_client/core/storage/account_store.dart';
@@ -34,6 +34,35 @@ const _renewed = {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('temporarily locked Keychain preserves account through cold start',
+      () async {
+    final fixture = await _Fixture.create((request) async => _json(_me));
+    fixture.tokens.readError = PlatformException(code: '-25308');
+
+    final state = await fixture.restore();
+    expect((state as AuthStateAuthenticated).user.name, 'Saved name');
+    expect(fixture.tokens.clearCount, 0);
+
+    fixture.tokens.readError = null;
+    await fixture.controller.bootstrap();
+    expect(fixture.container.read(authControllerProvider).requireValue,
+        isA<AuthStateAuthenticated>());
+  });
+
+  test('Keychain read failure rejects requests promptly without sending them',
+      () async {
+    var requests = 0;
+    final fixture = await _Fixture.create((request) async {
+      requests++;
+      return _json(_me);
+    });
+    fixture.tokens.readError = PlatformException(code: '-25308');
+
+    await expectLater(AuthApi(fixture.dio).me(), throwsA(isA<DioException>()));
+    expect(requests, 0);
+    expect(fixture.tokens.clearCount, 0);
+  });
 
   test('cold start retries connection timeouts before restoring the session',
       () async {
@@ -305,10 +334,14 @@ class _MemoryTokenStore extends SecureTokenStore {
   }
 
   TokenData? tokens;
+  Object? readError;
   int clearCount = 0;
 
   @override
-  Future<TokenData?> readTokens() async => tokens;
+  Future<TokenData?> readTokens() async {
+    if (readError != null) throw readError!;
+    return tokens;
+  }
 
   @override
   Future<void> saveTokens({

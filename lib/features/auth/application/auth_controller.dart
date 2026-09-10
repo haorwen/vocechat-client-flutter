@@ -129,17 +129,17 @@ class AuthController extends _$AuthController {
     }
 
     final tokenStore = ref.read(secureTokenStoreProvider(account.accountId));
-    final tokens = await tokenStore.readTokens();
-    AppLog.d(
-      LogTag.auth,
-      () =>
-          '🟦 bootstrap: tokens=${tokens == null ? "null" : "ok expires=${tokens.expiresAt}"}',
-    );
-    if (tokens == null) return const AuthState.unauthenticated();
-
-    final api = ref.read(authApiProvider);
-
     try {
+      final tokens = await tokenStore.readTokens();
+      AppLog.d(
+        LogTag.auth,
+        () =>
+            '🟦 bootstrap: tokens=${tokens == null ? "null" : "ok expires=${tokens.expiresAt}"}',
+      );
+      if (tokens == null) return const AuthState.unauthenticated();
+
+      final api = ref.read(authApiProvider);
+
       // Keep renewal failures distinguishable from rejected credentials. A
       // phone may still be reconnecting to Wi-Fi when the process restarts.
       if (tokens.expiresAt.isBefore(
@@ -249,7 +249,13 @@ class AuthController extends _$AuthController {
     final account = _currentAccount();
     if (account == null) return false;
     final tokenStore = ref.read(secureTokenStoreProvider(account.accountId));
-    final tokens = await tokenStore.readTokens();
+    final TokenData? tokens;
+    try {
+      tokens = await tokenStore.readTokens();
+    } catch (e) {
+      AppLog.d(LogTag.token, () => 'token renewal deferred: $e');
+      return false;
+    }
     if (tokens == null) return false;
     return _tryRefresh(
         ref.read(authApiProvider), tokenStore, tokens.refreshToken);
