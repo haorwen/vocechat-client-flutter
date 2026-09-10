@@ -405,7 +405,7 @@ class AuthController extends _$AuthController {
     await serverStore.selectServer(responseServerId);
   }
 
-  /// Login with email + password (MD5-hashed internally).
+  /// Login with email + password, including the web credential fallback.
   ///
   /// [serverUrl], when provided, targets that server instead of the
   /// currently-configured one — used by the account-switcher's "Add
@@ -462,15 +462,12 @@ class AuthController extends _$AuthController {
             : AuthApi(VoceDioClient(baseUrl: targetBaseUrl, ref: ref).dio);
 
         final deviceToken = await getFcmDeviceToken();
-        final request = LoginRequest(
-          credential: Credential.password(
-            email: email,
-            password: AuthApi.hashPassword(password),
-          ),
+        final response = await api.loginWithPassword(
+          email: email,
+          password: password,
           device: 'flutter',
           deviceToken: deviceToken.isEmpty ? null : deviceToken,
         );
-        final response = await api.login(request);
 
         // The login response is a second identity signal. The organization
         // probe normally catches this earlier, but checking here also covers

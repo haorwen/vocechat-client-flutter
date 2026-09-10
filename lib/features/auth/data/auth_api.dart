@@ -15,7 +15,7 @@ class AuthApi {
 
   final Dio _dio;
 
-  /// Hash password with MD5 hex per server contract.
+  /// MD5 hex used by the server's hashed-password compatibility path.
   static String hashPassword(String raw) {
     final bytes = utf8.encode(raw);
     return md5.convert(bytes).toString();
@@ -31,6 +31,35 @@ class AuthApi {
       options: Options(extra: {kSkipRefreshOn401: true}),
     );
     return AuthResponse.fromJson(resp.data as Map<String, dynamic>);
+  }
+
+  /// Try the app's MD5 credential first, then the web client's original
+  /// password representation only when the login endpoint rejects it.
+  /// Some stored credentials pass the server's direct comparison but not
+  /// its hash comparison. Neither representation should be logged.
+  Future<AuthResponse> loginWithPassword({
+    required String email,
+    required String password,
+    required String device,
+    String? deviceToken,
+  }) async {
+    final request = LoginRequest(
+      credential: Credential.password(
+        email: email,
+        password: hashPassword(password),
+      ),
+      device: device,
+      deviceToken: deviceToken,
+    );
+    try {
+      return await login(request);
+    } on DioException catch (error) {
+      if (error.response?.statusCode != 401) rethrow;
+    }
+
+    return login(request.copyWith(
+      credential: Credential.password(email: email, password: password),
+    ));
   }
 
   Future<AuthResponse> register({
