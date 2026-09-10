@@ -14,6 +14,7 @@ import '../../../core/utils/app_log.dart';
 import '../../../features/auth/application/auth_controller.dart';
 import 'burn_after_read_provider.dart';
 import '../data/message_api.dart';
+import '../data/attachment_preparer.dart';
 import '../data/message_cache.dart';
 import '../domain/message_models.dart';
 import '../domain/message_status.dart';
@@ -36,7 +37,16 @@ class ChatController extends _$ChatController {
   // Track this account's rows separately so a new cache cannot merge them.
   List<ChatMessage>? _messages;
 
+  // A local row follows the latest server mid known when it was inserted.
+  // New confirmed messages can then pass it without relying on device clocks.
+  final Map<int, int> _localOrderAnchors = {};
+
   void _publish(List<ChatMessage> messages) {
+    final latestMid =
+        messages.fold<int>(0, (mid, m) => m.mid > mid ? m.mid : mid);
+    for (final m in messages.where((m) => m.mid < 0)) {
+      _localOrderAnchors.putIfAbsent(m.mid, () => latestMid);
+    }
     _messages = messages;
     state = AsyncData(messages);
   }
@@ -54,7 +64,7 @@ class ChatController extends _$ChatController {
     _expiryTimer?.cancel();
     int? earliest;
     for (final message in messages ?? const <ChatMessage>[]) {
-      final deadline = message.expiresAt;
+      final deadline = _expiryDeadline(message);
       if (deadline != null && (earliest == null || deadline < earliest)) {
         earliest = deadline;
       }
@@ -79,16 +89,21 @@ class ChatController extends _$ChatController {
   List<ChatMessage> _withoutExpired(List<ChatMessage> messages) {
     final now = DateTime.now().millisecondsSinceEpoch;
     return messages.where((m) {
-      if (!m.isExpiredAt(now)) return true;
+      final deadline = _expiryDeadline(m);
+      if (deadline == null || deadline > now) return true;
       _seenMids.remove(m.mid);
       _statuses.remove(m.mid);
       _localAttachments.remove(m.mid);
       _pendingFiles.remove(m.mid);
       _progress.remove(m.mid);
+      _localOrderAnchors.remove(m.mid);
       _cache?.deleteMid(target, m.mid);
       return false;
     }).toList();
   }
+
+  int? _expiryDeadline(ChatMessage message) => message.expiryDeadline(
+      includeUnsent: _statuses[message.mid] == MessageSendStatus.failed);
 
   /// UI-only send status keyed by mid (negative for optimistic, then real mid).
   final Map<int, MessageSendStatus> _statuses = {};
@@ -246,6 +261,7 @@ class ChatController extends _$ChatController {
         if (idx >= 0) {
           final placeholder = updated[idx];
           final placeholderMid = placeholder.mid;
+          _acknowledgeOrder(placeholder, m.mid, updated);
           updated[idx] = m;
           if (placeholderMid < 0) {
             _statuses.remove(placeholderMid);
@@ -338,6 +354,7 @@ class ChatController extends _$ChatController {
     _localAttachments.clear();
     _pendingFiles.clear();
     _progress.clear();
+    _localOrderAnchors.clear();
     listenSelf((_, next) => _scheduleExpiry(next.valueOrNull));
     final lifecycle = AppLifecycleListener(onResume: _expireMessages);
     ref.onDispose(() {
@@ -474,7 +491,10 @@ class ChatController extends _$ChatController {
   /// Treats a 404 as already-deleted (still removes locally).
   Future<void> deleteMessage(int mid) async {
     final generation = _generation;
-    if (mid <= 0) return;
+    if (mid <= 0) {
+      if (_statuses[mid] == MessageSendStatus.failed) applyDeleteEcho(mid);
+      return;
+    }
     try {
       await ref.read(messageApiProvider).deleteMessage(mid);
     } on DioException catch (e) {
@@ -535,9 +555,7 @@ class ChatController extends _$ChatController {
               mid: realMid, createdAt: DateTime.now().millisecondsSinceEpoch));
     } catch (_) {
       if (generation != _generation) return;
-      _statuses[tempMid] = MessageSendStatus.failed;
-      final snapshot = _messages;
-      if (snapshot != null) _publish(List.from(snapshot));
+      _markSendFailed(tempMid);
       rethrow;
     }
   }
@@ -573,6 +591,10 @@ class ChatController extends _$ChatController {
     _publish(updated);
     _seenMids.remove(targetMid);
     _statuses.remove(targetMid);
+    _localAttachments.remove(targetMid);
+    _pendingFiles.remove(targetMid);
+    _progress.remove(targetMid);
+    _localOrderAnchors.remove(targetMid);
     _persist(updated);
     _cache?.deleteMid(target, targetMid);
   }
@@ -603,19 +625,31 @@ class ChatController extends _$ChatController {
   ///     descending. `mid` is the server's monotonic sequence and the
   ///     authoritative order — it matches the cache layer's `ORDER BY mid DESC`
   ///     and is immune to clock skew between `created_at` values.
-  ///   - Optimistic rows (negative temp `mid`, not yet acked) always sit at the
-  ///     very top (they're the just-sent messages) and tie-break among
-  ///     themselves by `createdAt` descending.
-  /// The sort is stable, so equal keys keep their relative input order.
+  ///   - Active sends remain at the newest end. Failed rows sit immediately
+  ///     after the server mid known at insertion, below later server messages.
   List<ChatMessage> _sortedNewestFirst(List<ChatMessage> input) {
     final out = _withoutExpired(input);
     out.sort((a, b) {
       final aOptimistic = a.mid < 0;
       final bOptimistic = b.mid < 0;
-      if (aOptimistic && bOptimistic) {
-        return b.createdAt.compareTo(a.createdAt);
+      final aSending =
+          aOptimistic && _statuses[a.mid] != MessageSendStatus.failed;
+      final bSending =
+          bOptimistic && _statuses[b.mid] != MessageSendStatus.failed;
+      if (aSending != bSending) return aSending ? -1 : 1;
+      if (aSending && bSending) {
+        final time = b.createdAt.compareTo(a.createdAt);
+        return time != 0 ? time : a.mid.compareTo(b.mid);
       }
-      // Optimistic (unsent) rows always rank above confirmed ones.
+      final aOrder = aOptimistic ? (_localOrderAnchors[a.mid] ?? 0) : a.mid;
+      final bOrder = bOptimistic ? (_localOrderAnchors[b.mid] ?? 0) : b.mid;
+      final order = bOrder.compareTo(aOrder);
+      if (order != 0) return order;
+      if (aOptimistic && bOptimistic) {
+        final time = b.createdAt.compareTo(a.createdAt);
+        return time != 0 ? time : a.mid.compareTo(b.mid);
+      }
+      // A local send follows its anchor, before the next server message.
       if (aOptimistic) return -1;
       if (bOptimistic) return 1;
       return b.mid.compareTo(a.mid);
@@ -623,11 +657,28 @@ class ChatController extends _$ChatController {
     return out;
   }
 
+  void _acknowledgeOrder(
+      ChatMessage placeholder, int realMid, List<ChatMessage> rows) {
+    for (final row in rows) {
+      if (row.mid < 0 &&
+          row.mid != placeholder.mid &&
+          (row.createdAt > placeholder.createdAt ||
+              (row.createdAt == placeholder.createdAt &&
+                  row.mid < placeholder.mid))) {
+        final anchor = _localOrderAnchors[row.mid] ?? 0;
+        if (realMid > anchor) _localOrderAnchors[row.mid] = realMid;
+      }
+    }
+    _localOrderAnchors.remove(placeholder.mid);
+  }
+
   void _confirmSent(int tempMid, ChatMessage confirmed) {
     _statuses.remove(tempMid);
     _statuses[confirmed.mid] = MessageSendStatus.sent;
     final current = _messages ?? const <ChatMessage>[];
     if (!current.any((m) => m.mid == tempMid)) return;
+    _acknowledgeOrder(
+        current.firstWhere((m) => m.mid == tempMid), confirmed.mid, current);
     // History or SSE may already carry the authoritative row. Preserve it,
     // remove the placeholder, and sort by server mid after HTTP confirmation.
     final rows = current.where((m) => m.mid != tempMid).toList();
@@ -719,10 +770,7 @@ class ChatController extends _$ChatController {
               mid: realMid, createdAt: DateTime.now().millisecondsSinceEpoch));
     } catch (_) {
       if (generation != _generation) return;
-      _statuses[tempMid] = MessageSendStatus.failed;
-      // Notify listeners that statuses changed (state value unchanged).
-      final snapshot = _messages;
-      if (snapshot != null) _publish(List.from(snapshot));
+      _markSendFailed(tempMid);
     }
   }
 
@@ -741,6 +789,13 @@ class ChatController extends _$ChatController {
     // local_id doubles as the dedup key the server echoes back via X-Properties
     // (see _findOptimisticMatch). Use a stable positive int.
     final localId = -tempMid;
+
+    final prepared = await AttachmentPreparer.prepare(
+        bytes: bytes, filename: filename, contentType: contentType);
+    if (generation != _generation) return;
+    bytes = prepared.bytes;
+    filename = prepared.filename;
+    contentType = prepared.contentType;
 
     // Always resolve a concrete content_type: the optimistic row renders by
     // properties['content_type'], and a missing/empty value makes _isImage()
@@ -862,11 +917,19 @@ class ChatController extends _$ChatController {
       _progress.remove(tempMid);
     } catch (_) {
       if (generation != _generation) return;
-      _statuses[tempMid] = MessageSendStatus.failed;
-      _progress.remove(tempMid);
-      final snapshot = _messages;
-      if (snapshot != null) _publish(List.from(snapshot));
+      _markSendFailed(tempMid);
     }
+  }
+
+  void _markSendFailed(int tempMid) {
+    final snapshot = _messages;
+    // An SSE acknowledgement may already have replaced this placeholder.
+    if (snapshot == null || !snapshot.any((m) => m.mid == tempMid)) return;
+    _statuses[tempMid] = MessageSendStatus.failed;
+    _progress.remove(tempMid);
+    final next = _sortedNewestFirst(snapshot);
+    _publish(next);
+    _persist(next);
   }
 
   static Map<String, dynamic>? _propertiesOf(ChatMessage m) {
@@ -897,6 +960,7 @@ class ChatController extends _$ChatController {
   /// Retry a previously failed send identified by [tempMid].
   Future<void> retrySend(int tempMid) async {
     final generation = _generation;
+    if (_statuses[tempMid] != MessageSendStatus.failed) return;
     // File retry: re-run the upload from the cached bytes.
     final pendingFile = _pendingFiles[tempMid];
     if (pendingFile != null) {
@@ -945,9 +1009,7 @@ class ChatController extends _$ChatController {
               mid: realMid, createdAt: DateTime.now().millisecondsSinceEpoch));
     } catch (_) {
       if (generation != _generation) return;
-      _statuses[tempMid] = MessageSendStatus.failed;
-      final snapshot2 = _messages;
-      if (snapshot2 != null) _publish(List.from(snapshot2));
+      _markSendFailed(tempMid);
     }
   }
 

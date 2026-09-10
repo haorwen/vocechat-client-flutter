@@ -181,14 +181,20 @@ class ChatMessage with _$ChatMessage {
       _$ChatMessageFromJson(json);
 
   /// Absolute expiry, matching the server/web send-time based contract.
-  /// Pending/failed optimistic rows do not expire before they are sent.
-  int? get expiresAt {
+  /// Pending optimistic rows do not expire before they are sent.
+  int? get expiresAt => expiryDeadline();
+
+  /// Failed local sends may be cleaned up using their attempted send time.
+  /// Active uploads keep their bytes until completion or failure.
+  int? expiryDeadline({bool includeUnsent = false}) {
     final seconds = switch (detail) {
       NormalMessageDetail(:final expiresIn) => expiresIn,
       ReplyMessageDetail(:final expiresIn) => expiresIn,
       _ => null,
     };
-    if (mid <= 0 || seconds == null || seconds <= 0) return null;
+    if ((!includeUnsent && mid <= 0) || seconds == null || seconds <= 0) {
+      return null;
+    }
     return createdAt + seconds * 1000;
   }
 

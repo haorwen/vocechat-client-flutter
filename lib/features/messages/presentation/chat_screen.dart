@@ -1705,10 +1705,9 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         final notifier =
             ref.read(chatControllerProvider(widget.target).notifier);
         final isSending = widget.status == MessageSendStatus.sending;
-        // Only preview from local memory while the upload is in flight. Once
-        // confirmed/failed the row falls back to the network-backed bubble so
-        // a sent image looks and behaves exactly like a received one.
-        final localBytes = isSending ? notifier.localBytesFor(msg.mid) : null;
+        // Failed uploads still have only a local path. Keep their preview
+        // until confirmation instead of requesting a nonexistent resource.
+        final localBytes = notifier.localBytesFor(msg.mid);
         content = FileMessageContent(
           content: displayContent,
           properties: props,
@@ -2001,7 +2000,9 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                           alignment: Alignment.centerRight,
                           child: MessageExpiryCountdown(
                             durationSeconds: expiresIn,
-                            expiresAt: msg.expiresAt,
+                            expiresAt: msg.expiryDeadline(
+                                includeUnsent:
+                                    widget.status == MessageSendStatus.failed),
                           ),
                         ),
                       ),
@@ -2051,7 +2052,8 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                     : null,
                 onFavoriteTap:
                     widget.message.mid > 0 ? () => _favorite() : null,
-                onMoreTap: widget.message.mid > 0
+                onMoreTap: widget.message.mid > 0 ||
+                        widget.status == MessageSendStatus.failed
                     ? () => _openContextMenuAtToolbar()
                     : null,
               ),
@@ -2060,8 +2062,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
       ),
     );
 
-    // Optimistic / failed rows can't be acted on yet.
-    if (widget.message.mid > 0) {
+    if (widget.message.mid > 0 || widget.status == MessageSendStatus.failed) {
       row = GestureDetector(
         behavior: HitTestBehavior.opaque,
         onLongPressStart: (details) => _openContextMenu(details.globalPosition),
@@ -2153,6 +2154,19 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
 
   Future<void> _openContextMenu(Offset globalPos) async {
     final l = AppL10n.of(context);
+    if (widget.message.mid < 0) {
+      if (widget.status != MessageSendStatus.failed) return;
+      final selection = await showVoceContextMenu(
+        context: context,
+        globalPos: globalPos,
+        items: [
+          VoceContextMenuItem('delete', l.chatActionDelete,
+              icon: Icons.delete_outline, danger: true)
+        ],
+      );
+      if (mounted && selection == 'delete') widget.onDelete?.call();
+      return;
+    }
     final isChannel = widget.target.map<bool>(
       user: (_) => false,
       group: (_) => true,

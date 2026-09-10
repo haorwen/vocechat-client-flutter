@@ -90,6 +90,10 @@ class FileMessageContent extends ConsumerWidget {
       );
     }
 
+    // Local files (including failed uploads) have no downloadable resource.
+    if (parsed.path.startsWith('local:')) {
+      return _FileCard(meta: parsed, urls: null);
+    }
     final urls = _buildResourceUrls(ref, parsed.path);
     if (urls == null) {
       return _FileCard(meta: parsed, urls: null);

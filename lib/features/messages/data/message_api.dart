@@ -9,6 +9,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../domain/message_models.dart';
+import 'attachment_preparer.dart';
 
 part 'message_api.g.dart';
 
@@ -136,10 +137,15 @@ class MessageApi {
     int? localId,
     void Function(int sent, int total)? onSendProgress,
   }) async {
+    final prepared = await AttachmentPreparer.prepare(
+        bytes: bytes, filename: filename, contentType: contentType);
+    bytes = prepared.bytes;
+    filename = prepared.filename;
     final resolvedType =
-        contentType ?? _inferContentType(filename, bytes: bytes);
+        prepared.contentType ?? _inferContentType(filename, bytes: bytes);
 
-    filename = resolveFilename(filename, bytes: bytes, contentType: resolvedType);
+    filename =
+        resolveFilename(filename, bytes: bytes, contentType: resolvedType);
 
     // Step 1: prepare
     // Server contract: POST /api/resource/file/prepare returns the file_id as a
@@ -315,7 +321,8 @@ class MessageApi {
       data: {'mid_list': mids},
     );
     final data = resp.data;
-    final path = data is String ? data : (data is Map ? data['id'] as String? : null);
+    final path =
+        data is String ? data : (data is Map ? data['id'] as String? : null);
     if (path == null || path.isEmpty) {
       throw StateError('createArchive returned no path: $data');
     }
@@ -412,11 +419,10 @@ class MessageApi {
   }) {
     if (filename != null && filename.trim().isNotEmpty) return filename;
     final type = contentType?.split(';').first.trim().toLowerCase();
-    final resolvedType = type == null ||
-            type.isEmpty ||
-            type == 'application/octet-stream'
-        ? _inferContentType('', bytes: bytes)
-        : type;
+    final resolvedType =
+        type == null || type.isEmpty || type == 'application/octet-stream'
+            ? _inferContentType('', bytes: bytes)
+            : type;
     final prefix = resolvedType.startsWith('image/') ? 'image' : 'file';
     final extension = resolvedType == 'image/jpeg'
         ? 'jpg'
@@ -425,7 +431,8 @@ class MessageApi {
   }
 
   static String _inferContentType(String filename, {Uint8List? bytes}) {
-    final ext = filename.contains('.') ? filename.split('.').last.toLowerCase() : '';
+    final ext =
+        filename.contains('.') ? filename.split('.').last.toLowerCase() : '';
     const map = {
       'jpg': 'image/jpeg',
       'jpeg': 'image/jpeg',
