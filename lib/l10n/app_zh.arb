@@ -144,6 +144,7 @@
   "storageCacheCleared": "缓存已清除",
 
   "aboutAppVersion": "应用版本",
+  "aboutServerVersion": "服务端版本",
   "aboutWebsite": "官网",
   "aboutReportBug": "反馈问题",
   "aboutReportBugSubtitle": "帮助我们改进 VoceChat。",

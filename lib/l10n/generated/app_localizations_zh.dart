@@ -415,6 +415,9 @@ class AppL10nZh extends AppL10n {
   String get aboutAppVersion => '应用版本';
 
   @override
+  String get aboutServerVersion => '服务端版本';
+
+  @override
   String get aboutWebsite => '官网';
 
   @override

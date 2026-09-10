@@ -127,6 +127,7 @@
   "storageCacheCleared": "キャッシュを削除しました",
 
   "aboutAppVersion": "アプリのバージョン",
+  "aboutServerVersion": "サーバーのバージョン",
   "aboutWebsite": "ウェブサイト",
   "aboutReportBug": "不具合を報告",
   "aboutReportBugSubtitle": "VoceChat の改善にご協力ください。",

@@ -20,6 +20,7 @@ import '../../auth/presentation/account_switcher_sheet.dart';
 import '../../channels/application/conversation_providers.dart';
 import '../../messages/data/message_cache.dart';
 import '../application/app_info_provider.dart';
+import '../application/server_version_provider.dart';
 import '../data/user_api.dart';
 import 'avo_settings_screen.dart';
 
@@ -42,6 +43,7 @@ void _showFeatureUnavailable(BuildContext context) {
 
 enum _SettingsNav {
   myAccount('general'),
+  avo('general'),
   notifications('general'),
   appearance('general'),
   storage('general'),
@@ -52,6 +54,7 @@ enum _SettingsNav {
 
   String title(AppL10n l) => switch (this) {
         _SettingsNav.myAccount => l.settingsMyAccount,
+        _SettingsNav.avo => 'AVO',
         _SettingsNav.notifications => l.settingsNotifications,
         _SettingsNav.appearance => l.settingsAppearance,
         _SettingsNav.storage => l.settingsStorage,
@@ -287,6 +290,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           email: userEmail,
           uid: userUid,
           avatarUpdatedAt: avatarUpdatedAt,
+        );
+      case _SettingsNav.avo:
+        content = ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 512),
+          child: const AvoSettingsCard(),
         );
       case _SettingsNav.notifications:
         content = _NotificationsPane(
@@ -956,8 +964,6 @@ class _MyAccountPaneState extends ConsumerState<_MyAccountPane> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         accountCard,
-        const SizedBox(height: 24),
-        const AvoSettingsCard(),
         if (widget.uid != 1) ...[
           const SizedBox(height: 24),
           FilledButton.icon(
@@ -1423,6 +1429,7 @@ class _AboutPane extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = AppL10n.of(context);
     final infoAsync = ref.watch(appPackageInfoProvider);
+    final serverVersionAsync = ref.watch(serverVersionProvider);
     final version = infoAsync.maybeWhen(
       data: (info) => info.buildNumber.isEmpty
           ? info.version
@@ -1434,6 +1441,15 @@ class _AboutPane extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _LabeledRow(label: l.aboutAppVersion, value: version),
+          _LabeledRow(
+            label: l.aboutServerVersion,
+            value: serverVersionAsync.when(
+              skipLoadingOnReload: false,
+              data: (version) => version,
+              loading: () => '…',
+              error: (_, __) => '—',
+            ),
+          ),
           _LabeledRow(
             label: l.aboutWebsite,
             value: 'voce.chat',

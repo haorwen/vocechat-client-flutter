@@ -170,6 +170,7 @@
   "storageCacheCleared": "Cache cleared",
 
   "aboutAppVersion": "App version",
+  "aboutServerVersion": "Server version",
   "aboutWebsite": "Website",
   "aboutReportBug": "Report a bug",
   "aboutReportBugSubtitle": "Help us improve VoceChat.",

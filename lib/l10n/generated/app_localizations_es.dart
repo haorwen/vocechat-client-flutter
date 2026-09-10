@@ -415,6 +415,9 @@ class AppL10nEs extends AppL10n {
   String get aboutAppVersion => 'Versión de la app';
 
   @override
+  String get aboutServerVersion => 'Versión del servidor';
+
+  @override
   String get aboutWebsite => 'Sitio web';
 
   @override

@@ -415,6 +415,9 @@ class AppL10nJa extends AppL10n {
   String get aboutAppVersion => 'アプリのバージョン';
 
   @override
+  String get aboutServerVersion => 'サーバーのバージョン';
+
+  @override
   String get aboutWebsite => 'ウェブサイト';
 
   @override

@@ -415,6 +415,9 @@ class AppL10nKo extends AppL10n {
   String get aboutAppVersion => '앱 버전';
 
   @override
+  String get aboutServerVersion => '서버 버전';
+
+  @override
   String get aboutWebsite => '웹사이트';
 
   @override

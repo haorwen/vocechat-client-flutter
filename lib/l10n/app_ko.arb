@@ -127,6 +127,7 @@
   "storageCacheCleared": "캐시가 지워졌습니다",
 
   "aboutAppVersion": "앱 버전",
+  "aboutServerVersion": "서버 버전",
   "aboutWebsite": "웹사이트",
   "aboutReportBug": "버그 신고",
   "aboutReportBugSubtitle": "VoceChat을 개선하는 데 도움을 주세요.",

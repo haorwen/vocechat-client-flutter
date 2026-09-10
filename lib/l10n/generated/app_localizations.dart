@@ -899,6 +899,12 @@ abstract class AppL10n {
   /// **'App version'**
   String get aboutAppVersion;
 
+  /// No description provided for @aboutServerVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Server version'**
+  String get aboutServerVersion;
+
   /// No description provided for @aboutWebsite.
   ///
   /// In en, this message translates to:

@@ -415,6 +415,9 @@ class AppL10nPt extends AppL10n {
   String get aboutAppVersion => 'Versão do aplicativo';
 
   @override
+  String get aboutServerVersion => 'Versão do servidor';
+
+  @override
   String get aboutWebsite => 'Site';
 
   @override

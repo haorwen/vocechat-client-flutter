@@ -415,6 +415,9 @@ class AppL10nRu extends AppL10n {
   String get aboutAppVersion => 'Версия приложения';
 
   @override
+  String get aboutServerVersion => 'Версия сервера';
+
+  @override
   String get aboutWebsite => 'Веб-сайт';
 
   @override
