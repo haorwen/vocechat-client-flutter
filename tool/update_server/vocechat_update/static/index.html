@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VoceChat · 版本发布</title>
+  <link rel="stylesheet" href="/admin/app.css">
+  <script src="/admin/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="/admin/"><span class="logo">v</span> VoceChat <span class="brand-sub">更新管理</span></a><span class="platform">● Android</span></header>
+  <main>
+    <div class="heading"><div><p class="eyebrow">RELEASE CONSOLE</p><h1>让下一次启动，焕然一新。</h1><p class="muted">管理 Android 版本、更新策略与双语公告。</p></div><button id="refresh" class="button secondary" type="button">刷新当前版本</button></div>
+    <div id="status" class="status" role="status" aria-live="polite" hidden></div>
+    <section class="overview" aria-label="当前发布信息">
+      <div><span class="label">当前版本</span><strong id="current-version">—</strong><span id="current-code" class="muted">正在连接服务器</span></div>
+      <div><span class="label">本次更新策略</span><strong id="current-policy">—</strong><span class="muted">历史强制要求会持续保留</span></div>
+      <div><span class="label">最近强制构建号</span><strong id="current-floor">—</strong><span class="muted">低于此构建号仍需强制升级</span></div>
+    </section>
+    <div class="workspace">
+      <form id="release-form">
+        <section class="card"><div class="section-title"><span class="step">01</span><div><h2>发布新版本</h2><p>先上传可下载的 APK，再发布版本信息。</p></div></div>
+          <div class="two-col"><label>版本号 <span class="required">*</span><input id="version" name="version" placeholder="例如 0.3.24" required maxlength="120" autocomplete="off"></label><label>构建号 <span class="required">*</span><input id="version-code" name="version-code" type="number" min="1" max="2100000000" step="1" placeholder="例如 24" required><small>必须与 APK 的 versionCode 一致并递增。</small></label></div>
+          <label>下载地址 <span class="required">*</span><input id="update-url" name="update-url" type="url" placeholder="https://update.voce.chat/downloads/vocechat-0.3.24.apk" required><small>请填写返回 APK 文件的 HTTPS 直链，链接后缀不限，支持签名参数。本页面不上传安装包。</small></label>
+          <label class="toggle-row"><span><b>设为强制更新</b><small>低于本次构建号的客户端必须升级，可应急跳过 3 次，每次 24 小时。</small></span><input id="force-update" name="force-update" type="checkbox" role="switch"></label>
+          <p id="policy-hint" class="note">普通更新保留历史强制要求，符合条件的客户端可以跳过此版本。</p>
+        </section>
+        <section class="card"><div class="section-title"><span class="step">02</span><div><h2>更新公告 <span class="optional">可选</span></h2><p>中文界面显示中文，其他界面语言显示英文。</p></div></div>
+          <div class="two-col"><label>中文公告<textarea id="announcement-zh" name="announcement-zh" rows="7" placeholder="本次更新：&#10;1. 修复已知问题&#10;2. 优化聊天体验"></textarea></label><label>English announcement<textarea id="announcement-en" name="announcement-en" rows="7" placeholder="What's new:&#10;1. Bug fixes&#10;2. Improved chat experience"></textarea></label></div>
+          <p class="muted compact">支持纯文本换行；单侧为空时回退至另一种语言，两侧都为空则不展示公告。</p>
+          <details><summary>扩展字段</summary><label class="details-label">额外 JSON 对象<textarea id="extra-fields" name="extra-fields" rows="4" spellcheck="false" placeholder='{"file_size": 12345678}'></textarea><small>可添加未来字段，不能覆盖版本、公告、时间戳和历史强制构建号。</small></label></details>
+        </section>
+        <section class="card"><div class="section-title"><span class="step">03</span><div><h2>确认并发布</h2><p>发布成功后，客户端在下一次冷启动检查时获取新版本。</p></div></div>
+          <label>管理员令牌 <span class="required">*</span><input id="admin-token" type="password" placeholder="输入服务器的管理员令牌" required autocomplete="off" spellcheck="false"><small>首次启动生成于服务器 data/admin-token.txt，仅在本页面内存中使用。</small></label>
+          <div class="publish-row"><p class="muted compact">发布记录不可修改。请核对构建号、下载地址和公告。</p><button id="review-button" class="button primary" type="submit">预览并发布 <span aria-hidden="true">↗</span></button></div>
+        </section>
+      </form>
+      <aside>
+        <section class="card preview"><p class="eyebrow">CLIENT PREVIEW</p><h2 id="preview-title">发现新版本</h2><span id="preview-policy" class="pill">普通更新</span><div class="tabs" role="group" aria-label="公告预览语言"><button type="button" id="preview-zh" class="active" aria-pressed="true">中文</button><button type="button" id="preview-en" aria-pressed="false">English</button></div><p id="preview-announcement" class="announcement">填写公告后在这里预览。</p><div class="preview-actions"><span id="preview-skip">跳过此版本</span><b>下载更新</b></div><p class="muted compact">实际提示取决于客户端已安装的构建号及剩余应急次数。</p></section>
+        <section class="help"><h3>发布如何生效？</h3><ol><li>上传正式签名的 Android 安装包。</li><li>填写版本信息并提交发布。</li><li>客户端下次冷启动检查更新。</li></ol><p>发布不会唤醒或打断正在运行的客户端。</p><p>检查接口<br><code>/client/android</code></p><a href="/client/android" target="_blank" rel="noopener">查看服务器响应 ↗</a></section>
+      </aside>
+    </div>
+    <footer>VoceChat Update Service <span id="server-origin"></span></footer>
+  </main>
+  <dialog id="confirm-dialog"><div class="dialog-content"><p class="eyebrow">READY TO RELEASE</p><h2>确认发布此版本？</h2><p id="confirm-summary"></p><pre id="payload-preview"></pre><p id="publish-error" class="error" role="alert" hidden></p><div class="dialog-actions"><button type="button" id="cancel-publish" class="button secondary">返回修改</button><button type="button" id="confirm-publish" class="button primary">确认发布</button></div></div></dialog>
+</body>
+</html>

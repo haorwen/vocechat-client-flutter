@@ -1,0 +1,17 @@
+# Adjust User, WorkingDirectory and the absolute uv executable path.
+[Unit]
+Description=VoceChat Android Update Service
+After=network.target
+
+[Service]
+Type=simple
+User=vocechat
+WorkingDirectory=/opt/vocechat-update-server
+ExecStart=/usr/local/bin/uv run --locked --no-sync vocechat-update-server
+Environment=UPDATE_HOST=127.0.0.1
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

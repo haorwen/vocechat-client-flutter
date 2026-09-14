@@ -1144,4 +1144,72 @@ class AppL10nZh extends AppL10n {
 
   @override
   String get avoNextVariant => '换个造型';
+
+  @override
+  String appUpdateTitle(String version) {
+    return '发现新版本：$version';
+  }
+
+  @override
+  String get appUpdateRequired => '请安装此必要更新后继续使用 VoceChat。';
+
+  @override
+  String get appUpdateAvailable => 'VoceChat 有新版本可供更新。';
+
+  @override
+  String get appUpdateOpenFailed => '无法打开下载链接，请重试。';
+
+  @override
+  String get appUpdateLater => '稍后再说';
+
+  @override
+  String get appUpdateDownload => '下载更新';
+
+  @override
+  String get appUpdateSkipVersion => '跳过此版本';
+
+  @override
+  String appUpdateEmergencySkip(int remaining) {
+    return '应急跳过 1 天（剩余 $remaining 次）';
+  }
+
+  @override
+  String get appUpdateEmergencyHint => '应急情况下可跳过 3 次，每次 24 小时内不再提醒，重启应用后同样有效。';
+
+  @override
+  String get appUpdateSkipFailed => '无法保存更新偏好，暂时不能跳过，请重试或下载更新。';
+
+  @override
+  String appUpdateDownloading(int percent) {
+    return '正在下载… $percent%';
+  }
+
+  @override
+  String appUpdateDownloadingUnknown(String megabytes) {
+    return '正在下载… $megabytes MB';
+  }
+
+  @override
+  String get appUpdateCancelDownload => '取消下载';
+
+  @override
+  String get appUpdateInstall => '安装更新';
+
+  @override
+  String get appUpdateAllowInstall => '允许安装';
+
+  @override
+  String get appUpdateInstallPermission => '请在 Android 设置中允许 VoceChat 安装应用，返回后继续安装。';
+
+  @override
+  String get appUpdateInvalidApk => '下载的文件不是本应用的有效更新，请检查 APK 直链及构建号后重新下载。';
+
+  @override
+  String get appUpdateInstallerOpened => '请在 Android 系统安装界面确认安装。如果已取消，可点击“安装更新”重试。';
+
+  @override
+  String get appUpdateDownloadFailed => '下载失败，请检查网络和可用存储空间后重试。';
+
+  @override
+  String get appUpdateInstallFailed => '无法打开系统安装界面，请重试。';
 }

@@ -1,0 +1,12 @@
+services:
+  update:
+    build: .
+    restart: unless-stopped
+    environment:
+      UPDATE_ADMIN_TOKEN: ${UPDATE_ADMIN_TOKEN:-}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - releases:/data
+volumes:
+  releases:

@@ -1,0 +1,19 @@
+[project]
+name = "vocechat-update-server"
+version = "0.2.0"
+description = "Android release registry for update.voce.chat"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[project.scripts]
+vocechat-update-server = "vocechat_update.server:main"
+
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["vocechat_update*"]
+
+[tool.setuptools.package-data]
+vocechat_update = ["static/*.html", "static/*.css", "static/*.js"]

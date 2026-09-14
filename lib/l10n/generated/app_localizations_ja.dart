@@ -1144,4 +1144,72 @@ class AppL10nJa extends AppL10n {
 
   @override
   String get avoNextVariant => 'Next variant';
+
+  @override
+  String appUpdateTitle(String version) {
+    return 'Update available: $version';
+  }
+
+  @override
+  String get appUpdateRequired => 'Please install this required update to continue using VoceChat.';
+
+  @override
+  String get appUpdateAvailable => 'A new version of VoceChat is available.';
+
+  @override
+  String get appUpdateOpenFailed => 'Could not open the download link. Please try again.';
+
+  @override
+  String get appUpdateLater => 'Later';
+
+  @override
+  String get appUpdateDownload => 'Download update';
+
+  @override
+  String get appUpdateSkipVersion => 'Skip this version';
+
+  @override
+  String appUpdateEmergencySkip(int remaining) {
+    return 'Skip for 1 day ($remaining left)';
+  }
+
+  @override
+  String get appUpdateEmergencyHint => 'You can postpone a required update 3 times for emergencies. Each skip hides the reminder for 24 hours, including after restarting the app.';
+
+  @override
+  String get appUpdateSkipFailed => 'Could not save update preferences. Skipping is unavailable; please try again or download the update.';
+
+  @override
+  String appUpdateDownloading(int percent) {
+    return 'Downloading… $percent%';
+  }
+
+  @override
+  String appUpdateDownloadingUnknown(String megabytes) {
+    return 'Downloading… $megabytes MB';
+  }
+
+  @override
+  String get appUpdateCancelDownload => 'Cancel download';
+
+  @override
+  String get appUpdateInstall => 'Install update';
+
+  @override
+  String get appUpdateAllowInstall => 'Allow installation';
+
+  @override
+  String get appUpdateInstallPermission => 'Allow VoceChat to install apps in Android settings, then return to continue installation.';
+
+  @override
+  String get appUpdateInvalidApk => 'The downloaded file is not a valid update for this app. Check the APK download link and build number, then download again.';
+
+  @override
+  String get appUpdateInstallerOpened => 'Confirm installation in the Android installer. If you cancelled, tap Install update to try again.';
+
+  @override
+  String get appUpdateDownloadFailed => 'Download failed. Check your network and available storage, then try again.';
+
+  @override
+  String get appUpdateInstallFailed => 'Could not open the installer. Please try again.';
 }

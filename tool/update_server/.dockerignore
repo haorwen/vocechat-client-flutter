@@ -1,0 +1,9 @@
+*
+!server.py
+!Dockerfile
+!pyproject.toml
+!uv.lock
+!.python-version
+!vocechat_update/
+!vocechat_update/**
+**/__pycache__/

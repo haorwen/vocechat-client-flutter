@@ -498,5 +498,53 @@
       }
     }
   },
-  "avoNextVariant": "Next variant"
+  "avoNextVariant": "Next variant",
+  "appUpdateTitle": "Update available: {version}",
+  "@appUpdateTitle": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "appUpdateRequired": "Please install this required update to continue using VoceChat.",
+  "appUpdateAvailable": "A new version of VoceChat is available.",
+  "appUpdateOpenFailed": "Could not open the download link. Please try again.",
+  "appUpdateLater": "Later",
+  "appUpdateDownload": "Download update",
+  "appUpdateSkipVersion": "Skip this version",
+  "appUpdateEmergencySkip": "Skip for 1 day ({remaining} left)",
+  "@appUpdateEmergencySkip": {
+    "placeholders": {
+      "remaining": {
+        "type": "int"
+      }
+    }
+  },
+  "appUpdateEmergencyHint": "You can postpone a required update 3 times for emergencies. Each skip hides the reminder for 24 hours, including after restarting the app.",
+  "appUpdateSkipFailed": "Could not save update preferences. Skipping is unavailable; please try again or download the update.",
+  "appUpdateDownloading": "Downloading… {percent}%",
+  "@appUpdateDownloading": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "appUpdateDownloadingUnknown": "Downloading… {megabytes} MB",
+  "@appUpdateDownloadingUnknown": {
+    "placeholders": {
+      "megabytes": {
+        "type": "String"
+      }
+    }
+  },
+  "appUpdateCancelDownload": "Cancel download",
+  "appUpdateInstall": "Install update",
+  "appUpdateAllowInstall": "Allow installation",
+  "appUpdateInstallPermission": "Allow VoceChat to install apps in Android settings, then return to continue installation.",
+  "appUpdateInvalidApk": "The downloaded file is not a valid update for this app. Check the APK download link and build number, then download again.",
+  "appUpdateInstallerOpened": "Confirm installation in the Android installer. If you cancelled, tap Install update to try again.",
+  "appUpdateDownloadFailed": "Download failed. Check your network and available storage, then try again.",
+  "appUpdateInstallFailed": "Could not open the installer. Please try again."
 }

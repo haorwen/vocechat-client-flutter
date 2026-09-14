@@ -1,0 +1,8 @@
+__pycache__/
+data/
+.env
+.venv/
+config.toml
+build/
+dist/
+*.egg-info/

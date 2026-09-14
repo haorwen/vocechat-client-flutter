@@ -12,6 +12,7 @@ import 'package:vocechat_client/core/storage/media_cache.dart';
 import 'package:vocechat_client/core/storage/video_stream_cache.dart';
 import 'package:vocechat_client/core/theme/app_theme.dart';
 import 'package:vocechat_client/core/theme/theme_provider.dart';
+import 'package:vocechat_client/features/app_update/presentation/app_update_gate.dart';
 import 'package:vocechat_client/features/voice/presentation/voice_picture_in_picture_overlay.dart';
 import 'package:vocechat_client/firebase_options.dart';
 import 'package:vocechat_client/l10n/generated/app_localizations.dart';
@@ -135,10 +136,12 @@ class VoceChatApp extends ConsumerWidget {
           // catch taps on plain, non-interactive areas.
           behavior: HitTestBehavior.opaque,
           onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-          child: VoicePictureInPictureOverlay(
-            child: KeyedSubtree(
-              key: ValueKey(brightness),
-              child: child ?? const SizedBox.shrink(),
+          child: AppUpdateGate(
+            child: VoicePictureInPictureOverlay(
+              child: KeyedSubtree(
+                key: ValueKey(brightness),
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
           ),
         );

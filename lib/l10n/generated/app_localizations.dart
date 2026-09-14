@@ -2260,6 +2260,126 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Next variant'**
   String get avoNextVariant;
+
+  /// No description provided for @appUpdateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available: {version}'**
+  String appUpdateTitle(String version);
+
+  /// No description provided for @appUpdateRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please install this required update to continue using VoceChat.'**
+  String get appUpdateRequired;
+
+  /// No description provided for @appUpdateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'A new version of VoceChat is available.'**
+  String get appUpdateAvailable;
+
+  /// No description provided for @appUpdateOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the download link. Please try again.'**
+  String get appUpdateOpenFailed;
+
+  /// No description provided for @appUpdateLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get appUpdateLater;
+
+  /// No description provided for @appUpdateDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download update'**
+  String get appUpdateDownload;
+
+  /// No description provided for @appUpdateSkipVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip this version'**
+  String get appUpdateSkipVersion;
+
+  /// No description provided for @appUpdateEmergencySkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip for 1 day ({remaining} left)'**
+  String appUpdateEmergencySkip(int remaining);
+
+  /// No description provided for @appUpdateEmergencyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You can postpone a required update 3 times for emergencies. Each skip hides the reminder for 24 hours, including after restarting the app.'**
+  String get appUpdateEmergencyHint;
+
+  /// No description provided for @appUpdateSkipFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save update preferences. Skipping is unavailable; please try again or download the update.'**
+  String get appUpdateSkipFailed;
+
+  /// No description provided for @appUpdateDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading… {percent}%'**
+  String appUpdateDownloading(int percent);
+
+  /// No description provided for @appUpdateDownloadingUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading… {megabytes} MB'**
+  String appUpdateDownloadingUnknown(String megabytes);
+
+  /// No description provided for @appUpdateCancelDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel download'**
+  String get appUpdateCancelDownload;
+
+  /// No description provided for @appUpdateInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Install update'**
+  String get appUpdateInstall;
+
+  /// No description provided for @appUpdateAllowInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow installation'**
+  String get appUpdateAllowInstall;
+
+  /// No description provided for @appUpdateInstallPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow VoceChat to install apps in Android settings, then return to continue installation.'**
+  String get appUpdateInstallPermission;
+
+  /// No description provided for @appUpdateInvalidApk.
+  ///
+  /// In en, this message translates to:
+  /// **'The downloaded file is not a valid update for this app. Check the APK download link and build number, then download again.'**
+  String get appUpdateInvalidApk;
+
+  /// No description provided for @appUpdateInstallerOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm installation in the Android installer. If you cancelled, tap Install update to try again.'**
+  String get appUpdateInstallerOpened;
+
+  /// No description provided for @appUpdateDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed. Check your network and available storage, then try again.'**
+  String get appUpdateDownloadFailed;
+
+  /// No description provided for @appUpdateInstallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the installer. Please try again.'**
+  String get appUpdateInstallFailed;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
