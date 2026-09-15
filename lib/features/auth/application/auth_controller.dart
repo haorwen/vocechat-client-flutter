@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -15,6 +16,16 @@ import '../domain/auth_models.dart';
 
 part 'auth_controller.freezed.dart';
 part 'auth_controller.g.dart';
+
+enum AuthRestoreFailure {
+  missingAccount,
+  missingTokens,
+  rejected,
+  serverChanged
+}
+
+final authRestoreFailureProvider =
+    StateProvider<AuthRestoreFailure?>((ref) => null);
 
 // ---------------------------------------------------------------------------
 // AuthState (sealed)
@@ -114,7 +125,14 @@ class AuthController extends _$AuthController {
       LogTag.auth,
       () => '🟦 bootstrap: accountId=${account?.accountId}',
     );
-    if (account == null) return const AuthState.unauthenticated();
+    if (account == null) {
+      if (ref.read(accountStoreProvider).valueOrNull?.currentAccountId !=
+          null) {
+        ref.read(authRestoreFailureProvider.notifier).state =
+            AuthRestoreFailure.missingAccount;
+      }
+      return const AuthState.unauthenticated();
+    }
 
     // Keep the server store's currentServerId in sync with the account we're
     // bootstrapping against — both stores are always written together by
@@ -136,7 +154,11 @@ class AuthController extends _$AuthController {
         () =>
             '🟦 bootstrap: tokens=${tokens == null ? "null" : "ok expires=${tokens.expiresAt}"}',
       );
-      if (tokens == null) return const AuthState.unauthenticated();
+      if (tokens == null) {
+        ref.read(authRestoreFailureProvider.notifier).state =
+            AuthRestoreFailure.missingTokens;
+        return const AuthState.unauthenticated();
+      }
 
       final api = ref.read(authApiProvider);
 
@@ -153,10 +175,13 @@ class AuthController extends _$AuthController {
       final user = await api.me();
       AppLog.d(LogTag.auth, () => '🟦 bootstrap: me() ok uid=${user.uid}');
       await _syncAccountProfile(account, user);
+      ref.read(authRestoreFailureProvider.notifier).state = null;
       return AuthState.authenticated(user: user);
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
         await tokenStore.clear();
+        ref.read(authRestoreFailureProvider.notifier).state =
+            AuthRestoreFailure.rejected;
         return const AuthState.unauthenticated();
       }
       AppLog.w(LogTag.auth,
@@ -228,6 +253,8 @@ class AuthController extends _$AuthController {
       if (e.response?.statusCode == 401) {
         await tokenStore.clear();
         if (_currentAccount()?.accountId == tokenStore.id) {
+          ref.read(authRestoreFailureProvider.notifier).state =
+              AuthRestoreFailure.rejected;
           state = const AsyncData(AuthState.unauthenticated());
         }
       }
@@ -304,10 +331,23 @@ class AuthController extends _$AuthController {
             ),
           );
       final body = response.data;
-      final remoteId =
-          body is Map ? body['server_id']?.toString().trim() : null;
+      final value = body is Map ? body['server_id'] : null;
+      final remoteId = value is String ? value.trim() : null;
       // Old servers/databases may return null. Keep their existing behavior.
-      if (remoteId == null || remoteId.isEmpty || remoteId == config.id) {
+      if (remoteId == null || remoteId.isEmpty ||
+          remoteId == config.organizationServerId) {
+        return false;
+      }
+
+      // Older clients only saved LoginResponse.server_id as config.id. That
+      // ID comes from key.json; the public organization UUID comes from a
+      // separate database entry. Establish its own baseline on first read,
+      // including upgrades with an existing session. A cross-namespace
+      // mismatch is not evidence that the server was replaced. Bootstrap
+      // still validates the existing tokens normally after this probe.
+      if (config.organizationServerId == null) {
+        await ref.read(serverStoreProvider.notifier)
+            .setOrganizationServerId(config.id, remoteId);
         return false;
       }
 
@@ -342,6 +382,8 @@ class AuthController extends _$AuthController {
         await ref
             .read(accountStoreProvider.notifier)
             .removeAccountsForServer(config.id);
+        ref.read(authRestoreFailureProvider.notifier).state =
+            AuthRestoreFailure.serverChanged;
       } else if (oldRemembered != null) {
         // Remembered credentials belong to the old server identity too. Do
         // not carry them across an instance replacement, or the next login
@@ -349,14 +391,12 @@ class AuthController extends _$AuthController {
         await oldServerStore.clearRememberedCredential();
       }
 
-      await ref.read(serverStoreProvider.notifier).replaceServerId(
-            oldId: config.id,
-            newId: remoteId,
-          );
+      await ref.read(serverStoreProvider.notifier)
+          .setOrganizationServerId(config.id, remoteId);
       AppLog.w(
         LogTag.auth,
         () =>
-            'server identity changed: ${config.id} -> $remoteId; local data cleared',
+            'organization identity changed: ${config.organizationServerId} -> $remoteId; local data cleared',
       );
       return hadServerLocalData;
     } catch (e) {
@@ -475,9 +515,8 @@ class AuthController extends _$AuthController {
           deviceToken: deviceToken.isEmpty ? null : deviceToken,
         );
 
-        // The login response is a second identity signal. The organization
-        // probe normally catches this earlier, but checking here also covers
-        // a server replacement that happened while the app stayed open.
+        // Recheck the organization UUID in case the installation changed
+        // while login was open, then align the separate login ID namespace.
         await checkServerIdentity(targetBaseUrl);
         await _reconcileServerEntry(response.serverId, targetBaseUrl);
 
@@ -524,6 +563,7 @@ class AuthController extends _$AuthController {
           await rememberStore.clearRememberedCredential();
         }
 
+        ref.read(authRestoreFailureProvider.notifier).state = null;
         return AuthState.authenticated(user: response.user);
       } catch (e, st) {
         AppLog.e(LogTag.auth, () => '🔴 login() failed: $e',
@@ -555,6 +595,7 @@ class AuthController extends _$AuthController {
   /// appears in the account switcher for a quick re-login — mirroring how a
   /// signed-out browser tab still remembers "who" was signed in.
   Future<void> logout() async {
+    ref.read(authRestoreFailureProvider.notifier).state = null;
     try {
       await ref.read(authApiProvider).logout();
     } catch (_) {

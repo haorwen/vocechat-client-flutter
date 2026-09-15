@@ -12,6 +12,7 @@ _$ServerConfigImpl _$$ServerConfigImplFromJson(Map<String, dynamic> json) =>
       baseUrl: json['baseUrl'] as String,
       name: json['name'] as String,
       orgLogo: json['orgLogo'] as String?,
+      organizationServerId: json['organization_server_id'] as String?,
     );
 
 Map<String, dynamic> _$$ServerConfigImplToJson(_$ServerConfigImpl instance) =>
@@ -20,13 +21,14 @@ Map<String, dynamic> _$$ServerConfigImplToJson(_$ServerConfigImpl instance) =>
       'baseUrl': instance.baseUrl,
       'name': instance.name,
       'orgLogo': instance.orgLogo,
+      'organization_server_id': instance.organizationServerId,
     };
 
 // **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$serverStoreHash() => r'f9486f163f3ebe2788c86869dac7c6ce8997ab23';
+String _$serverStoreHash() => r'03ccf7546e4d4ffd384a05a22342765351b20dbd';
 
 /// See also [ServerStore].
 @ProviderFor(ServerStore)

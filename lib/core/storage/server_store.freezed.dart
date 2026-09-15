@@ -23,7 +23,12 @@ mixin _$ServerConfig {
   String get id => throw _privateConstructorUsedError;
   String get baseUrl => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
-  String? get orgLogo => throw _privateConstructorUsedError;
+  String? get orgLogo =>
+      throw _privateConstructorUsedError; // OrganizationInfo.server_id comes from the server's database config.
+// LoginResponse.server_id (used by id/account/token keys) comes from
+// key.json. They are independently generated and must never be compared.
+  @JsonKey(name: 'organization_server_id')
+  String? get organizationServerId => throw _privateConstructorUsedError;
 
   /// Serializes this ServerConfig to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -41,7 +46,12 @@ abstract class $ServerConfigCopyWith<$Res> {
           ServerConfig value, $Res Function(ServerConfig) then) =
       _$ServerConfigCopyWithImpl<$Res, ServerConfig>;
   @useResult
-  $Res call({String id, String baseUrl, String name, String? orgLogo});
+  $Res call(
+      {String id,
+      String baseUrl,
+      String name,
+      String? orgLogo,
+      @JsonKey(name: 'organization_server_id') String? organizationServerId});
 }
 
 /// @nodoc
@@ -63,6 +73,7 @@ class _$ServerConfigCopyWithImpl<$Res, $Val extends ServerConfig>
     Object? baseUrl = null,
     Object? name = null,
     Object? orgLogo = freezed,
+    Object? organizationServerId = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -81,6 +92,10 @@ class _$ServerConfigCopyWithImpl<$Res, $Val extends ServerConfig>
           ? _value.orgLogo
           : orgLogo // ignore: cast_nullable_to_non_nullable
               as String?,
+      organizationServerId: freezed == organizationServerId
+          ? _value.organizationServerId
+          : organizationServerId // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -93,7 +108,12 @@ abstract class _$$ServerConfigImplCopyWith<$Res>
       __$$ServerConfigImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({String id, String baseUrl, String name, String? orgLogo});
+  $Res call(
+      {String id,
+      String baseUrl,
+      String name,
+      String? orgLogo,
+      @JsonKey(name: 'organization_server_id') String? organizationServerId});
 }
 
 /// @nodoc
@@ -113,6 +133,7 @@ class __$$ServerConfigImplCopyWithImpl<$Res>
     Object? baseUrl = null,
     Object? name = null,
     Object? orgLogo = freezed,
+    Object? organizationServerId = freezed,
   }) {
     return _then(_$ServerConfigImpl(
       id: null == id
@@ -131,6 +152,10 @@ class __$$ServerConfigImplCopyWithImpl<$Res>
           ? _value.orgLogo
           : orgLogo // ignore: cast_nullable_to_non_nullable
               as String?,
+      organizationServerId: freezed == organizationServerId
+          ? _value.organizationServerId
+          : organizationServerId // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -142,7 +167,8 @@ class _$ServerConfigImpl implements _ServerConfig {
       {required this.id,
       required this.baseUrl,
       required this.name,
-      this.orgLogo});
+      this.orgLogo,
+      @JsonKey(name: 'organization_server_id') this.organizationServerId});
 
   factory _$ServerConfigImpl.fromJson(Map<String, dynamic> json) =>
       _$$ServerConfigImplFromJson(json);
@@ -155,10 +181,16 @@ class _$ServerConfigImpl implements _ServerConfig {
   final String name;
   @override
   final String? orgLogo;
+// OrganizationInfo.server_id comes from the server's database config.
+// LoginResponse.server_id (used by id/account/token keys) comes from
+// key.json. They are independently generated and must never be compared.
+  @override
+  @JsonKey(name: 'organization_server_id')
+  final String? organizationServerId;
 
   @override
   String toString() {
-    return 'ServerConfig(id: $id, baseUrl: $baseUrl, name: $name, orgLogo: $orgLogo)';
+    return 'ServerConfig(id: $id, baseUrl: $baseUrl, name: $name, orgLogo: $orgLogo, organizationServerId: $organizationServerId)';
   }
 
   @override
@@ -169,12 +201,15 @@ class _$ServerConfigImpl implements _ServerConfig {
             (identical(other.id, id) || other.id == id) &&
             (identical(other.baseUrl, baseUrl) || other.baseUrl == baseUrl) &&
             (identical(other.name, name) || other.name == name) &&
-            (identical(other.orgLogo, orgLogo) || other.orgLogo == orgLogo));
+            (identical(other.orgLogo, orgLogo) || other.orgLogo == orgLogo) &&
+            (identical(other.organizationServerId, organizationServerId) ||
+                other.organizationServerId == organizationServerId));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, id, baseUrl, name, orgLogo);
+  int get hashCode => Object.hash(
+      runtimeType, id, baseUrl, name, orgLogo, organizationServerId);
 
   /// Create a copy of ServerConfig
   /// with the given fields replaced by the non-null parameter values.
@@ -197,7 +232,9 @@ abstract class _ServerConfig implements ServerConfig {
       {required final String id,
       required final String baseUrl,
       required final String name,
-      final String? orgLogo}) = _$ServerConfigImpl;
+      final String? orgLogo,
+      @JsonKey(name: 'organization_server_id')
+      final String? organizationServerId}) = _$ServerConfigImpl;
 
   factory _ServerConfig.fromJson(Map<String, dynamic> json) =
       _$ServerConfigImpl.fromJson;
@@ -209,7 +246,13 @@ abstract class _ServerConfig implements ServerConfig {
   @override
   String get name;
   @override
-  String? get orgLogo;
+  String?
+      get orgLogo; // OrganizationInfo.server_id comes from the server's database config.
+// LoginResponse.server_id (used by id/account/token keys) comes from
+// key.json. They are independently generated and must never be compared.
+  @override
+  @JsonKey(name: 'organization_server_id')
+  String? get organizationServerId;
 
   /// Create a copy of ServerConfig
   /// with the given fields replaced by the non-null parameter values.

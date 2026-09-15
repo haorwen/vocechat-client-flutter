@@ -2380,6 +2380,42 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Could not open the installer. Please try again.'**
   String get appUpdateInstallFailed;
+
+  /// No description provided for @authSavedSessionMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Your saved sign-in information could not be found. Please sign in again.'**
+  String get authSavedSessionMissing;
+
+  /// No description provided for @authSavedSessionRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'The server no longer accepts your saved session. Please sign in again.'**
+  String get authSavedSessionRejected;
+
+  /// No description provided for @authServerChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'This address now belongs to a different server. Please sign in again.'**
+  String get authServerChanged;
+
+  /// No description provided for @authRememberedReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your saved password could not be read. You can retry or enter it manually.'**
+  String get authRememberedReadFailed;
+
+  /// No description provided for @authRetrySavedPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry saved password'**
+  String get authRetrySavedPassword;
+
+  /// No description provided for @authSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save your sign-in information on this device. Please try again.'**
+  String get authSaveFailed;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

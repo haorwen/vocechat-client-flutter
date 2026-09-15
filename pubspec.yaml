@@ -2,7 +2,7 @@ name: vocechat_client
 description: "VoceChat cross-platform client"
 publish_to: 'none'
 
-version: 0.3.23+23
+version: 0.3.24+24
 
 environment:
   sdk: ^3.6.0
@@ -128,6 +128,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  shared_preferences_platform_interface: ^2.4.1
   build_runner: ^2.4.13
   riverpod_generator: ^2.6.3
   freezed: ^2.5.7

@@ -1212,4 +1212,22 @@ class AppL10nZh extends AppL10n {
 
   @override
   String get appUpdateInstallFailed => '无法打开系统安装界面，请重试。';
+
+  @override
+  String get authSavedSessionMissing => '未找到本机保存的登录信息，请重新登录。';
+
+  @override
+  String get authSavedSessionRejected => '服务器已拒绝原来的登录凭据，请重新登录。';
+
+  @override
+  String get authServerChanged => '此地址的服务器身份已变更，请重新登录。';
+
+  @override
+  String get authRememberedReadFailed => '暂时无法读取已保存的密码，请重试或手动输入。';
+
+  @override
+  String get authRetrySavedPassword => '重新读取密码';
+
+  @override
+  String get authSaveFailed => '登录信息未能保存到本机，请重试。';
 }

@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/app_log.dart';
+import 'preference_write.dart';
 
 part 'server_store.freezed.dart';
 part 'server_store.g.dart';
@@ -20,6 +21,10 @@ class ServerConfig with _$ServerConfig {
     required String baseUrl,
     required String name,
     String? orgLogo,
+    // OrganizationInfo.server_id comes from the server's database config.
+    // LoginResponse.server_id (used by id/account/token keys) comes from
+    // key.json. They are independently generated and must never be compared.
+    @JsonKey(name: 'organization_server_id') String? organizationServerId,
   }) = _ServerConfig;
 
   factory ServerConfig.fromJson(Map<String, dynamic> json) =>
@@ -86,6 +91,19 @@ class ServerStore extends _$ServerStore {
     state = AsyncData(current.copyWith(currentServerId: id));
   }
 
+  /// Record only the identity returned by /admin/system/organization. This
+  /// must not move the server/account/token namespace used by login responses.
+  Future<void> setOrganizationServerId(String id, String organizationId) async {
+    final current = await future;
+    final updated = current.servers
+        .map((server) => server.id == id
+            ? server.copyWith(organizationServerId: organizationId)
+            : server)
+        .toList();
+    await _persist(updated, current.currentServerId);
+    state = AsyncData(current.copyWith(servers: updated));
+  }
+
   /// Replace the id of an existing server (and currentServerId if it matches),
   /// preserving baseUrl/name. Used after login/register to align the local
   /// server entry with the server-issued id without creating a duplicate.
@@ -107,15 +125,15 @@ class ServerStore extends _$ServerStore {
 
   List<ServerConfig> get list => state.valueOrNull?.servers ?? [];
 
-  Future<void> _persist(
-      List<ServerConfig> servers, String? currentId) async {
+  Future<void> _persist(List<ServerConfig> servers, String? currentId) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = servers.map((s) => jsonEncode(s.toJson())).toList();
-    await prefs.setStringList(_kServersKey, raw);
+    await requirePreferenceWrite(prefs, prefs.setStringList(_kServersKey, raw));
     if (currentId != null) {
-      await prefs.setString(_kCurrentServerKey, currentId);
+      await requirePreferenceWrite(
+          prefs, prefs.setString(_kCurrentServerKey, currentId));
     } else {
-      await prefs.remove(_kCurrentServerKey);
+      await requirePreferenceWrite(prefs, prefs.remove(_kCurrentServerKey));
     }
   }
 }

@@ -417,5 +417,11 @@
   "appUpdateInvalidApk": "下载的文件不是本应用的有效更新，请检查 APK 直链及构建号后重新下载。",
   "appUpdateInstallerOpened": "请在 Android 系统安装界面确认安装。如果已取消，可点击“安装更新”重试。",
   "appUpdateDownloadFailed": "下载失败，请检查网络和可用存储空间后重试。",
-  "appUpdateInstallFailed": "无法打开系统安装界面，请重试。"
+  "appUpdateInstallFailed": "无法打开系统安装界面，请重试。",
+  "authSavedSessionMissing": "未找到本机保存的登录信息，请重新登录。",
+  "authSavedSessionRejected": "服务器已拒绝原来的登录凭据，请重新登录。",
+  "authServerChanged": "此地址的服务器身份已变更，请重新登录。",
+  "authRememberedReadFailed": "暂时无法读取已保存的密码，请重试或手动输入。",
+  "authRetrySavedPassword": "重新读取密码",
+  "authSaveFailed": "登录信息未能保存到本机，请重试。"
 }

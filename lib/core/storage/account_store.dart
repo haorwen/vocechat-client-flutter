@@ -4,6 +4,8 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'preference_write.dart';
+
 part 'account_store.freezed.dart';
 part 'account_store.g.dart';
 
@@ -138,11 +140,13 @@ class AccountStore extends _$AccountStore {
   Future<void> _persist(List<AccountConfig> accounts, String? currentId) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = accounts.map((a) => jsonEncode(a.toJson())).toList();
-    await prefs.setStringList(_kAccountsKey, raw);
+    await requirePreferenceWrite(
+        prefs, prefs.setStringList(_kAccountsKey, raw));
     if (currentId != null) {
-      await prefs.setString(_kCurrentAccountKey, currentId);
+      await requirePreferenceWrite(
+          prefs, prefs.setString(_kCurrentAccountKey, currentId));
     } else {
-      await prefs.remove(_kCurrentAccountKey);
+      await requirePreferenceWrite(prefs, prefs.remove(_kCurrentAccountKey));
     }
   }
 }

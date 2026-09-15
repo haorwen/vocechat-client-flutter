@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -105,6 +106,8 @@ Future<void> _persistFallback() async {
 ///     session tokens, so the same server can hold multiple logged-in
 ///     accounts side by side without clobbering each other's tokens.
 class SecureTokenStore {
+  static const _androidCommit = MethodChannel('vocechat/secure_storage_commit');
+
   SecureTokenStore({required this.id, File? legacyFallbackFile})
       : _legacyFallbackFile = legacyFallbackFile,
         _storage = const FlutterSecureStorage(
@@ -123,14 +126,27 @@ class SecureTokenStore {
   final FlutterSecureStorage _storage;
   final File? _legacyFallbackFile;
 
-  bool get _isIOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+  bool get _isMobile =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.android);
 
-  File get _iosLegacyFile =>
-      _legacyFallbackFile ??
-      File(
-          '${Platform.environment['HOME'] ?? '.'}/.vocechat-client/tokens.json');
+  File? get _mobileLegacyFile {
+    if (_legacyFallbackFile != null) return _legacyFallbackFile;
+    final home = Platform.environment['HOME'];
+    // Android normally has no HOME. The old relative fallback could not
+    // reliably persist there; do not create another file outside app storage.
+    if (home == null || home.isEmpty) return null;
+    return File('$home/.vocechat-client/tokens.json');
+  }
 
   String _key(String suffix) => 'voce_${id}_$suffix';
+
+  Future<void> _commitAndroidWrites() async {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      await _androidCommit.invokeMethod<void>('commit');
+    }
+  }
 
   void _onKeyringFailure(Object e) {
     _useFileFallback = true;
@@ -142,9 +158,13 @@ class SecureTokenStore {
   }
 
   Future<void> _writeOne(String key, String value) async {
-    // A locked/unavailable iOS Keychain is not a missing desktop keyring.
+    // A mobile secure-storage failure is not a missing desktop keyring.
     // Never silently report a successful login backed only by a file/cache.
-    if (_isIOS) return _storage.write(key: key, value: value);
+    if (_isMobile) {
+      await _storage.write(key: key, value: value);
+      await _commitAndroidWrites();
+      return;
+    }
     if (_useFileFallback) {
       await _loadFallbackCacheOnce();
       _fallbackCache[key] = value;
@@ -162,7 +182,7 @@ class SecureTokenStore {
   }
 
   Future<String?> _readOne(String key) async {
-    if (_isIOS) return _storage.read(key: key);
+    if (_isMobile) return _storage.read(key: key);
     if (_useFileFallback) {
       await _loadFallbackCacheOnce();
       return _fallbackCache[key];
@@ -177,13 +197,14 @@ class SecureTokenStore {
   }
 
   Future<void> _deleteOne(String key) async {
-    if (_isIOS) {
+    if (_isMobile) {
       // Include entries written with the old `unlocked` accessibility too.
       await _storage.delete(
         key: key,
         iOptions: const IOSOptions(accessibility: null),
       );
-      await _removeIOSLegacyValues([key]);
+      await _commitAndroidWrites();
+      await _removeMobileLegacyValues([key]);
       return;
     }
     _fallbackCache.remove(key);
@@ -204,8 +225,8 @@ class SecureTokenStore {
     required String refresh,
     required DateTime expiresAt,
   }) async {
-    if (_isIOS) {
-      // One Keychain operation commits the entire session. Killing the app
+    if (_isMobile) {
+      // One secure-storage operation commits the entire session. Killing the app
       // between three independent writes must not leave a mixed token pair.
       await _writeOne(
           _key('session'),
@@ -214,7 +235,7 @@ class SecureTokenStore {
             'refresh': refresh,
             'expires_at': expiresAt.toIso8601String(),
           }));
-      await _clearIOSLegacyTokens();
+      await _clearMobileLegacyTokens();
       return;
     }
     // Serial writes — flutter_secure_storage on Windows (DPAPI) and Linux
@@ -230,7 +251,7 @@ class SecureTokenStore {
   }
 
   Future<TokenData?> readTokens() async {
-    if (_isIOS) {
+    if (_isMobile) {
       final session = await _readOne(_key('session'));
       if (session != null) {
         final decoded = jsonDecode(session);
@@ -240,10 +261,10 @@ class SecureTokenStore {
         return _decodeSession(decoded as Map<String, dynamic>);
       }
 
-      // Older builds switched to a plaintext file after ANY Keychain error,
+      // Older builds switched to a plaintext file after ANY secure-storage error,
       // but forgot that choice on restart. Recover those entries (including
-      // a write split between Keychain and file) and migrate to Keychain.
-      final legacy = await _readIOSLegacyValues();
+      // a write split between secure storage and file) and migrate it.
+      final legacy = await _readMobileLegacyValues();
       final values = <String, dynamic>{};
       for (final suffix in ['access', 'refresh', 'expires_at']) {
         values[suffix] = legacy[_key(suffix)] ?? await _readOne(_key(suffix));
@@ -275,9 +296,9 @@ class SecureTokenStore {
   }
 
   Future<void> clear() async {
-    if (_isIOS) {
+    if (_isMobile) {
       await _writeOne(_key('session'), 'null');
-      await _clearIOSLegacyTokens();
+      await _clearMobileLegacyTokens();
       return;
     }
     await _deleteOne(_key('access'));
@@ -291,26 +312,27 @@ class SecureTokenStore {
         expiresAt: DateTime.parse(values['expires_at'] as String),
       );
 
-  Future<Map<String, dynamic>> _readIOSLegacyValues() async {
-    final file = _iosLegacyFile;
-    if (!await file.exists()) return {};
+  Future<Map<String, dynamic>> _readMobileLegacyValues() async {
+    final file = _mobileLegacyFile;
+    if (file == null || !await file.exists()) return {};
     final raw = await file.readAsString();
     return raw.isEmpty ? {} : jsonDecode(raw) as Map<String, dynamic>;
   }
 
-  Future<void> _removeIOSLegacyValues(List<String> keys) async {
-    final values = await _readIOSLegacyValues();
+  Future<void> _removeMobileLegacyValues(List<String> keys) async {
+    final values = await _readMobileLegacyValues();
     if (!keys.any(values.containsKey)) return;
     for (final key in keys) {
       values.remove(key);
     }
-    final file = _iosLegacyFile;
+    final file = _mobileLegacyFile;
+    if (file == null) return;
     final pending = File('${file.path}.tmp');
     await pending.writeAsString(jsonEncode(values), flush: true);
     await pending.rename(file.path);
   }
 
-  Future<void> _clearIOSLegacyTokens() async {
+  Future<void> _clearMobileLegacyTokens() async {
     // The authoritative session/marker has already been committed. Cleanup
     // failure must not turn a durable login into an apparent login failure.
     try {
@@ -318,7 +340,7 @@ class SecureTokenStore {
         await _deleteOne(_key(suffix));
       }
     } catch (e) {
-      _log.w('iOS legacy token cleanup deferred', error: e);
+      _log.w('Mobile legacy token cleanup deferred', error: e);
     }
   }
 
@@ -326,11 +348,40 @@ class SecureTokenStore {
     required String email,
     required String password,
   }) async {
+    if (_isMobile) {
+      await _writeOne(
+          _key('remembered'),
+          jsonEncode({
+            'email': email,
+            'password': password,
+          }));
+      await _clearMobileLegacyRemembered();
+      return;
+    }
     await _writeOne(_key('remember_email'), email);
     await _writeOne(_key('remember_password'), password);
   }
 
   Future<RememberedCredential?> readRememberedCredential() async {
+    if (_isMobile) {
+      final saved = await _readOne(_key('remembered'));
+      if (saved != null) {
+        final decoded = jsonDecode(saved);
+        if (decoded == null) return null;
+        return RememberedCredential(
+          email: decoded['email'] as String,
+          password: decoded['password'] as String,
+        );
+      }
+      final legacy = await _readMobileLegacyValues();
+      final email = legacy[_key('remember_email')] as String? ??
+          await _readOne(_key('remember_email'));
+      final password = legacy[_key('remember_password')] as String? ??
+          await _readOne(_key('remember_password'));
+      if (email == null || password == null) return null;
+      await saveRememberedCredential(email: email, password: password);
+      return RememberedCredential(email: email, password: password);
+    }
     final email = await _readOne(_key('remember_email'));
     final password = await _readOne(_key('remember_password'));
     if (email == null || password == null) return null;
@@ -338,8 +389,24 @@ class SecureTokenStore {
   }
 
   Future<void> clearRememberedCredential() async {
+    if (_isMobile) {
+      // Commit the opt-out before deleting legacy keys, so an interrupted
+      // cleanup cannot bring the old password back on the next launch.
+      await _writeOne(_key('remembered'), 'null');
+      await _clearMobileLegacyRemembered();
+      return;
+    }
     await _deleteOne(_key('remember_email'));
     await _deleteOne(_key('remember_password'));
+  }
+
+  Future<void> _clearMobileLegacyRemembered() async {
+    try {
+      await _deleteOne(_key('remember_email'));
+      await _deleteOne(_key('remember_password'));
+    } catch (e) {
+      _log.w('Mobile legacy remembered credential cleanup deferred', error: e);
+    }
   }
 }
 

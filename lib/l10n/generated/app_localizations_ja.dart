@@ -1212,4 +1212,22 @@ class AppL10nJa extends AppL10n {
 
   @override
   String get appUpdateInstallFailed => 'Could not open the installer. Please try again.';
+
+  @override
+  String get authSavedSessionMissing => 'Your saved sign-in information could not be found. Please sign in again.';
+
+  @override
+  String get authSavedSessionRejected => 'The server no longer accepts your saved session. Please sign in again.';
+
+  @override
+  String get authServerChanged => 'This address now belongs to a different server. Please sign in again.';
+
+  @override
+  String get authRememberedReadFailed => 'Your saved password could not be read. You can retry or enter it manually.';
+
+  @override
+  String get authRetrySavedPassword => 'Retry saved password';
+
+  @override
+  String get authSaveFailed => 'Could not save your sign-in information on this device. Please try again.';
 }
