@@ -1,3 +1,4 @@
+import '../../../core/background/background_lifecycle.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -365,10 +366,16 @@ class ChatController extends _$ChatController {
       lifecycle.dispose();
     });
 
+    // The dispatcher still persists messages while backgrounded. Rebuild
+    // once on resume instead of merging/repainting every mounted chat.
+    ref.listen(androidBackgroundedProvider, (previous, background) {
+      if (previous == true && !background) ref.invalidateSelf();
+    });
+
     // Subscribe to SSE for live updates.
     ref.listen(sseEventsProvider, (_, next) {
       next.whenData((event) {
-        if (event is ChatEventChat) {
+        if (event is ChatEventChat && !ref.read(androidBackgroundedProvider)) {
           applyIncomingMessage(event.message);
         }
       });

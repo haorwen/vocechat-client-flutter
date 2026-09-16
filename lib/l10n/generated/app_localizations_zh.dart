@@ -1230,4 +1230,49 @@ class AppL10nZh extends AppL10n {
 
   @override
   String get authSaveFailed => '登录信息未能保存到本机，请重试。';
+
+  @override
+  String get backgroundTitle => '常驻后台';
+
+  @override
+  String get backgroundDescription => '通过前台常驻通知保持当前账号的消息连接，默认关闭。';
+
+  @override
+  String get backgroundActionFailed => '无法更新后台设置，请重试。';
+
+  @override
+  String get backgroundSetupRequired => '请先允许通知，并点击“关闭电池优化”完成设置，再启用常驻后台。';
+
+  @override
+  String get backgroundRunning => '后台服务正在运行';
+
+  @override
+  String get backgroundNotRunning => '已启用，但服务尚未运行，请返回应用重试。';
+
+  @override
+  String get backgroundDisabled => '后台服务已关闭';
+
+  @override
+  String get backgroundNotificationPermission => '允许消息通知与前台服务通知';
+
+  @override
+  String get backgroundGranted => '已允许';
+
+  @override
+  String get backgroundBattery => '关闭电池优化';
+
+  @override
+  String get backgroundBatteryDescription => '允许不受限制的电池使用，以便锁屏后保持消息连接。';
+
+  @override
+  String get backgroundManufacturer => '自启动与后台限制';
+
+  @override
+  String get backgroundManufacturerDescription => '在手机应用或电池设置中允许后台活动、自启动；如有最近任务锁定功能，请锁定 VoceChat。不同品牌的设置入口可能不同。';
+
+  @override
+  String get backgroundLimitations => '开启后耗电会增加；通话继续运行，后台空闲时减少处理任务。仅接收当前账号的消息。强制停止、重启手机或厂商清理可能中断服务，需要重新打开应用恢复。关闭此开关不会撤销系统通知与电池权限。';
+
+  @override
+  String get backgroundBatteryVisited => '已点击设置，可开启常驻后台。部分手机无法准确检测，请在系统中确认已允许不受限制的电池使用。';
 }

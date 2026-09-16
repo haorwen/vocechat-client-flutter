@@ -2416,6 +2416,96 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Could not save your sign-in information on this device. Please try again.'**
   String get authSaveFailed;
+
+  /// No description provided for @backgroundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep running in background'**
+  String get backgroundTitle;
+
+  /// No description provided for @backgroundDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep a foreground notification and receive messages over the current account’s connection. Off by default.'**
+  String get backgroundDescription;
+
+  /// No description provided for @backgroundActionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to update background settings. Please try again.'**
+  String get backgroundActionFailed;
+
+  /// No description provided for @backgroundSetupRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow notifications and tap “Disable battery optimization” to review the setting before enabling.'**
+  String get backgroundSetupRequired;
+
+  /// No description provided for @backgroundRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Background service is running'**
+  String get backgroundRunning;
+
+  /// No description provided for @backgroundNotRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled, but service is not running. Return to the app to retry.'**
+  String get backgroundNotRunning;
+
+  /// No description provided for @backgroundDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Background service is off'**
+  String get backgroundDisabled;
+
+  /// No description provided for @backgroundNotificationPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow message and foreground notifications'**
+  String get backgroundNotificationPermission;
+
+  /// No description provided for @backgroundGranted.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed'**
+  String get backgroundGranted;
+
+  /// No description provided for @backgroundBattery.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable battery optimization'**
+  String get backgroundBattery;
+
+  /// No description provided for @backgroundBatteryDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow unrestricted battery use so the message connection can continue while the screen is off.'**
+  String get backgroundBatteryDescription;
+
+  /// No description provided for @backgroundManufacturer.
+  ///
+  /// In en, this message translates to:
+  /// **'Autostart and background restrictions'**
+  String get backgroundManufacturer;
+
+  /// No description provided for @backgroundManufacturerDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'In your phone’s app or battery settings, allow background activity and autostart. If available, lock VoceChat in recent apps. Options vary by manufacturer.'**
+  String get backgroundManufacturerDescription;
+
+  /// No description provided for @backgroundLimitations.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses more battery. Calls remain active; idle background work is reduced. Only the current account receives messages. Force stop, reboot, or manufacturer cleanup can interrupt the service; reopen the app to restore it. Battery and notification permissions stay unchanged when this switch is turned off.'**
+  String get backgroundLimitations;
+
+  /// No description provided for @backgroundBatteryVisited.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings reviewed; background mode can be enabled. Some phones cannot report this accurately. Please confirm unrestricted battery use in system settings.'**
+  String get backgroundBatteryVisited;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

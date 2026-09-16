@@ -1,3 +1,6 @@
+import 'features/voice/application/voice_controller.dart';
+import 'core/background/background_runtime.dart';
+import 'core/background/background_lifecycle.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -105,6 +108,7 @@ class VoceChatApp extends ConsumerWidget {
     // Starts Firebase Messaging permission request and notification listeners
     // on Android/iOS. No-op on other platforms.
     ref.watch(fcmServiceProvider);
+    ref.watch(backgroundRuntimeProvider);
 
     // AppTokens.* getters resolve through a global brightness flag. Sync it
     // from the brightness MaterialApp actually picked (which depends on
@@ -140,7 +144,11 @@ class VoceChatApp extends ConsumerWidget {
             child: VoicePictureInPictureOverlay(
               child: KeyedSubtree(
                 key: ValueKey(brightness),
-                child: child ?? const SizedBox.shrink(),
+                child: TickerMode(
+                  enabled: !ref.watch(androidBackgroundedProvider) ||
+                      ref.watch(voiceControllerProvider.select((s) => s != null)),
+                  child: child ?? const SizedBox.shrink(),
+                ),
               ),
             ),
           ),

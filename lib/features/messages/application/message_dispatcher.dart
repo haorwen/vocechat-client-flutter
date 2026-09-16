@@ -1,3 +1,4 @@
+import '../../../core/background/background_notifications.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -42,6 +43,7 @@ class MessageDispatcher extends _$MessageDispatcher {
       next.whenData((event) {
         if (event is ChatEventChat) {
           final msg = event.message;
+          deliverBackgroundNotification(ref, msg);
 
           // Reaction events arrive as chat messages with type=reaction.
           // Route them to the reactions provider; do NOT add them to chat

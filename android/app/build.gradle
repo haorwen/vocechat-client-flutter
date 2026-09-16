@@ -84,3 +84,9 @@ flutter {
 if (googleServicesFile.exists()) {
     apply plugin: "com.google.gms.google-services"
 }
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
+}
+android.testOptions.unitTests.includeAndroidResources = true

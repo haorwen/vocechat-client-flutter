@@ -1,3 +1,4 @@
+import '../background/background_lifecycle.dart';
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -48,6 +49,11 @@ class SseTokenWatcher extends _$SseTokenWatcher {
   @override
   void build() {
     ref.onDispose(_stop);
+
+    if (ref.watch(androidBackgroundedProvider)) {
+      _stop();
+      return;
+    }
 
     // React to login/logout and account switch by restarting the poll loop
     // against the right token-store key.

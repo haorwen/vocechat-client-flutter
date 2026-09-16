@@ -1,9 +1,9 @@
+import '../../../core/background/background_lifecycle.dart';
 import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:camera/camera.dart';
-import 'package:cross_file/cross_file.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -235,6 +235,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _onPositionsChanged() {
+    if (ref.read(androidBackgroundedProvider)) return;
     final positions = _itemPositionsListener.itemPositions.value;
     if (positions.isEmpty) return;
     // List is reverse: index 0 is the newest. The "older" end of the visible
@@ -270,6 +271,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// debounced, persistent server queue so leaving this screen cannot cancel
   /// a read acknowledgement.
   void _scheduleReadReport(int mid) {
+    if (ref.read(androidBackgroundedProvider)) return;
     if (!mounted || mid <= _lastReportedReadMid || mid <= 0) return;
     _lastReportedReadMid = mid;
     final notifier = ref.read(readIndexProvider.notifier);
@@ -893,6 +895,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(androidBackgroundedProvider, (previous, background) {
+      if (previous == true && !background) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _onPositionsChanged();
+        });
+      }
+    });
     final l = AppL10n.of(context);
     final messagesAsync = ref.watch(chatControllerProvider(_target));
 

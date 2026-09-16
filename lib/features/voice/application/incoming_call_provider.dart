@@ -1,3 +1,4 @@
+import '../../../core/background/background_lifecycle.dart';
 import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -22,22 +23,29 @@ part 'incoming_call_provider.g.dart';
 @Riverpod(keepAlive: true)
 class IncomingCall extends _$IncomingCall {
   Timer? _timer;
+  bool _polling = false;
 
   @override
   IncomingCallState build() {
     ref.onDispose(() => _timer?.cancel());
+    ref.listen(androidBackgroundedProvider, (_, __) => _start());
+    ref.listen(voiceControllerProvider.select((s) => s != null), (_, __) => _start());
     _start();
     return const IncomingCallState();
   }
 
   void _start() {
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 10), (_) => _poll());
+    if (ref.read(voiceControllerProvider) != null) return;
+    final interval = ref.read(androidBackgroundedProvider)
+        ? const Duration(seconds: 60) : const Duration(seconds: 10);
+    _timer = Timer.periodic(interval, (_) => _poll());
     // Fire once immediately rather than waiting a full interval.
     Future.microtask(_poll);
   }
 
   Future<void> _poll() async {
+    if (_polling) return;
     final authState = ref.read(authControllerProvider).valueOrNull;
     if (authState is! AuthStateAuthenticated) return;
     final selfUid = authState.user.uid;
@@ -47,6 +55,7 @@ class IncomingCall extends _$IncomingCall {
     // risks clobbering the connected state with a stale "ringing" snapshot.
     if (ref.read(voiceControllerProvider) != null) return;
 
+    _polling = true;
     try {
       final channels = await ref.read(agoraApiProvider).getActiveChannels();
       final myChannel = channels.where((c) {
@@ -72,6 +81,8 @@ class IncomingCall extends _$IncomingCall {
       set(fromUid: caller, toUid: selfUid, calling: true);
     } catch (_) {
       // Transient network error — next tick retries.
+    } finally {
+      _polling = false;
     }
   }
 

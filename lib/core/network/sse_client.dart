@@ -1,3 +1,4 @@
+import '../background/background_lifecycle.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -52,10 +53,14 @@ class VoceSseClient {
     required String apiKey,
     int? initialAfterMid,
     this.refreshToken,
+    this.preferInlineParsing,
   })  : _apiKey = apiKey,
         _highWaterMid = initialAfterMid;
 
   final String baseUrl;
+
+  /// Small background messages do not need a new isolate for each event.
+  final bool Function()? preferInlineParsing;
 
   /// Called at the start of every (re)connect attempt. If it returns a
   /// non-null, non-empty string the returned value replaces [_apiKey] before
@@ -203,11 +208,15 @@ class VoceSseClient {
           chatEvent = parseSseEvent(eventType, trimmed);
         } else {
           try {
-            chatEvent = await compute(
-              _parseSseEventInIsolate,
-              [eventType, trimmed],
-              debugLabel: 'parseSseEvent',
-            );
+            if (trimmed.length <= 16384 && preferInlineParsing?.call() == true) {
+              chatEvent = parseSseEvent(eventType, trimmed);
+            } else {
+              chatEvent = await compute(
+                _parseSseEventInIsolate,
+                [eventType, trimmed],
+                debugLabel: 'parseSseEvent',
+              );
+            }
           } catch (_) {
             chatEvent = ChatEvent.unknown(type: eventType, raw: trimmed);
           }
@@ -363,6 +372,7 @@ Stream<ChatEvent> sseEvents(Ref ref) async* {
     apiKey: tokens.accessToken,
     initialAfterMid: cursor,
     refreshToken: tokenRefreshCallback,
+    preferInlineParsing: () => ref.read(androidBackgroundedProvider),
   );
 
   // Forward connection-status transitions to the UI provider.

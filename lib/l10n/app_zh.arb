@@ -423,5 +423,20 @@
   "authServerChanged": "此地址的服务器身份已变更，请重新登录。",
   "authRememberedReadFailed": "暂时无法读取已保存的密码，请重试或手动输入。",
   "authRetrySavedPassword": "重新读取密码",
-  "authSaveFailed": "登录信息未能保存到本机，请重试。"
+  "authSaveFailed": "登录信息未能保存到本机，请重试。",
+  "backgroundTitle": "常驻后台",
+  "backgroundDescription": "通过前台常驻通知保持当前账号的消息连接，默认关闭。",
+  "backgroundActionFailed": "无法更新后台设置，请重试。",
+  "backgroundSetupRequired": "请先允许通知，并点击“关闭电池优化”完成设置，再启用常驻后台。",
+  "backgroundRunning": "后台服务正在运行",
+  "backgroundNotRunning": "已启用，但服务尚未运行，请返回应用重试。",
+  "backgroundDisabled": "后台服务已关闭",
+  "backgroundNotificationPermission": "允许消息通知与前台服务通知",
+  "backgroundGranted": "已允许",
+  "backgroundBattery": "关闭电池优化",
+  "backgroundBatteryDescription": "允许不受限制的电池使用，以便锁屏后保持消息连接。",
+  "backgroundManufacturer": "自启动与后台限制",
+  "backgroundManufacturerDescription": "在手机应用或电池设置中允许后台活动、自启动；如有最近任务锁定功能，请锁定 VoceChat。不同品牌的设置入口可能不同。",
+  "backgroundLimitations": "开启后耗电会增加；通话继续运行，后台空闲时减少处理任务。仅接收当前账号的消息。强制停止、重启手机或厂商清理可能中断服务，需要重新打开应用恢复。关闭此开关不会撤销系统通知与电池权限。",
+  "backgroundBatteryVisited": "已点击设置，可开启常驻后台。部分手机无法准确检测，请在系统中确认已允许不受限制的电池使用。"
 }

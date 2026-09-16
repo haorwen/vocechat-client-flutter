@@ -1,3 +1,5 @@
+import '../../../core/background/background_preferences.dart';
+import 'background_settings_card.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -993,7 +995,7 @@ class _MyAccountPaneState extends ConsumerState<_MyAccountPane> {
 // _NotificationsPane — three switches in a single card.
 // ---------------------------------------------------------------------------
 
-class _NotificationsPane extends StatelessWidget {
+class _NotificationsPane extends ConsumerWidget {
   const _NotificationsPane({
     required this.notificationsEnabled,
     required this.soundEnabled,
@@ -1011,8 +1013,30 @@ class _NotificationsPane extends StatelessWidget {
   final ValueChanged<bool> onMentionOnlyChanged;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l = AppL10n.of(context);
+    final preferences = isAndroidBackgroundSupported
+        ? ref.watch(backgroundPreferencesProvider).valueOrNull : null;
+    final notificationsEnabled = preferences?.pushEnabled ?? this.notificationsEnabled;
+    final soundEnabled = preferences?.soundEnabled ?? this.soundEnabled;
+    final mentionOnlyMode = preferences?.mentionsOnly ?? this.mentionOnlyMode;
+    Future<void> update(Future<void> Function() write) async {
+      try { await write(); }
+      catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l.backgroundActionFailed)));
+        }
+      }
+    }
+    final notifier = isAndroidBackgroundSupported
+        ? ref.read(backgroundPreferencesProvider.notifier) : null;
+    final onNotificationsChanged = notifier == null ? this.onNotificationsChanged
+        : (bool value) => update(() => notifier.updateNotifications(pushEnabled: value));
+    final onSoundChanged = notifier == null ? this.onSoundChanged
+        : (bool value) => update(() => notifier.updateNotifications(soundEnabled: value));
+    final onMentionOnlyChanged = notifier == null ? this.onMentionOnlyChanged
+        : (bool value) => update(() => notifier.updateNotifications(mentionsOnly: value));
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1038,6 +1062,7 @@ class _NotificationsPane extends StatelessWidget {
             onChanged:
                 notificationsEnabled ? onMentionOnlyChanged : null,
           ),
+          const BackgroundSettingsCard(),
         ],
       ),
     );

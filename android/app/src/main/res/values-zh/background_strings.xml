@@ -1,0 +1,7 @@
+<resources>
+    <string name="background_channel">后台消息连接</string>
+    <string name="background_messages">聊天消息</string>
+    <string name="background_title">VoceChat 正在后台运行</string>
+    <string name="background_body">接收消息中 · 可在设置 → 通知中关闭</string>
+    <string name="background_call">通话进行中 · 保持音频连接</string>
+</resources>

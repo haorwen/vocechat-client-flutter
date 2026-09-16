@@ -1230,4 +1230,49 @@ class AppL10nPt extends AppL10n {
 
   @override
   String get authSaveFailed => 'Could not save your sign-in information on this device. Please try again.';
+
+  @override
+  String get backgroundTitle => 'Keep running in background';
+
+  @override
+  String get backgroundDescription => 'Keep a foreground notification and receive messages over the current account’s connection. Off by default.';
+
+  @override
+  String get backgroundActionFailed => 'Unable to update background settings. Please try again.';
+
+  @override
+  String get backgroundSetupRequired => 'Allow notifications and tap “Disable battery optimization” to review the setting before enabling.';
+
+  @override
+  String get backgroundRunning => 'Background service is running';
+
+  @override
+  String get backgroundNotRunning => 'Enabled, but service is not running. Return to the app to retry.';
+
+  @override
+  String get backgroundDisabled => 'Background service is off';
+
+  @override
+  String get backgroundNotificationPermission => 'Allow message and foreground notifications';
+
+  @override
+  String get backgroundGranted => 'Allowed';
+
+  @override
+  String get backgroundBattery => 'Disable battery optimization';
+
+  @override
+  String get backgroundBatteryDescription => 'Allow unrestricted battery use so the message connection can continue while the screen is off.';
+
+  @override
+  String get backgroundManufacturer => 'Autostart and background restrictions';
+
+  @override
+  String get backgroundManufacturerDescription => 'In your phone’s app or battery settings, allow background activity and autostart. If available, lock VoceChat in recent apps. Options vary by manufacturer.';
+
+  @override
+  String get backgroundLimitations => 'Uses more battery. Calls remain active; idle background work is reduced. Only the current account receives messages. Force stop, reboot, or manufacturer cleanup can interrupt the service; reopen the app to restore it. Battery and notification permissions stay unchanged when this switch is turned off.';
+
+  @override
+  String get backgroundBatteryVisited => 'Settings reviewed; background mode can be enabled. Some phones cannot report this accurately. Please confirm unrestricted battery use in system settings.';
 }

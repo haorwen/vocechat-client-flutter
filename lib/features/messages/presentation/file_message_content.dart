@@ -1,3 +1,4 @@
+import '../../../core/background/background_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -1066,7 +1067,15 @@ class _VideoPlayerScreen extends StatefulWidget {
   State<_VideoPlayerScreen> createState() => _VideoPlayerScreenState();
 }
 
-class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
+class _VideoPlayerScreenState extends State<_VideoPlayerScreen> with WidgetsBindingObserver {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (isAndroidBackgroundSupported &&
+        (state == AppLifecycleState.paused || state == AppLifecycleState.hidden)) {
+      _videoCtrl?.pause();
+    }
+  }
+
   VideoPlayerController? _videoCtrl;
   ChewieController? _chewieCtrl;
   _MediaLoadStatus _status = _MediaLoadStatus.loading;
@@ -1075,6 +1084,7 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _init();
   }
 
@@ -1112,7 +1122,8 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
       }
       _chewieCtrl = ChewieController(
         videoPlayerController: ctrl,
-        autoPlay: true,
+        autoPlay: !isAndroidBackgroundSupported ||
+            WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed,
         allowFullScreen: true,
         materialProgressColors: ChewieProgressColors(
           playedColor: AppTokens.primary500,
@@ -1177,6 +1188,7 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _chewieCtrl?.dispose();
     _videoCtrl?.dispose();
     super.dispose();
@@ -1289,7 +1301,21 @@ class _AudioBubble extends ConsumerStatefulWidget {
   ConsumerState<_AudioBubble> createState() => _AudioBubbleState();
 }
 
-class _AudioBubbleState extends ConsumerState<_AudioBubble> {
+class _AudioBubbleState extends ConsumerState<_AudioBubble> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (isAndroidBackgroundSupported &&
+        (state == AppLifecycleState.paused || state == AppLifecycleState.hidden)) {
+      _player.pause();
+    }
+  }
+
   final AudioPlayer _player = AudioPlayer();
   String? _audioCachePath;
   int? _audioCacheReaderToken;
@@ -1427,7 +1453,10 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> {
       return;
     }
     if (!_ready) await _load();
-    if (mounted && _ready) await _player.play();
+    if (mounted && _ready && (!isAndroidBackgroundSupported ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed)) {
+      await _player.play();
+    }
   }
 
   Future<void> _download() async {
@@ -1472,6 +1501,7 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _durSub?.cancel();
     _posSub?.cancel();
     _stateSub?.cancel();
