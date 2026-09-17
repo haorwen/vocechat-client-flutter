@@ -36,6 +36,10 @@ bool get isVoiceCallingSupported =>
     defaultTargetPlatform == TargetPlatform.macOS ||
     defaultTargetPlatform == TargetPlatform.windows;
 
+final agoraRtcEngineFactoryProvider = Provider<RtcEngine Function()>(
+  (ref) => createAgoraRtcEngine,
+);
+
 @Riverpod(keepAlive: true)
 class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   RtcEngine? _engine;
@@ -97,7 +101,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     final existing = _engine;
     if (existing != null) return existing;
 
-    final engine = createAgoraRtcEngine();
+    final engine = ref.read(agoraRtcEngineFactoryProvider)();
     await engine.initialize(RtcEngineContext(appId: appId));
     if (!kIsWeb &&
         (defaultTargetPlatform == TargetPlatform.android ||
@@ -112,13 +116,30 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
 
     final handler = RtcEngineEventHandler(
       onJoinChannelSuccess: (connection, elapsed) {
+        if (!_isCurrentConnection(connection)) return;
         AppLog.d(
             LogTag.voice, () => '🎙️ joined channel=${connection.channelId}');
+        final current = state!;
+        _upsertMember(_localUid!, const VoicingMemberInfo());
+        state = current.copyWith(
+          joining: false,
+          connectionState: VoiceConnectionState.connected,
+        );
+        _syncPictureInPictureEligibility();
+        unawaited(ref
+            .read(avoInteractionControllerProvider.notifier)
+            .joinRoom(current.context));
       },
       onUserJoined: (connection, remoteUid, elapsed) {
+        if (!_isCurrentConnection(connection)) return;
+        AppLog.d(
+            LogTag.voice,
+            () =>
+                'remote joined channel=${connection.channelId} uid=$remoteUid');
         _upsertMember(remoteUid, const VoicingMemberInfo());
       },
       onUserOffline: (connection, remoteUid, reason) {
+        if (!_isCurrentConnection(connection)) return;
         if (reason == UserOfflineReasonType.userOfflineQuit ||
             reason == UserOfflineReasonType.userOfflineDropped) {
           _removeMember(remoteUid);
@@ -166,8 +187,9 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
           // speaking ring), so only track remotes here.
           if (uid == 0) {
             final current = state;
-            if (current != null)
+            if (current != null) {
               state = current.copyWith(speakingVolume: volume);
+            }
             continue;
           }
           _patchMember(uid, (m) => m.copyWith(speakingVolume: volume));
@@ -178,8 +200,19 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
         state = state?.copyWith(downlinkNetworkQuality: rxQuality.value());
       },
       onConnectionStateChanged: (connection, connectionState, reason) {
+        if (!_isCurrentConnection(connection)) return;
+        AppLog.d(
+            LogTag.voice,
+            () =>
+                'channel=${connection.channelId} state=$connectionState reason=$reason');
         state = state?.copyWith(
           connectionState: _mapConnectionState(connectionState),
+          joining:
+              connectionState == ConnectionStateType.connectionStateFailed ||
+                      connectionState ==
+                          ConnectionStateType.connectionStateDisconnected
+                  ? false
+                  : state!.joining,
         );
         _syncPictureInPictureEligibility();
       },
@@ -203,8 +236,11 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
           () => 'Agora permission denied: $permissionType',
         );
       },
-      onLeaveChannel: (connection, stats) {
-        members.value = const VoicingMembers();
+      onError: (code, message) {
+        AppLog.e(
+            LogTag.voice,
+            () =>
+                'Agora error channel=$_channelName code=$code message=$message');
       },
     );
     engine.registerEventHandler(handler);
@@ -212,6 +248,12 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     _engine = engine;
     return engine;
   }
+
+  bool _isCurrentConnection(RtcConnection connection) =>
+      state != null &&
+      _channelName != null &&
+      connection.channelId == _channelName &&
+      connection.localUid == _localUid;
 
   VoiceConnectionState _mapConnectionState(ConnectionStateType s) {
     switch (s) {
@@ -419,20 +461,35 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
 
   /// Requests a token, joins the channel, and publishes the local microphone
   /// track. [context] is the DM peer or channel to call.
-  Future<void> join(MessageTarget context) async {
+  /// When answering a DM, [dmChannelOwnerUid] is the invite's callee (`toUid`),
+  /// while [context] still points to the caller for chat navigation and Avo.
+  /// Both participants must request a token for the callee's RTC channel.
+  Future<void> join(MessageTarget context, {int? dmChannelOwnerUid}) async {
     if (state != null || _channelName != null) {
       await leave();
     }
     members.value = const VoicingMembers();
-    state = VoicingInfo(context: context, joining: true);
+    state = VoicingInfo(
+      context: context,
+      joining: true,
+      connectionState: VoiceConnectionState.connecting,
+    );
     try {
       final api = ref.read(agoraApiProvider);
       final token = await context.map(
-        user: (t) => api.generateToken(uid: t.uid),
+        user: (t) => api.generateToken(uid: dmChannelOwnerUid ?? t.uid),
         group: (t) => api.generateToken(gid: t.gid),
       );
 
       final engine = await _ensureEngine(token.appId);
+      // Native joinChannel completes when the request is accepted. Only
+      // onJoinChannelSuccess confirms membership (unlike Web client.join).
+      _channelName = token.channelName;
+      _localUid = token.uid;
+      AppLog.d(
+          LogTag.voice,
+          () =>
+              'joining channel=${token.channelName} uid=${token.uid} peer=$context');
       await engine.joinChannel(
         token: token.agoraToken,
         channelId: token.channelName,
@@ -446,23 +503,6 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
           autoSubscribeVideo: true,
         ),
       );
-
-      _channelName = token.channelName;
-      _localUid = token.uid;
-      final selfUid = token.uid;
-      _upsertMember(selfUid, const VoicingMemberInfo());
-
-      state = VoicingInfo(
-        context: context,
-        joining: false,
-        connectionState: VoiceConnectionState.connected,
-        muted: false,
-        deafen: false,
-      );
-      _syncPictureInPictureEligibility();
-      unawaited(ref
-          .read(avoInteractionControllerProvider.notifier)
-          .joinRoom(context));
     } catch (e, st) {
       AppLog.e(LogTag.voice, () => 'join failed', error: e, stackTrace: st);
       _channelName = null;

@@ -31,6 +31,7 @@ void main() {
     final dragHandle = find.byKey(const ValueKey('voice-call-drag-handle'));
     expect(callBar, findsOneWidget);
     expect(dragHandle, findsOneWidget);
+    expect(find.text('Calling...'), findsOneWidget);
 
     final initialTopLeft = tester.getTopLeft(callBar);
     await tester.drag(dragHandle, const Offset(-120, 80));
@@ -54,7 +55,7 @@ void main() {
     expect(bottomRight.dy, lessThanOrEqualTo(screenSize.height - 12));
   });
 
-  testWidgets('answering an incoming call opens the matching DM',
+  testWidgets('answer opens caller DM but joins callee RTC channel',
       (tester) async {
     final router = GoRouter(
       initialLocation: '/contacts',
@@ -115,6 +116,12 @@ void main() {
       container.read(voiceControllerProvider)?.context,
       const MessageTarget.user(uid: 42),
     );
+    expect(
+      (container.read(voiceControllerProvider.notifier)
+              as _AnswerVoiceController)
+          .dmChannelOwnerUid,
+      7,
+    );
   });
 }
 
@@ -169,11 +176,14 @@ class _ActiveVoiceController extends VoiceController {
 }
 
 class _AnswerVoiceController extends VoiceController {
+  int? dmChannelOwnerUid;
+
   @override
   VoicingInfo? build() => null;
 
   @override
-  Future<void> join(MessageTarget context) async {
+  Future<void> join(MessageTarget context, {int? dmChannelOwnerUid}) async {
+    this.dmChannelOwnerUid = dmChannelOwnerUid;
     state = VoicingInfo(
       context: context,
       connectionState: VoiceConnectionState.connected,

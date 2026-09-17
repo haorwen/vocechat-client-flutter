@@ -165,7 +165,7 @@ class _IncomingCallBannerState extends ConsumerState<IncomingCallBanner> {
                   _RoundButton(
                     color: Colors.green,
                     icon: Icons.call,
-                    onTap: () => _answer(call.fromUid),
+                    onTap: () => _answer(call),
                   ),
                 ],
               ],
@@ -209,12 +209,21 @@ class _IncomingCallBannerState extends ConsumerState<IncomingCallBanner> {
     );
   }
 
-  Future<void> _answer(int fromUid) async {
-    context.go('/home/chat/u-$fromUid');
+  Future<void> _answer(IncomingCallState call) async {
+    context.go('/home/chat/u-${call.fromUid}');
     ref.read(incomingCallProvider.notifier).dismiss();
-    await ref
-        .read(voiceControllerProvider.notifier)
-        .join(MessageTarget.user(uid: fromUid));
+    try {
+      await ref.read(voiceControllerProvider.notifier).join(
+            MessageTarget.user(uid: call.fromUid),
+            dmChannelOwnerUid: call.toUid,
+          );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppL10n.of(context).errorPrefix('$error'))),
+        );
+      }
+    }
   }
 
   Future<void> _reject(bool sendByMe) async {

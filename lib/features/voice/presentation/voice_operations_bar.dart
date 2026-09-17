@@ -30,8 +30,6 @@ class _VoiceOperationsBarState extends ConsumerState<VoiceOperationsBar> {
     if (info == null) return const SizedBox.shrink();
     final l = AppL10n.of(context);
     final controller = ref.read(voiceControllerProvider.notifier);
-    final reconnecting =
-        info.connectionState == VoiceConnectionState.reconnecting;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final showParticipants = !widget.fullscreen && !_openingFullscreen;
@@ -51,13 +49,36 @@ class _VoiceOperationsBarState extends ConsumerState<VoiceOperationsBar> {
                 children: [
                   _NetworkDot(quality: info.downlinkNetworkQuality),
                   const SizedBox(width: 6),
-                  Text(
-                    reconnecting ? l.voiceReconnecting : l.voiceConnected,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: reconnecting ? Colors.red : Colors.green.shade700,
-                    ),
+                  ValueListenableBuilder<VoicingMembers>(
+                    valueListenable: controller.members,
+                    builder: (context, members, _) {
+                      final peerPresent = info.context.map(
+                        user: (target) => members.ids.contains(target.uid),
+                        group: (_) => true,
+                      );
+                      final connected = !info.joining &&
+                          info.connectionState ==
+                              VoiceConnectionState.connected &&
+                          peerPresent;
+                      final label = switch (info.connectionState) {
+                        VoiceConnectionState.failed => l.errorRequestFailed,
+                        VoiceConnectionState.disconnected =>
+                          l.chatStatusOffline,
+                        VoiceConnectionState.reconnecting =>
+                          l.voiceReconnecting,
+                        _ => connected ? l.voiceConnected : l.voiceCallingOut,
+                      };
+                      return Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: connected
+                              ? Colors.green.shade700
+                              : Colors.orange.shade800,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
