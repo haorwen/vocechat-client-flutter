@@ -1,0 +1,20 @@
+# Optional Agora effects unused by the app; reviewed for agora_rtc_engine 6.5.4.
+# Keep exact names: never replace this list with libagora_*_extension.so.
+# Beauty, video denoising, low-light and color effects (not enabled by the app).
+libagora_clear_vision_extension.so
+# Voice-driven virtual characters; Avo uses its own volume-based animation.
+libagora_lip_sync_extension.so
+# Spatial audio and virtual backgrounds.
+libagora_spatial_audio_extension.so
+libagora_segmentation_extension.so
+# Facial motion capture and optional face ROI analysis.
+libagora_face_capture_extension.so
+libagora_face_detection_extension.so
+# Voice beautification, content inspection and subjective video scoring.
+libagora_audio_beauty_extension.so
+libagora_content_inspect_extension.so
+libagora_video_quality_analyzer_extension.so
+# Low-latency variants require explicit vendor configuration, absent in this
+# app. Keep the regular AI noise suppression and echo cancellation libraries.
+libagora_ai_noise_suppression_ll_extension.so
+libagora_ai_echo_cancellation_ll_extension.so

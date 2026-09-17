@@ -72,6 +72,33 @@ android {
             signingConfig = keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
         }
     }
+
+    // Agora's optional effects are not used by this app. Keep the RTC core,
+    // codecs, screen capture, audio processing and Iris/PiP integration intact.
+    // The same list is consumed by tool/rtc_size/audit.py for APK/AAB checks.
+    // Set ORG_GRADLE_PROJECT_keepAgoraExtensions=true for an untrimmed baseline.
+    if (!providers.gradleProperty("keepAgoraExtensions").orElse("false").get().toBoolean()) {
+        def unusedAgoraLibraries = rootProject.file("agora-excluded-libraries.txt")
+                .readLines("UTF-8")
+                .collect { it.trim() }
+                .findAll { it && !it.startsWith("#") }
+        packagingOptions {
+            jniLibs {
+                excludes += unusedAgoraLibraries.collect { "**/${it}" }
+            }
+        }
+    }
+
+    // Compress native libraries in APKs by default. The installer extracts
+    // compressed .so files, so this trades installed disk space/install work
+    // for a smaller download. Play continues to use AAB delivery.
+    // Set ORG_GRADLE_PROJECT_compressNativeLibraries=false for direct loading.
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = providers.gradleProperty("compressNativeLibraries")
+                    .orElse("true").get().toBoolean()
+        }
+    }
 }
 
 flutter {

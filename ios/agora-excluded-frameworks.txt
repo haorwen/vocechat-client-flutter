@@ -1,0 +1,15 @@
+# Reviewed against AgoraRtcEngine_Special_iOS 4.5.3.70's podspec.
+# These are weak-linked optional frameworks; never remove AgoraRtcKit,
+# AgoraRtcWrapper, ReplayKit, codecs, or the regular AINS/AEC frameworks.
+AgoraClearVisionExtension
+AgoraLipSyncExtension
+AgoraSpatialAudioExtension
+AgoraVideoSegmentationExtension
+AgoraFaceCaptureExtension
+AgoraFaceDetectionExtension
+AgoraAudioBeautyExtension
+AgoraContentInspectExtension
+AgoraVideoQualityAnalyzerExtension
+# No custom configuration enables the independent low-latency variants.
+AgoraAiNoiseSuppressionLLExtension
+AgoraAiEchoCancellationLLExtension

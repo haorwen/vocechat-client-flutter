@@ -114,6 +114,12 @@ jobs:
           flutter build ipa --release \
             --export-options-plist=ios/ExportOptions.plist
 
+      - name: Verify Agora framework trimming
+        run: |
+          python3 -m unittest discover -s ios/scripts -p 'test_*.py'
+          python3 ios/scripts/trim_agora_frameworks.py \
+            build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app --verify
+
       - name: Upload to TestFlight
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
