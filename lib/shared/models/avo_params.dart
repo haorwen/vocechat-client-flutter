@@ -29,6 +29,23 @@ class AvoParams {
     energy: 0.6,
   );
 
+  /// Generates a repeatable identity without relying on platform-specific
+  /// String.hashCode or Random. Hash the full name before the protocol's
+  /// 20-character limit so names sharing a prefix still get different shapes.
+  /// Equal trimmed names intentionally produce the same identity.
+  factory AvoParams.fromName(String name) {
+    final trimmed = name.trim();
+    final identity = trimmed.isEmpty ? 'guest' : trimmed;
+    final seed = _hash(identity);
+    return AvoParams(
+      name: _runes(identity),
+      variant: seed.toSigned(32),
+      hue: allowedHues[_hash('$identity:hue') % allowedHues.length],
+      style: const ['blob', 'ring', 'wave'][_hash('$identity:style') % 3],
+      energy: (2 + _hash('$identity:energy') % 19) / 20.0,
+    );
+  }
+
   /// Sanitizes both API and imported JSON. Malformed values never prevent a
   /// user directory or login from loading.
   factory AvoParams.normalize(Map<String, dynamic>? json,
@@ -80,9 +97,13 @@ class AvoParams {
   /// The reference's unsigned FNV-1a hash over UTF-16 code units.
   /// Split multiplication keeps Math.imul's low 32 bits exact on Flutter Web.
   int get stableSeed {
-    var hash = 0x811c9dc5;
     final referenceName = name.isEmpty ? 'guest' : name;
-    for (final unit in '$referenceName#${variant.toSigned(32)}'.codeUnits) {
+    return _hash('$referenceName#${variant.toSigned(32)}');
+  }
+
+  static int _hash(String value) {
+    var hash = 0x811c9dc5;
+    for (final unit in value.codeUnits) {
       hash ^= unit;
       hash = (((hash & 0xffff) * 0x01000193) +
               (((hash >> 16) * 0x0193 & 0xffff) << 16)) &

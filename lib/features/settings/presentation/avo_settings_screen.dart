@@ -17,7 +17,7 @@ class AvoSettingsCard extends ConsumerStatefulWidget {
 }
 
 class _AvoSettingsCardState extends ConsumerState<AvoSettingsCard> {
-  AvoParams _params = AvoParams.defaults;
+  AvoParams _params = AvoParams.fromName('guest');
   late final TextEditingController _nameController =
       TextEditingController(text: _params.name);
   bool _loading = true;
@@ -26,10 +26,27 @@ class _AvoSettingsCardState extends ConsumerState<AvoSettingsCard> {
   @override
   void initState() {
     super.initState();
+    final auth = ref.read(authControllerProvider).valueOrNull;
+    if (auth is AuthStateAuthenticated) {
+      _params = auth.user.avoParams ?? AvoParams.fromName(auth.user.name);
+    }
     _load();
   }
 
   Future<void> _load() async {
+    try {
+      final auth = await ref.read(authControllerProvider.future);
+      if (!mounted) return;
+      if (auth is AuthStateAuthenticated) {
+        setState(() {
+          _params = auth.user.avoParams ?? AvoParams.fromName(auth.user.name);
+          _nameController.text = _params.name;
+        });
+      }
+    } catch (_) {
+      // Keep the local preview usable if the account is unavailable.
+    }
+    if (!mounted) return;
     // Settings is also rendered by logged-out/loading shells and by widget
     // tests. Do not start Dio's retry chain until an account-scoped token is
     // actually available; Avo is optional and defaults are sufficient here.
@@ -51,7 +68,10 @@ class _AvoSettingsCardState extends ConsumerState<AvoSettingsCard> {
       return;
     }
     try {
-      final params = await ref.read(userApiProvider).getAvo();
+      final auth = ref.read(authControllerProvider).valueOrNull;
+      final params = await ref.read(userApiProvider).getAvo(
+          fallbackName:
+              auth is AuthStateAuthenticated ? auth.user.name : _params.name);
       if (mounted) {
         _nameController.text = params.name;
         setState(() => _params = params);
@@ -133,8 +153,7 @@ class _AvoSettingsCardState extends ConsumerState<AvoSettingsCard> {
               maxLength: 20,
               decoration: InputDecoration(labelText: l.avoNameLabel),
               controller: _nameController,
-              onChanged: (v) =>
-                  setState(() => _params = _params.copyWith(name: v)),
+              onChanged: (v) => setState(() => _params = AvoParams.fromName(v)),
             ),
             DropdownButtonFormField<String>(
               value: _params.style,

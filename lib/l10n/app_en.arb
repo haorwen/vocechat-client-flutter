@@ -464,7 +464,7 @@
   "voiceLeave": "Leave call",
   "voiceConnected": "Voice connected",
   "voiceReconnecting": "Reconnecting...",
-  "avoDescription": "Customize the avatar shown when your camera is off.",
+  "avoDescription": "Generate your Avo from a name: the same name always creates the same avatar. Customize its style, color and energy, then save it for when your camera is off.",
   "avoNameLabel": "Name",
   "avoStyleLabel": "Style",
   "avoStyleBlob": "Blob",

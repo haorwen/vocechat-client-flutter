@@ -33,7 +33,7 @@ class VoiceParticipantVideoTile extends ConsumerWidget {
     final userDir = ref.watch(userDirectoryProvider).valueOrNull ?? const {};
     final summary = userDir[uid];
     final name = summary?.name ?? '#$uid';
-    final avoParams = summary?.avoParams ?? AvoParams.defaults;
+    final avoParams = summary?.avoParams ?? AvoParams.fromName(name);
     final controller = ref.read(voiceControllerProvider.notifier);
     final engine = controller.engineOrNull;
     final channelName = controller.channelNameOrNull;

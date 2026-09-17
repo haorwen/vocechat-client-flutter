@@ -1098,7 +1098,7 @@ class AppL10nJa extends AppL10n {
   String get voiceReconnecting => 'Reconnecting...';
 
   @override
-  String get avoDescription => 'Customize the avatar shown when your camera is off.';
+  String get avoDescription => 'Generate your Avo from a name: the same name always creates the same avatar. Customize its style, color and energy, then save it for when your camera is off.';
 
   @override
   String get avoNameLabel => 'Name';

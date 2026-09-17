@@ -21,7 +21,7 @@ class _AvoPreview extends StatefulWidget {
 }
 
 class _AvoPreviewState extends State<_AvoPreview> {
-  AvoParams _params = AvoParams.defaults.copyWith(name: 'Han');
+  AvoParams _params = AvoParams.fromName('Han');
   double _level = 0;
 
   @override
@@ -64,11 +64,11 @@ class _AvoPreviewState extends State<_AvoPreview> {
               ),
           ]),
           const SizedBox(height: 24),
-          TextField(
-            controller: null,
+          TextFormField(
+            initialValue: _params.name,
             decoration: InputDecoration(labelText: l.avoPreviewNameLabel),
             onChanged: (name) =>
-                setState(() => _params = _params.copyWith(name: name)),
+                setState(() => _params = AvoParams.fromName(name)),
           ),
           Text(l.avoVoiceLevel((_level * 100).round())),
           Slider(

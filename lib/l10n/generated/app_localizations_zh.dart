@@ -1098,7 +1098,7 @@ class AppL10nZh extends AppL10n {
   String get voiceReconnecting => '正在重新连接...';
 
   @override
-  String get avoDescription => '自定义关闭摄像头时显示的 Avo 虚拟形象。';
+  String get avoDescription => '根据名字生成专属 Avo：相同名字会生成相同形象。还可以调整造型、颜色和活跃度，保存后在关闭摄像头时显示。';
 
   @override
   String get avoNameLabel => '名称';

@@ -45,8 +45,11 @@ class VoceUser with _$VoceUser {
     AvoParams? avoParams,
   }) = _VoceUser;
 
-  factory VoceUser.fromJson(Map<String, dynamic> json) =>
-      _$VoceUserFromJson(json);
+  factory VoceUser.fromJson(Map<String, dynamic> json) => _$VoceUserFromJson({
+        ...json,
+        // The API uses snake_case; existing local account JSON uses camelCase.
+        'avoParams': json['avo_params'] ?? json['avoParams'],
+      });
 }
 
 AvoParams? _avoParamsFromJson(Object? value) =>

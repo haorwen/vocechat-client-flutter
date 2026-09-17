@@ -55,24 +55,40 @@ class UserApi {
     return VoceUser.fromJson(resp.data as Map<String, dynamic>);
   }
 
-  Future<AvoParams> getAvo() async {
+  Future<AvoParams> getAvo({String fallbackName = 'guest'}) async {
     try {
       final resp = await _dio.get('/api/user/avo');
-      final data = resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : <String, dynamic>{};
-      final raw = data['avo_params'] is Map ? data['avo_params'] as Map : data;
-      return AvoParams.normalize(Map<String, dynamic>.from(raw));
+      final data = resp.data is Map
+          ? Map<String, dynamic>.from(resp.data as Map)
+          : <String, dynamic>{};
+      final raw = data.containsKey('avo_params') ? data['avo_params'] : data;
+      return raw is Map && raw.isNotEmpty
+          ? AvoParams.normalize(Map<String, dynamic>.from(raw),
+              fallbackName: fallbackName)
+          : AvoParams.fromName(fallbackName);
     } on DioException {
       // Older servers may only expose the field through /api/user/me.
       final resp = await _dio.get('/api/user/me');
-      final data = resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : <String, dynamic>{};
-      return AvoParams.normalize(data['avo_params'] is Map ? Map<String, dynamic>.from(data['avo_params'] as Map) : null);
+      final data = resp.data is Map
+          ? Map<String, dynamic>.from(resp.data as Map)
+          : <String, dynamic>{};
+      final name = data['name'] as String? ?? fallbackName;
+      final raw = data['avo_params'];
+      return raw is Map && raw.isNotEmpty
+          ? AvoParams.normalize(Map<String, dynamic>.from(raw),
+              fallbackName: name)
+          : AvoParams.fromName(name);
     }
   }
 
   Future<VoceUser> updateAvo(AvoParams params) async {
     final resp = await _dio.put('/api/user/avo', data: params.toJson());
-    final data = resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : <String, dynamic>{};
-    final userData = data['user'] is Map ? Map<String, dynamic>.from(data['user'] as Map) : data;
+    final data = resp.data is Map
+        ? Map<String, dynamic>.from(resp.data as Map)
+        : <String, dynamic>{};
+    final userData = data['user'] is Map
+        ? Map<String, dynamic>.from(data['user'] as Map)
+        : data;
     return VoceUser.fromJson(userData);
   }
 

@@ -14,6 +14,8 @@ import 'package:vocechat_client/features/settings/application/server_version_pro
 import 'package:vocechat_client/features/settings/presentation/avo_settings_screen.dart';
 import 'package:vocechat_client/features/settings/presentation/settings_screen.dart';
 import 'package:vocechat_client/l10n/generated/app_localizations.dart';
+import 'package:vocechat_client/shared/models/avo_params.dart';
+import 'package:vocechat_client/shared/widgets/avo_avatar.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -41,6 +43,21 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
       expect(find.byType(AvoSettingsCard), findsOneWidget);
       expect(find.byKey(const Key('avo-name')), findsOneWidget);
+      expect(tester.widget<AvoAvatar>(find.byType(AvoAvatar)).params,
+          AvoParams.fromName('Regular user'));
+      await tester.enterText(find.byKey(const Key('avo-name')), '张三');
+      await tester.pump();
+      final generated = tester.widget<AvoAvatar>(find.byType(AvoAvatar)).params;
+      expect(generated, AvoParams.fromName('张三'));
+      await tester.enterText(find.byKey(const Key('avo-name')), 'Alice');
+      await tester.pump();
+      expect(tester.widget<AvoAvatar>(find.byType(AvoAvatar)).params,
+          isNot(generated));
+      await tester.enterText(find.byKey(const Key('avo-name')), '张三');
+      await tester.pump();
+      expect(
+          tester.widget<AvoAvatar>(find.byType(AvoAvatar)).params, generated);
+      tester.testTextInput.hide();
       expect(tester.takeException(), isNull);
 
       if (width < 700) {

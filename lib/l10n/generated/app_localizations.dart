@@ -2180,7 +2180,7 @@ abstract class AppL10n {
   /// No description provided for @avoDescription.
   ///
   /// In en, this message translates to:
-  /// **'Customize the avatar shown when your camera is off.'**
+  /// **'Generate your Avo from a name: the same name always creates the same avatar. Customize its style, color and energy, then save it for when your camera is off.'**
   String get avoDescription;
 
   /// No description provided for @avoNameLabel.
