@@ -6,7 +6,7 @@ part of 'user_directory_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$userDirectoryHash() => r'023adfa40c275a9cd3640853fee4465aa873a10c';
+String _$userDirectoryHash() => r'e4b5cf60812c73ea6b6bb3bed19a60993550f9e1';
 
 /// See also [UserDirectory].
 @ProviderFor(UserDirectory)

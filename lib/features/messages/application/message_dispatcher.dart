@@ -80,9 +80,7 @@ class MessageDispatcher extends _$MessageDispatcher {
           }
 
           // Update the conversation list preview/timestamp.
-          ref
-              .read(conversationsProvider.notifier)
-              .applyIncomingMessage(msg);
+          ref.read(conversationsProvider.notifier).applyIncomingMessage(msg);
 
           // NOTE: We intentionally do NOT touch chatControllerProvider here.
           // Each ChatController.build() already does `ref.listen(
@@ -106,6 +104,12 @@ class MessageDispatcher extends _$MessageDispatcher {
           }
           return;
         }
+        if (event is ChatEventUsersSnapshot) {
+          unawaited(ref
+              .read(userDirectoryProvider.notifier)
+              .applySnapshot(event.users));
+          return;
+        }
         if (event is ChatEventUserSettings) {
           _applyPinnedChatsSnapshot(event.data);
           _applyReadIndexSnapshot(event.data);
@@ -124,10 +128,15 @@ class MessageDispatcher extends _$MessageDispatcher {
           _handleKick(event.reason);
           return;
         }
-        if (event is ChatEventUnknown && (event.type == 'user_changed' || event.type == 'user_updated' || event.type == 'avo_changed')) {
+        if (event is ChatEventUnknown &&
+            (event.type == 'user_changed' ||
+                event.type == 'user_updated' ||
+                event.type == 'avo_changed')) {
           final decoded = _decode(event.raw);
           if (decoded != null) {
-            unawaited(ref.read(userDirectoryProvider.notifier).applyUserUpdate(decoded));
+            unawaited(ref
+                .read(userDirectoryProvider.notifier)
+                .applyUserUpdate(decoded));
           }
           return;
         }
@@ -141,6 +150,17 @@ class MessageDispatcher extends _$MessageDispatcher {
         }
         if (event is ChatEventUnknown) {
           switch (event.type) {
+            case 'users_log':
+              final logs = _decode(event.raw)?['logs'];
+              if (logs is List) {
+                unawaited(ref.read(userDirectoryProvider.notifier).applyLogs(
+                      logs
+                          .whereType<Map>()
+                          .map((m) => Map<String, dynamic>.from(m))
+                          .toList(),
+                    ));
+              }
+              break;
             case 'users_state':
               final decoded = _decode(event.raw);
               final users = decoded?['users'];
@@ -240,16 +260,20 @@ class MessageDispatcher extends _$MessageDispatcher {
 
   /// Burn-after-read snapshot from `user_settings`: replace wholesale.
   void _applyBurnAfterReadSnapshot(Map<String, dynamic> data) {
-    final users = _parseBurnAfterReading(data['burn_after_reading_users'], 'uid');
-    final groups = _parseBurnAfterReading(data['burn_after_reading_groups'], 'gid');
+    final users =
+        _parseBurnAfterReading(data['burn_after_reading_users'], 'uid');
+    final groups =
+        _parseBurnAfterReading(data['burn_after_reading_groups'], 'gid');
     ref.read(burnAfterReadProvider.notifier).applySnapshot(users, groups);
   }
 
   /// Burn-after-read delta from `user_settings_changed` (e.g. changed on
   /// another device): per-entry upsert/remove based on `expires_in`.
   void _applyBurnAfterReadDelta(Map<String, dynamic> data) {
-    final users = _parseBurnAfterReading(data['burn_after_reading_users'], 'uid');
-    final groups = _parseBurnAfterReading(data['burn_after_reading_groups'], 'gid');
+    final users =
+        _parseBurnAfterReading(data['burn_after_reading_users'], 'uid');
+    final groups =
+        _parseBurnAfterReading(data['burn_after_reading_groups'], 'gid');
     if (users.isEmpty && groups.isEmpty) return;
     ref.read(burnAfterReadProvider.notifier).applyDelta(users, groups);
   }
@@ -382,10 +406,9 @@ class MessageDispatcher extends _$MessageDispatcher {
         ref
             .read(chatControllerProvider(chatTarget).notifier)
             .applyEditEcho(detail.mid, content, contentType);
-        ref
-            .read(conversationsProvider.notifier)
-            .applyEditEcho(msg.target, detail.mid, content,
-                fromUid: msg.fromUid);
+        ref.read(conversationsProvider.notifier).applyEditEcho(
+            msg.target, detail.mid, content,
+            fromUid: msg.fromUid);
       }
     }
   }
@@ -402,10 +425,11 @@ class MessageDispatcher extends _$MessageDispatcher {
         final authState = ref.read(authControllerProvider).valueOrNull;
         final currentUid =
             authState is AuthStateAuthenticated ? authState.user.uid : null;
-        final peerUid =
-            currentUid != null && msg.fromUid != currentUid && t.uid == currentUid
-                ? msg.fromUid
-                : t.uid;
+        final peerUid = currentUid != null &&
+                msg.fromUid != currentUid &&
+                t.uid == currentUid
+            ? msg.fromUid
+            : t.uid;
         return MessageTarget.user(uid: peerUid);
       },
       group: (t) => MessageTarget.group(gid: t.gid),
