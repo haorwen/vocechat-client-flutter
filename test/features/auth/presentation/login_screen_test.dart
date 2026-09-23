@@ -12,7 +12,7 @@ import 'package:vocechat_client/l10n/generated/app_localizations.dart';
 
 void main() {
   Future<void> mount(WidgetTester tester, _Credentials credentials,
-      {AuthRestoreFailure? failure}) async {
+      {AuthRestoreFailure? failure, _Auth? auth}) async {
     tester.view.physicalSize = const Size(450, 1100);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -20,7 +20,7 @@ void main() {
     await tester.pumpWidget(ProviderScope(
       overrides: [
         serverStoreProvider.overrideWith(_Server.new),
-        authControllerProvider.overrideWith(_Auth.new),
+        authControllerProvider.overrideWith(() => auth ?? _Auth()),
         secureTokenStoreProvider('server').overrideWith((ref) => credentials),
         authRestoreFailureProvider.overrideWith((ref) => failure),
       ],
@@ -38,6 +38,21 @@ void main() {
       .widget<TextFormField>(find.byType(TextFormField).at(index))
       .controller!
       .text;
+
+  for (final email in ['xx@vip.qq.com', 'user+tag@mail.example.co.uk']) {
+    testWidgets('login submits $email after trimming surrounding spaces',
+        (tester) async {
+      final auth = _Auth();
+      await mount(tester, _Credentials(() async => null), auth: auth);
+      await tester.enterText(find.byType(TextFormField).first, '  $email  ');
+      await tester.enterText(find.byType(TextFormField).last, 'test-password');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(auth.submittedEmail, email);
+      expect(auth.submittedPassword, 'test-password');
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('saved email/password and checkbox are restored on opening login',
       (tester) async {
@@ -123,6 +138,16 @@ class _Server extends ServerStore {
 }
 
 class _Auth extends AuthController {
+  String? submittedEmail;
+  String? submittedPassword;
+
+  @override
+  Future<void> login(String email, String password,
+      {bool rememberMe = false, String? serverUrl}) async {
+    submittedEmail = email;
+    submittedPassword = password;
+  }
+
   @override
   Future<AuthState> build() async => const AuthState.unauthenticated();
 }

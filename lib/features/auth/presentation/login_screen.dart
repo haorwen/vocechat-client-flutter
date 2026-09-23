@@ -11,6 +11,7 @@ import '../../../core/storage/server_store.dart';
 import '../../../core/utils/safe_text.dart';
 import '../../../features/messages/application/message_dispatcher.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/utils/email_validator.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../application/auth_controller.dart';
 
@@ -258,9 +259,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       if (v == null || v.trim().isEmpty) {
                         return l.loginEmailRequired;
                       }
-                      final emailRegex =
-                          RegExp(r'^[\w\.\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
-                      if (!emailRegex.hasMatch(v.trim())) {
+                      if (!isValidEmail(v)) {
                         return l.loginEmailInvalid;
                       }
                       return null;

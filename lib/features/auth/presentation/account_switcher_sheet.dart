@@ -8,6 +8,7 @@ import '../../../core/storage/server_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/utils/email_validator.dart';
 import '../../../shared/utils/server_url_validator.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../../../shared/widgets/voce_dialog.dart';
@@ -389,9 +390,7 @@ class _AddAccountScreenState extends ConsumerState<_AddAccountScreen> {
                     if (v == null || v.trim().isEmpty) {
                       return l.loginEmailRequired;
                     }
-                    final emailRegex =
-                        RegExp(r'^[\w\.\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
-                    if (!emailRegex.hasMatch(v.trim())) {
+                    if (!isValidEmail(v)) {
                       return l.loginEmailInvalid;
                     }
                     return null;

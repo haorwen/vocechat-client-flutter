@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/utils/email_validator.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../application/auth_controller.dart';
 
@@ -168,9 +169,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     if (v == null || v.trim().isEmpty) {
                       return l.registerEmailRequired;
                     }
-                    final regex =
-                        RegExp(r'^[\w\.\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
-                    if (!regex.hasMatch(v.trim())) {
+                    if (!isValidEmail(v)) {
                       return l.registerEmailInvalid;
                     }
                     return null;
