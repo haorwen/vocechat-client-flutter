@@ -24,23 +24,25 @@ import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import 'file_display_utils.dart';
 
-/// Renders a `vocechat/file` message — image, video, audio, or generic file.
+/// Renders a `vocechat/file` attachment or a `vocechat/audio` voice message.
 ///
 /// Mirrors the web reference's FileMessage dispatch:
 ///   - image content_type (excl. raw camera, size ≤ 10MB) → inline thumbnail,
 ///     tap opens a full-screen viewer with download / zoom-in / zoom-out /
 ///     fullscreen / close (web lightbox parity).
 ///   - video → thumb with play overlay, tap opens chewie full-screen player.
-///   - audio → inline just_audio player.
+///   - vocechat/audio → inline voice player, independent of the file MIME.
+///   - audio files → file card with a download button.
 ///   - other → file card with a download button.
 ///
-/// vocechat/file body is JSON `{"path": "<server path>"}`. Width/height/name/
-/// content_type/size come from the message's `properties` map.
+/// The server returns a bare resource path; local rows may use JSON
+/// `{"path": "<server path>"}`. File metadata comes from `properties`.
 class FileMessageContent extends ConsumerWidget {
   const FileMessageContent({
     super.key,
     required this.content,
     required this.properties,
+    this.messageContentType = 'vocechat/file',
     this.localBytes,
     this.sending = false,
     this.progress,
@@ -49,6 +51,10 @@ class FileMessageContent extends ConsumerWidget {
 
   final String content;
   final Map<String, dynamic>? properties;
+
+  /// The message type, distinct from the attachment's MIME in [properties].
+  /// Only the recording entry point sends `vocechat/audio`.
+  final String messageContentType;
 
   /// Local image bytes for an optimistic (not-yet-uploaded) row. When set and
   /// the message is an image, the bubble previews from memory instead of the
@@ -81,6 +87,19 @@ class FileMessageContent extends ConsumerWidget {
       );
     }
 
+    if (messageContentType == 'vocechat/audio') {
+      final urls = parsed.path.startsWith('local:')
+          ? null
+          : _buildResourceUrls(ref, parsed.path);
+      return _AudioBubble(
+        key: ValueKey((urls?.originCacheKey ?? parsed.path, cacheMedia)),
+        urls: urls,
+        cacheMedia: cacheMedia,
+        sending: sending,
+        progress: progress,
+      );
+    }
+
     // Optimistic local image: render directly from memory (no server URL yet).
     if (localBytes != null && _isImage(parsed.contentType, parsed.size)) {
       return _LocalImageBubble(
@@ -110,14 +129,6 @@ class FileMessageContent extends ConsumerWidget {
     }
     if (parsed.contentType.startsWith('video')) {
       return _VideoBubble(
-        key: ValueKey((urls.originCacheKey, cacheMedia)),
-        meta: parsed,
-        urls: urls,
-        cacheMedia: cacheMedia,
-      );
-    }
-    if (parsed.contentType.startsWith('audio')) {
-      return _AudioBubble(
         key: ValueKey((urls.originCacheKey, cacheMedia)),
         meta: parsed,
         urls: urls,
@@ -1282,26 +1293,29 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> with WidgetsBind
 }
 
 // ---------------------------------------------------------------------------
-// Audio bubble (inline just_audio player)
+// Voice message bubble (inline just_audio player)
 // ---------------------------------------------------------------------------
 
 class _AudioBubble extends ConsumerStatefulWidget {
   const _AudioBubble({
     super.key,
-    required this.meta,
     required this.urls,
     required this.cacheMedia,
+    required this.sending,
+    this.progress,
   });
 
-  final _FileMeta meta;
-  final _ResourceUrls urls;
+  final _ResourceUrls? urls;
   final bool cacheMedia;
+  final bool sending;
+  final double? progress;
 
   @override
   ConsumerState<_AudioBubble> createState() => _AudioBubbleState();
 }
 
-class _AudioBubbleState extends ConsumerState<_AudioBubble> with WidgetsBindingObserver {
+class _AudioBubbleState extends ConsumerState<_AudioBubble>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
@@ -1311,7 +1325,8 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> with WidgetsBindingO
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (isAndroidBackgroundSupported &&
-        (state == AppLifecycleState.paused || state == AppLifecycleState.hidden)) {
+        (state == AppLifecycleState.paused ||
+            state == AppLifecycleState.hidden)) {
       _player.pause();
     }
   }
@@ -1331,30 +1346,31 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> with WidgetsBindingO
   StreamSubscription<double>? _cacheProgressSub;
 
   Future<void> _load() async {
-    if (_ready || _loading) return;
+    final urls = widget.urls;
+    if (_ready || _loading || urls == null) return;
     setState(() => _loading = true);
     String? writerPath;
     int? writerToken;
     Map<String, String>? resolvedHeaders;
     try {
-      final headers = await _buildAuthHeaders(ref, widget.urls.baseUrl);
+      final headers = await _buildAuthHeaders(ref, urls.baseUrl);
       resolvedHeaders = headers;
       if (!mounted) return;
       late final AudioSource source;
       if (kIsWeb || !widget.cacheMedia) {
         source = AudioSource.uri(
-          Uri.parse(widget.urls.origin),
+          Uri.parse(urls.origin),
           headers: headers,
         );
       } else {
         final cacheFile = await MediaCache.audioFileForKey(
-          widget.urls.originCacheKey,
+          urls.originCacheKey,
         );
         if (!mounted) return;
         final readerToken = MediaCache.claimAudioCacheReader(cacheFile.path);
         if (readerToken == null) {
           source = AudioSource.uri(
-            Uri.parse(widget.urls.origin),
+            Uri.parse(urls.origin),
             headers: headers,
           );
         } else {
@@ -1368,13 +1384,13 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> with WidgetsBindingO
           // same `.part` file.
           _releaseAudioCacheReader();
           source = AudioSource.uri(
-            Uri.parse(widget.urls.origin),
+            Uri.parse(urls.origin),
             headers: headers,
           );
         } else if (writerToken != null) {
           writerPath = cacheFile.path;
           final cacheSource = LockCachingAudioSource(
-            Uri.parse(widget.urls.origin),
+            Uri.parse(urls.origin),
             headers: headers,
             cacheFile: cacheFile,
           );
@@ -1406,7 +1422,7 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> with WidgetsBindingO
         try {
           final dur = await _player.setAudioSource(
             AudioSource.uri(
-              Uri.parse(widget.urls.origin),
+              Uri.parse(urls.origin),
               headers: resolvedHeaders,
             ),
           );
@@ -1453,50 +1469,13 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> with WidgetsBindingO
       return;
     }
     if (!_ready) await _load();
-    if (mounted && _ready && (!isAndroidBackgroundSupported ||
-        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed)) {
+    if (mounted &&
+        _ready &&
+        (!isAndroidBackgroundSupported ||
+            WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed)) {
       await _player.play();
     }
-  }
-
-  Future<void> _download() async {
-    var cachedFile = widget.cacheMedia
-        ? await MediaCache.completedAudioFile(widget.urls.originCacheKey)
-        : null;
-    if (cachedFile == null && widget.cacheMedia) {
-      final candidate = await MediaCache.audioFileForKey(
-        widget.urls.originCacheKey,
-      );
-      try {
-        if (await candidate.exists() && await candidate.length() > 0) {
-          cachedFile = candidate;
-        }
-      } catch (_) {
-        // An eviction racing this lookup is an ordinary cache miss.
-      }
-    }
-    if (cachedFile != null) {
-      if (!mounted) return;
-      await downloadAndSave(
-        context,
-        ProviderScope.containerOf(context, listen: false),
-        widget.urls.download,
-        widget.meta.name,
-        contentType: widget.meta.contentType,
-        cacheKey: widget.urls.originCacheKey,
-        cachedFile: cachedFile,
-      );
-      return;
-    }
-    if (!mounted) return;
-    await downloadAndSave(
-      context,
-      ProviderScope.containerOf(context, listen: false),
-      widget.urls.download,
-      widget.meta.name,
-      contentType: widget.meta.contentType,
-      cacheKey: widget.cacheMedia ? widget.urls.originCacheKey : null,
-    );
   }
 
   @override
@@ -1525,15 +1504,14 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> with WidgetsBindingO
   @override
   Widget build(BuildContext context) {
     if (_failed) {
-      return _ExpiredCard(kind: _ExpiredKind.audio, name: widget.meta.name);
+      return _ExpiredCard(
+        kind: _ExpiredKind.audio,
+        name: AppL10n.of(context).chatVoiceMessage,
+      );
     }
     final playing = _player.playing;
-    final label = widget.meta.name.isEmpty
-        ? widget.meta.path.split('/').last
-        : widget.meta.name;
     final total = _duration ?? Duration.zero;
     final pos = _position > total ? total : _position;
-    final sizeLabel = formatBytes(widget.meta.size);
 
     return Container(
       constraints: const BoxConstraints(maxWidth: 320),
@@ -1549,12 +1527,11 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> with WidgetsBindingO
         children: [
           Row(
             children: [
-              Icon(Icons.audiotrack_outlined,
-                  color: AppTokens.primary500, size: 22),
+              Icon(Icons.graphic_eq, color: AppTokens.primary500, size: 22),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  safeText(label),
+                  AppL10n.of(context).chatVoiceMessage,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -1564,37 +1541,21 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> with WidgetsBindingO
                   ),
                 ),
               ),
-              if (sizeLabel.isNotEmpty)
-                Text(
-                  sizeLabel,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppTokens.gray500,
-                  ),
-                ),
-              IconButton(
-                tooltip: AppL10n.of(context).tooltipDownload,
-                icon: Icon(
-                  Icons.download_outlined,
-                  color: AppTokens.gray500,
-                  size: 18,
-                ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                onPressed: _download,
-              ),
             ],
           ),
           const SizedBox(height: 6),
           Row(
             children: [
               IconButton(
-                onPressed: _loading ? null : _togglePlayback,
-                icon: _loading
+                onPressed: _loading || widget.sending || widget.urls == null
+                    ? null
+                    : _togglePlayback,
+                icon: _loading || widget.sending
                     ? SizedBox(
                         width: 32,
                         height: 32,
                         child: CircularProgressIndicator(
+                          value: widget.sending ? widget.progress : null,
                           strokeWidth: 2,
                           color: AppTokens.primary500,
                         ),
@@ -1639,7 +1600,9 @@ class _AudioBubbleState extends ConsumerState<_AudioBubble> with WidgetsBindingO
               ),
               const SizedBox(width: 4),
               Text(
-                '${_formatDuration(pos)} / ${_formatDuration(total)}',
+                _duration == null
+                    ? '--:--'
+                    : '${_formatDuration(pos)} / ${_formatDuration(total)}',
                 style: TextStyle(
                   fontSize: 11,
                   color: AppTokens.gray500,

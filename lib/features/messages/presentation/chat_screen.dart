@@ -468,10 +468,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  /// Open the voice-recording sheet; on confirm, upload the recorded clip
-  /// through the same `sendImage` pipeline used for staged files (reusing
-  /// the existing optimistic-row + upload machinery rather than adding a
-  /// parallel send path).
+  /// Record and send a voice message using the cross-client audio protocol.
   Future<void> _recordVoiceMessage() async {
     final l = AppL10n.of(context);
     final bytes = await showModalBottomSheet<Uint8List>(
@@ -483,10 +480,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (bytes == null || bytes.isEmpty || !mounted) return;
     try {
       final notifier = ref.read(chatControllerProvider(_target).notifier);
-      await notifier.sendImage(
+      await notifier.sendVoiceMessage(
         bytes: bytes,
         filename: 'voice_${DateTime.now().millisecondsSinceEpoch}.m4a',
-        contentType: 'audio/mp4',
       );
     } catch (e) {
       if (mounted) {
@@ -1709,7 +1705,8 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         onCancel: widget.onEditCancel ?? () {},
       );
     } else if (detail is NormalMessageDetail || msg.isEdited) {
-      if (displayContentType == 'vocechat/file') {
+      if (displayContentType == 'vocechat/file' ||
+          displayContentType == 'vocechat/audio') {
         final props = detail is NormalMessageDetail ? detail.properties : null;
         final notifier =
             ref.read(chatControllerProvider(widget.target).notifier);
@@ -1720,6 +1717,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         content = FileMessageContent(
           content: displayContent,
           properties: props,
+          messageContentType: displayContentType,
           localBytes: localBytes,
           sending: isSending,
           progress: isSending ? notifier.progressFor(msg.mid) : null,
@@ -1843,10 +1841,12 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                   ),
                 ),
           const SizedBox(height: 4),
-          if (displayContentType == 'vocechat/file')
+          if (displayContentType == 'vocechat/file' ||
+              displayContentType == 'vocechat/audio')
             FileMessageContent(
               content: displayContent,
               properties: detail.properties,
+              messageContentType: displayContentType,
               cacheMedia: expiresIn == null,
             )
           else if (displayContentType == 'vocechat/archive')
@@ -2320,7 +2320,7 @@ class _ReplyQuotePreview extends StatelessWidget {
       );
     }
 
-    if (type == 'text/audio' || type.startsWith('audio')) {
+    if (type == 'vocechat/audio') {
       return Text(
         l.chatReplyVoiceMessage,
         style: TextStyle(

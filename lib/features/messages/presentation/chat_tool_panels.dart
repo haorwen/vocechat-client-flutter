@@ -364,6 +364,7 @@ class _FavArchiveCard extends ConsumerWidget {
     if (ct == 'text/plain' || ct == 'text/markdown') {
       return (body.content ?? '').trim();
     }
+    if (ct == 'vocechat/audio') return l.previewVoice;
     if (ct == 'vocechat/file') {
       final fileType = (body.properties?['content_type'] as String?) ?? '';
       final name = body.properties?['name'] as String?;
@@ -810,9 +811,10 @@ class _MessageListTile extends StatelessWidget {
   final String contentType;
   final Widget? trailing;
 
-  String _previewContent() {
+  String _previewContent(AppL10n l) {
     if (contentType.startsWith('text/')) return content;
     if (contentType.startsWith('image/')) return '[image]';
+    if (contentType == 'vocechat/audio') return l.previewVoice;
     if (contentType == 'vocechat/file') return '[file]';
     return content.isEmpty ? '[$contentType]' : content;
   }
@@ -871,7 +873,7 @@ class _MessageListTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  safeText(_previewContent()),
+                  safeText(_previewContent(AppL10n.of(context))),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

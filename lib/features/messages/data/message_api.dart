@@ -120,8 +120,9 @@ class MessageApi {
   }
 
   /// Uploads raw [bytes] (e.g. from the clipboard, which has no file path) in a
-  /// single chunk, then sends a `vocechat/file` message referencing the stored
-  /// path.
+  /// single chunk, then sends a message referencing the stored path. Only a
+  /// client recording sets [isVoiceMessage] to send `vocechat/audio`; picked
+  /// audio files remain ordinary `vocechat/file` attachments.
   ///
   /// Flow mirrors the web reference: prepare → upload(single chunk) → send. The
   /// `X-Properties` header carries name/content_type/size/width/height so the
@@ -132,6 +133,7 @@ class MessageApi {
     required Uint8List bytes,
     required String filename,
     String? contentType,
+    bool isVoiceMessage = false,
     int? width,
     int? height,
     int? localId,
@@ -191,8 +193,8 @@ class MessageApi {
     final outW = (imgProps?['width'] as num?)?.toInt() ?? width;
     final outH = (imgProps?['height'] as num?)?.toInt() ?? height;
 
-    // Step 3: send file message — content_type must be vocechat/file. The
-    // server parses the body as JSON (Json<FileInfo>), so the body must be a
+    // Step 3: send the file or recorded voice message. The server parses both
+    // bodies as JSON (Json<FileInfo>), so the body must be a
     // JSON string `{"path":"..."}` — mirror the web client's
     // `JSON.stringify(content)`. Passing a raw Map with a non-JSON content type
     // would make Dio's default transformer emit Dart map toString (invalid
@@ -213,7 +215,7 @@ class MessageApi {
       _sendPath(target),
       data: jsonEncode({'path': path}),
       options: Options(
-        contentType: 'vocechat/file',
+        contentType: isVoiceMessage ? 'vocechat/audio' : 'vocechat/file',
         headers: {
           'X-Properties': base64Encode(utf8.encode(jsonEncode(properties))),
         },

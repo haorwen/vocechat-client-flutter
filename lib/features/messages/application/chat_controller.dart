@@ -109,7 +109,7 @@ class ChatController extends _$ChatController {
   /// UI-only send status keyed by mid (negative for optimistic, then real mid).
   final Map<int, MessageSendStatus> _statuses = {};
 
-  /// Local image/file bytes for optimistic `vocechat/file` rows, keyed by the
+  /// Local attachment bytes for optimistic file/voice rows, keyed by the
   /// row's current mid. Lets the UI render a preview from memory before the
   /// upload finishes. Migrated tempMid → realMid on confirm, dropped once the
   /// server row (with a real resource URL) lands so we stop holding the bytes.
@@ -789,6 +789,31 @@ class ChatController extends _$ChatController {
     required Uint8List bytes,
     required String filename,
     String? contentType,
+  }) =>
+      _sendAttachment(
+        bytes: bytes,
+        filename: filename,
+        contentType: contentType,
+      );
+
+  /// Send audio recorded by the client as a voice message. Selecting an audio
+  /// file still uses [sendImage] and preserves the ordinary attachment style.
+  Future<void> sendVoiceMessage({
+    required Uint8List bytes,
+    required String filename,
+  }) =>
+      _sendAttachment(
+        bytes: bytes,
+        filename: filename,
+        contentType: 'audio/mp4',
+        isVoiceMessage: true,
+      );
+
+  Future<void> _sendAttachment({
+    required Uint8List bytes,
+    required String filename,
+    String? contentType,
+    bool isVoiceMessage = false,
   }) async {
     final generation = _generation;
     final currentUid = _currentUid() ?? -1;
@@ -817,7 +842,7 @@ class ChatController extends _$ChatController {
       contentType: resolvedType,
     );
 
-    final dims = await _decodeImageSize(bytes);
+    final dims = isVoiceMessage ? null : await _decodeImageSize(bytes);
     if (generation != _generation) return;
 
     final properties = <String, dynamic>{
@@ -835,7 +860,7 @@ class ChatController extends _$ChatController {
       createdAt: DateTime.now().millisecondsSinceEpoch,
       target: target,
       detail: MessageDetail.normal(
-        contentType: 'vocechat/file',
+        contentType: isVoiceMessage ? 'vocechat/audio' : 'vocechat/file',
         // Placeholder content; the real {"path": ...} arrives via the echo.
         content: jsonEncode({'path': 'local:$localId'}),
         properties: properties,
@@ -848,6 +873,7 @@ class ChatController extends _$ChatController {
       bytes: bytes,
       filename: filename,
       contentType: resolvedType,
+      isVoiceMessage: isVoiceMessage,
       localId: localId,
       width: dims?.$1,
       height: dims?.$2,
@@ -861,7 +887,7 @@ class ChatController extends _$ChatController {
     await _runFileUpload(tempMid, _pendingFiles[tempMid]!);
   }
 
-  /// Shared upload+confirm path used by [sendImage] and [retrySend] for files.
+  /// Shared attachment upload/confirm path, including retries of recordings.
   Future<void> _runFileUpload(int tempMid, _PendingFile pending) async {
     final generation = _generation;
     // Throttle progress emissions: byte-level callbacks fire very often and a
@@ -888,6 +914,7 @@ class ChatController extends _$ChatController {
             bytes: pending.bytes,
             filename: pending.filename,
             contentType: pending.contentType,
+            isVoiceMessage: pending.isVoiceMessage,
             width: pending.width,
             height: pending.height,
             localId: pending.localId,
@@ -910,7 +937,8 @@ class ChatController extends _$ChatController {
           mid: result.mid,
           createdAt: DateTime.now().millisecondsSinceEpoch,
           detail: MessageDetail.normal(
-            contentType: 'vocechat/file',
+            contentType:
+                pending.isVoiceMessage ? 'vocechat/audio' : 'vocechat/file',
             content: jsonEncode({'path': result.path}),
             properties: _propertiesOf(placeholder),
             expiresIn: _outgoingExpiresIn(),
@@ -1083,6 +1111,7 @@ class _PendingFile {
     required this.bytes,
     required this.filename,
     required this.contentType,
+    required this.isVoiceMessage,
     required this.localId,
     this.width,
     this.height,
@@ -1091,6 +1120,7 @@ class _PendingFile {
   final Uint8List bytes;
   final String filename;
   final String? contentType;
+  final bool isVoiceMessage;
   final int localId;
   final int? width;
   final int? height;
