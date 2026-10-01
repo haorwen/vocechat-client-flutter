@@ -6,18 +6,13 @@ import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'sse_client.dart';
+import 'resume_reconnect_observer.dart';
 import '../storage/account_store.dart';
 import '../storage/secure_token_store.dart';
 import '../utils/app_log.dart';
 import '../../features/auth/application/auth_controller.dart';
 
 part 'sse_lifecycle.g.dart';
-
-/// Reconnect the SSE stream when the device comes back online or the app
-/// resumes after being backgrounded longer than this. Mirrors the web
-/// reference's 1-day visibility threshold but tightened — mobile sockets
-/// die in minutes, not days.
-const Duration _kForceReconnectAfterBackground = Duration(minutes: 2);
 
 // ---------------------------------------------------------------------------
 // SSE token watcher
@@ -180,7 +175,7 @@ class SseConnectivityWatcher extends _$SseConnectivityWatcher {
 
 @Riverpod(keepAlive: true)
 class SseLifecycleWatcher extends _$SseLifecycleWatcher {
-  _LifecycleObserver? _observer;
+  ResumeReconnectObserver? _observer;
 
   @override
   void build() {
@@ -197,8 +192,9 @@ class SseLifecycleWatcher extends _$SseLifecycleWatcher {
 
   void _start() {
     _stop();
-    _observer = _LifecycleObserver(
-      onResumeAfterLongPause: () {
+    _observer = ResumeReconnectObserver(
+      initialState: WidgetsBinding.instance.lifecycleState,
+      onReconnect: () {
         AppLog.w(LogTag.sse,
             () => '⏰ app resumed after long pause → reconnecting SSE');
         ref
@@ -216,35 +212,5 @@ class SseLifecycleWatcher extends _$SseLifecycleWatcher {
       WidgetsBinding.instance.removeObserver(obs);
     }
     _observer = null;
-  }
-}
-
-class _LifecycleObserver with WidgetsBindingObserver {
-  _LifecycleObserver({required this.onResumeAfterLongPause});
-
-  final VoidCallback onResumeAfterLongPause;
-
-  DateTime? _pausedAt;
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    switch (state) {
-      case AppLifecycleState.paused:
-      case AppLifecycleState.hidden:
-        _pausedAt = DateTime.now();
-        break;
-      case AppLifecycleState.resumed:
-        final pausedAt = _pausedAt;
-        _pausedAt = null;
-        if (pausedAt == null) return;
-        final elapsed = DateTime.now().difference(pausedAt);
-        if (elapsed >= _kForceReconnectAfterBackground) {
-          onResumeAfterLongPause();
-        }
-        break;
-      case AppLifecycleState.inactive:
-      case AppLifecycleState.detached:
-        break;
-    }
   }
 }

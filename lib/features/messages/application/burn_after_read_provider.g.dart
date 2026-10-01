@@ -6,7 +6,7 @@ part of 'burn_after_read_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$burnAfterReadHash() => r'957caaf2b066592b03698765f604e9076eaf0aa8';
+String _$burnAfterReadHash() => r'2ba95cfbac12ba8d922d2f5fc3c9b77df4c86368';
 
 /// See also [BurnAfterRead].
 @ProviderFor(BurnAfterRead)

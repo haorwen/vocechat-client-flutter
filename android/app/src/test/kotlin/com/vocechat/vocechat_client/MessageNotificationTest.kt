@@ -2,19 +2,52 @@ package com.vocechat.vocechat_client
 
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import org.junit.Assert.*
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.SQLiteMode
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
+// Android's native SQLite waits for a competing transaction; the legacy
+// sqlite4java shadow rejects concurrent BEGIN immediately instead.
+@SQLiteMode(SQLiteMode.Mode.NATIVE)
 class MessageNotificationTest {
     private val context: Context get() = RuntimeEnvironment.getApplication()
+
+    @Before fun resetConnections() {
+        MessageNotificationRouter.closeStore()
+        MainActivity.foreground = false
+    }
+
+    @After fun closeConnections() {
+        // Robolectric replaces SQLite connections between test environments;
+        // a Kotlin object's cached helper must not survive that reset.
+        MessageNotificationRouter.closeStore()
+        MainActivity.foreground = false
+    }
+
+    private fun <T> withStore(block: (MessageNotificationStore) -> T): T {
+        val store = MessageNotificationStore(context)
+        try {
+            return block(store)
+        } finally {
+            // SQLiteOpenHelper did not implement AutoCloseable on API 28.
+            // Compiling .use against a newer SDK otherwise adds an invalid cast.
+            store.close()
+        }
+    }
+
     private fun now() = System.currentTimeMillis()
     private fun sample(mid: Long = 42, session: String = "server::1") =
         MessageNotification(session, mid, "u-2", now(), null, "Alice", "hello")
@@ -38,11 +71,11 @@ class MessageNotificationTest {
 
     @Test fun receiptsSurviveReopenAndDoNotUseHighWaterMid() {
         val t = now()
-        MessageNotificationStore(context).use {
+        withStore {
             assertTrue(it.claim("s::1", 200, t, t))
             assertTrue(it.claim("s::1", 100, t, t)) // out-of-order is independent
         }
-        MessageNotificationStore(context).use {
+        withStore {
             assertFalse(it.claim("s::1", 200, t, t))
             assertTrue(it.claim("s::2", 200, t, t))
             assertTrue(it.claim("another::1", 200, t, t))
@@ -53,14 +86,24 @@ class MessageNotificationTest {
         val t = now()
         val gate = CountDownLatch(1)
         val pool = Executors.newFixedThreadPool(2)
+        val stores = List(2) { MessageNotificationStore(context) }
         try {
-            val claims = (1..2).map { pool.submit<Boolean> {
+            // API 28's Robolectric SQLite shadow cannot initialize two
+            // android_metadata tables concurrently. Open independent helpers
+            // first, then race the actual receipt inserts on their connections.
+            stores.forEach { it.writableDatabase }
+            val claims = stores.map { store -> pool.submit<Boolean> {
                 gate.await()
-                MessageNotificationStore(context).use { it.claim("race::1", 99, t, t) }
+                store.claim("race::1", 99, t, t)
             } }
             gate.countDown()
             assertEquals(1, claims.count { it.get() })
-        } finally { pool.shutdownNow() }
+        } finally {
+            gate.countDown()
+            pool.shutdownNow()
+            pool.awaitTermination(5, TimeUnit.SECONDS)
+            stores.forEach { it.close() }
+        }
     }
 
     @Test fun foregroundFilteredAndExpiredMessagesCannotAlertLater() {
@@ -88,12 +131,26 @@ class MessageNotificationTest {
 
     @Test fun expiredRetentionCannotResurrectOldTransportMessages() {
         val t = now()
-        MessageNotificationStore(context).use {
+        withStore {
             assertTrue(it.claim("ttl::1", 42, t, t))
             val later = t + 9L * 24 * 60 * 60 * 1000
             assertTrue(it.claim("ttl::1", 43, later, later)) // triggers cleanup
             assertFalse(it.claim("ttl::1", 42, t, later))
         }
+    }
+
+    @Test fun messageTapReusesActivityAndPreservesItsDestination() {
+        prepare()
+        assertTrue(MessageNotificationRouter.deliver(context, sample(501)))
+        val notification = context.getSystemService(NotificationManager::class.java)
+            .activeNotifications.single().notification
+        val intent = shadowOf(notification.contentIntent).savedIntent
+        assertEquals("u-2", intent.getStringExtra("background_target"))
+        assertEquals("server::1", intent.getStringExtra("background_session"))
+        assertEquals("vocechat-notification", intent.data?.scheme)
+        assertEquals(Intent.FLAG_ACTIVITY_CLEAR_TOP, intent.flags and Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        assertEquals(Intent.FLAG_ACTIVITY_SINGLE_TOP, intent.flags and Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        assertEquals(Intent.FLAG_ACTIVITY_NEW_TASK, intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 
 }

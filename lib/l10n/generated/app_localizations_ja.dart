@@ -10,6 +10,18 @@ class AppL10nJa extends AppL10n {
   String get appTitle => 'VoceChat';
 
   @override
+  String get appLoadingSlowTitle => '読み込みに時間がかかっています';
+
+  @override
+  String get appLoadingSlowBody => 'アプリの読み込みを続けています。このまま待つか、再試行してください。保存済みのアカウントは削除されません。';
+
+  @override
+  String get appRecoveryTitle => 'このページを表示できません';
+
+  @override
+  String get appRecoveryBody => '画面の読み込み中にエラーが発生しました。再試行してください。保存済みのアカウントは削除されません。';
+
+  @override
   String get actionCancel => 'キャンセル';
 
   @override

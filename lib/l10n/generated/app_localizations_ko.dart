@@ -10,6 +10,18 @@ class AppL10nKo extends AppL10n {
   String get appTitle => 'VoceChat';
 
   @override
+  String get appLoadingSlowTitle => '불러오는 데 시간이 걸리고 있습니다';
+
+  @override
+  String get appLoadingSlowBody => '앱을 계속 불러오는 중입니다. 더 기다리거나 다시 시도해 주세요. 저장된 계정은 삭제되지 않습니다.';
+
+  @override
+  String get appRecoveryTitle => '이 페이지를 표시할 수 없습니다';
+
+  @override
+  String get appRecoveryBody => '화면을 불러오는 중 오류가 발생했습니다. 다시 시도해 주세요. 저장된 계정은 삭제되지 않습니다.';
+
+  @override
   String get actionCancel => '취소';
 
   @override

@@ -3,6 +3,12 @@
 
   "appTitle": "VoceChat",
 
+  "appLoadingSlowTitle": "O carregamento está demorando mais que o normal",
+  "appLoadingSlowBody": "Ainda estamos tentando carregar o aplicativo. Você pode continuar esperando ou tentar novamente. Suas contas salvas não serão removidas.",
+
+  "appRecoveryTitle": "Não foi possível exibir esta página",
+  "appRecoveryBody": "Ocorreu um erro ao carregar a interface. Tente novamente. Suas contas salvas não serão removidas.",
+
   "actionCancel": "Cancelar",
   "actionOpen": "Abrir",
   "actionChange": "Alterar",

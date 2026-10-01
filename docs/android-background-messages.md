@@ -1,10 +1,12 @@
 # Android 常驻后台消息
 
+仅 `standalone` 构建提供此功能。Google Play 使用 `play` 构建，排除常驻后台及应用内更新，命令见 [Android 发布渠道](android-distribution.md)。
+
 入口：设置 → 通知 → 常驻后台。默认关闭，用户先允许通知，并点击电池优化设置入口，再手动开启。电池条件接受系统已豁免或用户已点击入口；点击记录持久化，兼容小米等设备检测不准确的情况。偏好由 Android 原生 SharedPreferences 保存，重开应用后恢复；仅当前登录账号使用该连接。设置中的消息开关、声音、仅提及选项会控制此功能产生的本地通知。
 
 ## 实现与资源策略
 
-- `BackgroundMessageService` 使用 Android 前台服务，持有当前 FlutterEngine。Activity 被划掉后，原来的消息连接和 dispatcher 继续工作；重新打开 Activity 时复用引擎。不会额外创建后台 Dart isolate、第二个账号会话或第二条 WebSocket。
+- `AppFlutterEngine` 管理 Activity 与前台服务共用的 FlutterEngine，按实际 Activity 实例维护所有权。Activity 被划掉且服务仍运行时，原来的消息连接和 dispatcher 继续工作；重新打开 Activity 时复用引擎。旧 Activity 的延迟销毁不能释放新界面正在使用的引擎。不会额外创建后台 Dart isolate、第二个账号会话或第二条 WebSocket。
 - Android 14+ 使用 `specialUse` 描述自托管即时通讯连接，避免长期消息连接误用受时限约束的 `dataSync`。通话已经加入且具备录音权限时增加 `microphone` 类型；通话结束后去掉该类型。应用退到后台时不尝试新建前台服务或新增麦克风权限类型。
 - 保留消息连接、网络恢复、重连及按需令牌刷新、消息落盘、本地通知。暂停 30 秒令牌轮询；闲置时关闭 UI tickers、清理未使用的解码图片缓存，聊天控制器不逐条合并后台事件，恢复前台后从缓存/服务端重新同步。小消息直接解析以减少创建 isolate 的开销。后台消息不标记已读。
 - 聊天附件音视频进入后台后暂停，加载完成也不会在后台自动开始播放。Agora 通话和画中画使用独立路径，不随附件播放器暂停。
@@ -32,4 +34,4 @@
 8. 从最近任务划掉再接收消息、点通知回来；强制停止/重启后重新打开应用：检查引擎复用与服务恢复。覆盖 Android 8/12/13/14/15+，至少一台有额外省电限制的国产手机。
 
 本地验证：`flutter test --no-pub test/core/background test/features/settings/presentation/settings_screen_test.dart test/features/messages/application/read_index_test.dart test/features/voice/domain/voice_picture_in_picture_test.dart`。
-Android 构建：`flutter build apk --debug --no-pub`。当前开发环境缺少 Android SDK/Java，需在配置完整的构建环境执行原生编译和以上真机检查。
+Android 构建：`flutter build apk --flavor standalone --debug --no-pub`。原生生命周期与通知测试使用完整 Android SDK/Java；引擎所有权、通知打开与白屏恢复的回归步骤见 [白屏排查与恢复](blank-screen-recovery.md)。

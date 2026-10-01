@@ -334,7 +334,8 @@ class AuthController extends _$AuthController {
       final value = body is Map ? body['server_id'] : null;
       final remoteId = value is String ? value.trim() : null;
       // Old servers/databases may return null. Keep their existing behavior.
-      if (remoteId == null || remoteId.isEmpty ||
+      if (remoteId == null ||
+          remoteId.isEmpty ||
           remoteId == config.organizationServerId) {
         return false;
       }
@@ -346,7 +347,8 @@ class AuthController extends _$AuthController {
       // mismatch is not evidence that the server was replaced. Bootstrap
       // still validates the existing tokens normally after this probe.
       if (config.organizationServerId == null) {
-        await ref.read(serverStoreProvider.notifier)
+        await ref
+            .read(serverStoreProvider.notifier)
             .setOrganizationServerId(config.id, remoteId);
         return false;
       }
@@ -391,7 +393,8 @@ class AuthController extends _$AuthController {
         await oldServerStore.clearRememberedCredential();
       }
 
-      await ref.read(serverStoreProvider.notifier)
+      await ref
+          .read(serverStoreProvider.notifier)
           .setOrganizationServerId(config.id, remoteId);
       AppLog.w(
         LogTag.auth,
@@ -673,6 +676,9 @@ class AuthController extends _$AuthController {
     if (target == null) return;
     if (accountState?.currentAccountId == accountId) return;
 
+    final previous = state;
+    final previousServerId =
+        ref.read(serverStoreProvider).valueOrNull?.currentServerId;
     state = AsyncLoading<AuthState>().copyWithPrevious(state, isRefresh: false);
 
     _suppressStoreReact = true;
@@ -693,11 +699,21 @@ class AuthController extends _$AuthController {
           .read(serverStoreProvider.notifier)
           .selectServer(target.serverId);
       await ref.read(accountStoreProvider.notifier).selectAccount(accountId);
+      state = AsyncData(await _bootstrap());
+    } catch (error, stackTrace) {
+      // Store failures can happen before or after the selected account moves.
+      // Preserve the old session only while both pointers still refer to it;
+      // otherwise let the normal auth guard show login. Always leave loading.
+      final unchanged =
+          ref.read(accountStoreProvider).valueOrNull?.currentAccountId ==
+                  accountState?.currentAccountId &&
+              ref.read(serverStoreProvider).valueOrNull?.currentServerId ==
+                  previousServerId;
+      state = unchanged ? previous : AsyncError(error, stackTrace);
+      rethrow;
     } finally {
       _suppressStoreReact = false;
     }
-
-    state = AsyncData(await _bootstrap());
   }
 
   /// Register a new account and auto-login on success.
@@ -800,7 +816,7 @@ class AuthController extends _$AuthController {
     // initial auth bootstrap to the router's redirect logic.
     // isRefresh: false — see login() for why the default true is wrong here.
     state = AsyncLoading<AuthState>().copyWithPrevious(state, isRefresh: false);
-    state = AsyncData(await _bootstrap());
+    state = await AsyncValue.guard(_bootstrap);
   }
 
   /// Re-fetch `/api/user/me` and update [state] in place, without the token

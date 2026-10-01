@@ -518,7 +518,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         await _hideOrLeave(item);
       case 'settings':
         final gid = (item.key as GroupConversationKey).gid;
-        if (mounted) context.go('/home/chat/g-$gid/settings');
+        if (context.mounted) context.go('/home/chat/g-$gid/settings');
     }
   }
 

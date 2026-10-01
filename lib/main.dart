@@ -1,96 +1,38 @@
 import 'features/voice/application/voice_controller.dart';
 import 'core/background/background_runtime.dart';
 import 'core/background/background_lifecycle.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
+import 'core/recovery/app_recovery.dart';
+import 'core/startup/app_startup.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fvp/fvp.dart' as fvp;
-import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:vocechat_client/core/i18n/locale_provider.dart';
 import 'package:vocechat_client/core/notifications/fcm_service.dart';
 import 'package:vocechat_client/core/router/app_router.dart';
 import 'package:vocechat_client/core/router/deep_link_listener.dart';
-import 'package:vocechat_client/core/storage/media_cache.dart';
-import 'package:vocechat_client/core/storage/video_stream_cache.dart';
 import 'package:vocechat_client/core/theme/app_theme.dart';
 import 'package:vocechat_client/core/theme/theme_provider.dart';
 import 'package:vocechat_client/features/app_update/presentation/app_update_gate.dart';
 import 'package:vocechat_client/features/voice/presentation/voice_picture_in_picture_overlay.dart';
-import 'package:vocechat_client/firebase_options.dart';
 import 'package:vocechat_client/l10n/generated/app_localizations.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Firebase is only supported on Android and iOS. Failures here (e.g. a CI
-  // build that hasn't injected real google-services.json/GoogleService-Info.plist
-  // credentials yet, or the checked-in firebase_options.dart placeholder
-  // values) must not crash app startup — FCM push is a nice-to-have, not a
-  // boot dependency. fcm_service.dart separately checks Firebase.apps before
-  // touching FirebaseMessaging, so push is simply unavailable in that case.
-  if (!kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS)) {
-    try {
-      // FlutterFire automatically discovers GoogleService-Info.plist (iOS) or
-      // google-services.json (Android) and creates the default native app.
-      // Initialising with Dart options first can race that native setup (or
-      // use the checked-in REPLACE_ME placeholders) and makes FirebaseCore
-      // throw an uncaught duplicate-app NSException. Reuse the native app
-      // whenever it is available.
-      await Firebase.initializeApp();
-    } catch (e) {
-      // Some development/CI builds intentionally omit native Firebase
-      // resources. If real Dart options were generated, use them as a
-      // fallback; never pass the checked-in placeholders to native Firebase.
-      if (Firebase.apps.isEmpty) {
-        final options = DefaultFirebaseOptions.currentPlatform;
-        if (_hasUsableFirebaseOptions(options)) {
-          try {
-            await Firebase.initializeApp(options: options);
-          } catch (fallbackError) {
-            debugPrint(
-              'Firebase.initializeApp failed, push notifications disabled: '
-              '$fallbackError',
-            );
-          }
-        } else {
-          debugPrint(
-            'Firebase.initializeApp failed, push notifications disabled: $e',
-          );
-        }
-      }
-    }
-  }
-
-  // video_player has no official Windows/Linux backend; fvp fills that gap
-  // and defers to the official implementation on platforms that have one.
-  // Android is also opted in (even though video_player_android exists)
-  // because it falls back to an FFmpeg software decoder when the device's
-  // hardware MediaCodec doesn't recognize a stream's codec/profile — the
-  // stock plugin has no such fallback and its channel just dies, so some
-  // servers' HEVC uploads simply won't play at all on affected devices.
-  fvp.registerWith(options: {'platforms': ['windows', 'linux', 'android']});
-  if (!kIsWeb) {
-    JustAudioMediaKit.ensureInitialized();
-    await MediaCache.trimAudioCache();
-    await VideoStreamCache.initialize();
-  }
-  runApp(const ProviderScope(child: VoceChatApp()));
+  final recovery = AppRecoveryController();
+  AppErrorReporting.install(recovery);
+  runApp(AppRecoveryHost(
+    controller: recovery,
+    builder: (_) => const ProviderScope(child: _AppBootstrap()),
+  ));
 }
 
-bool _hasUsableFirebaseOptions(FirebaseOptions options) {
-  const placeholder = 'REPLACE_ME';
-  final requiredValues = <String>[
-    options.apiKey,
-    options.appId,
-    options.messagingSenderId,
-    options.projectId,
-  ];
-  return requiredValues.every(
-    (value) => value.isNotEmpty && value != placeholder,
-  );
+class _AppBootstrap extends ConsumerWidget {
+  const _AppBootstrap();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(appStartupProvider);
+    return const VoceChatApp();
+  }
 }
 
 class VoceChatApp extends ConsumerWidget {
@@ -146,8 +88,12 @@ class VoceChatApp extends ConsumerWidget {
                 key: ValueKey(brightness),
                 child: TickerMode(
                   enabled: !ref.watch(androidBackgroundedProvider) ||
-                      ref.watch(voiceControllerProvider.select((s) => s != null)),
-                  child: child ?? const SizedBox.shrink(),
+                      ref.watch(
+                          voiceControllerProvider.select((s) => s != null)),
+                  child: child ??
+                      AppRecoveryPage(
+                        onRetry: () => ref.invalidate(goRouterProvider),
+                      ),
                 ),
               ),
             ),

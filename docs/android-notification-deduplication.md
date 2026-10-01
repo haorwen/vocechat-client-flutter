@@ -23,7 +23,7 @@ SQLite 提交与 Android NotificationManager 之间不能原子执行。如果�
 ## 验证
 
 - Flutter：`flutter test --no-pub test/core/notifications test/core/background`，覆盖本地去重 key、前后台路由、名称与缓存回退、账号切换及通知过滤。
-- Android：`cd android && bash gradlew :app:testDebugUnitTest --tests '*MessageNotificationTest'`，覆盖重复投递、并发争抢、数据库重开、清空通知、账号隔离、乱序 mid、前台/过滤消息及过期记录。
+- Android：`cd android && bash gradlew :app:testStandaloneDebugUnitTest --tests '*MessageNotificationTest'`，覆盖重复投递、并发争抢、数据库重开、清空通知、账号隔离、乱序 mid、前台/过滤消息及过期记录。
 - 真机：断线重连与清空通知后补收不重复；私聊和群聊名称显示正确；通知点击进入正确会话；分别检查常驻开启/关闭及 FCM 可用/不可用时的行为。
 
-当前环境缺少 Android SDK/Java，原生 Robolectric、Android 构建及真机检查需在完整 Android 环境运行。
+原生 Robolectric 和 Android 构建需要完整的 Android SDK/Java。通知打开时的 Activity 复用、引擎所有权和可见错误恢复见 [白屏排查与恢复](blank-screen-recovery.md)。

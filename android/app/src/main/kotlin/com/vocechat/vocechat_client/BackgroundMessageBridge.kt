@@ -129,6 +129,11 @@ class BackgroundMessageBridge(private val context: Context, messenger: BinaryMes
         channel.invokeMethod("notificationTap", null)
     }
 
+    fun dispose() {
+        channel.setMethodCallHandler(null)
+        pendingTap = null
+    }
+
     private fun stop() {
         context.stopService(Intent(context, BackgroundMessageService::class.java))
         clearMessages()

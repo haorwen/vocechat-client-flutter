@@ -10,6 +10,18 @@ class AppL10nEn extends AppL10n {
   String get appTitle => 'VoceChat';
 
   @override
+  String get appLoadingSlowTitle => 'Loading is taking longer than usual';
+
+  @override
+  String get appLoadingSlowBody => 'We are still trying to load the app. You can keep waiting or retry. Your saved accounts will not be removed.';
+
+  @override
+  String get appRecoveryTitle => 'Unable to display this page';
+
+  @override
+  String get appRecoveryBody => 'Something went wrong while loading the interface. Please retry. Your saved accounts will not be removed.';
+
+  @override
   String get actionCancel => 'Cancel';
 
   @override

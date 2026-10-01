@@ -3,6 +3,12 @@
 
   "appTitle": "VoceChat",
 
+  "appLoadingSlowTitle": "Le chargement prend plus de temps que prévu",
+  "appLoadingSlowBody": "Nous essayons toujours de charger l’application. Vous pouvez patienter ou réessayer. Vos comptes enregistrés ne seront pas supprimés.",
+
+  "appRecoveryTitle": "Impossible d’afficher cette page",
+  "appRecoveryBody": "Une erreur est survenue lors du chargement de l’interface. Réessayez. Vos comptes enregistrés ne seront pas supprimés.",
+
   "actionCancel": "Annuler",
   "actionOpen": "Ouvrir",
   "actionChange": "Changer",

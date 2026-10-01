@@ -28,9 +28,12 @@ part 'deep_link_listener.g.dart';
 InviteLinkParseResult _resolveDeepLink(Uri uri) {
   final envelope = uri.queryParameters['link'] ?? uri.queryParameters['i'];
   if (envelope != null && envelope.isNotEmpty) {
-    return parseInviteLink(Uri.decodeFull(envelope));
+    // queryParameters has already decoded the envelope once.
+    return parseInviteLink(envelope);
   }
-  return parseInviteLink(uri.toString());
+  return parseInviteLink(
+      (uri.scheme == 'vocechat' ? uri.replace(scheme: 'https') : uri)
+          .toString());
 }
 
 /// Subscribes to incoming `vocechat://` deep links (Android/iOS custom URL
@@ -45,40 +48,76 @@ InviteLinkParseResult _resolveDeepLink(Uri uri) {
 @Riverpod(keepAlive: true)
 class DeepLinkListener extends _$DeepLinkListener {
   StreamSubscription<Uri>? _sub;
+  Future<void> _queue = Future.value();
+  final _queued = <Uri>{};
+  bool _disposed = false;
 
   @override
   void build() {
     final appLinks = AppLinks();
-    _sub = appLinks.uriLinkStream.listen(_handleUri, onError: (e) {
-      AppLog.w(LogTag.general, () => '🔗 deep link stream error: $e');
+    _disposed = false;
+    // app_links emits the initial link on this stream too. Reading it again
+    // via getInitialLink used to select/create the same server concurrently.
+    _sub = appLinks.uriLinkStream.listen(_enqueueUri, onError: (Object error) {
+      AppLog.w(LogTag.general, () => 'Deep link stream unavailable: $error');
     });
-    appLinks.getInitialLink().then((uri) {
-      if (uri != null) _handleUri(uri);
+    ref.onDispose(() {
+      _disposed = true;
+      _sub?.cancel();
     });
-    ref.onDispose(() => _sub?.cancel());
+  }
+
+  void _enqueueUri(Uri uri) {
+    if (_disposed ||
+        !const {'vocechat', 'https', 'http'}.contains(uri.scheme) ||
+        !_queued.add(uri)) {
+      return;
+    }
+    _queue = _queue.then((_) async {
+      try {
+        if (!_disposed) await _handleUri(uri);
+      } catch (error, stackTrace) {
+        AppLog.e(LogTag.general, () => 'Could not open invitation link',
+            error: error, stackTrace: stackTrace);
+      } finally {
+        _queued.remove(uri);
+      }
+    });
   }
 
   Future<void> _handleUri(Uri uri) async {
-    AppLog.d(LogTag.general, () => '🔗 received deep link: $uri');
     final parsed = _resolveDeepLink(uri);
-    if (parsed is! InviteLinkParseValid) {
-      AppLog.w(LogTag.general, () => '🔗 deep link is not a valid invite: $uri');
-      return;
-    }
+    if (parsed is! InviteLinkParseValid) return;
 
-    final name = Uri.tryParse(parsed.serverBaseUrl)?.host ?? parsed.serverBaseUrl;
-    final config = ServerConfig(
-      id: '${Uri.parse(parsed.serverBaseUrl).host.replaceAll('.', '_')}_${DateTime.now().millisecondsSinceEpoch}',
-      baseUrl: parsed.serverBaseUrl,
-      name: name,
-    );
+    final servers = await ref.read(serverStoreProvider.future);
+    if (_disposed) return;
+    await ref.read(accountStoreProvider.future);
+    if (_disposed) return;
+
+    final name =
+        Uri.tryParse(parsed.serverBaseUrl)?.host ?? parsed.serverBaseUrl;
+    final existing = servers.servers
+        .where((server) =>
+            server.baseUrl.replaceAll(RegExp(r'/+$'), '') ==
+            parsed.serverBaseUrl)
+        .firstOrNull;
+    final config = existing ??
+        ServerConfig(
+          id: '${Uri.parse(parsed.serverBaseUrl).host.replaceAll('.', '_')}_${DateTime.now().millisecondsSinceEpoch}',
+          baseUrl: parsed.serverBaseUrl,
+          name: name,
+        );
 
     final serverNotifier = ref.read(serverStoreProvider.notifier);
-    await serverNotifier.addServer(config);
+    if (existing == null) await serverNotifier.addServer(config);
+    if (_disposed) return;
     await serverNotifier.selectServer(config.id);
+    if (_disposed) return;
     await ref.read(accountStoreProvider.notifier).clearCurrentAccount();
+    if (_disposed) return;
     // Wait for auth controller to re-bootstrap with the new server.
     await ref.read(authControllerProvider.future);
+    if (_disposed) return;
 
     ref.read(goRouterProvider).go('/register', extra: parsed.magicToken);
   }

@@ -18,8 +18,7 @@ class BackgroundMessageService : Service() {
         const val MESSAGES = "background_messages"
         const val ID = 41001
         var running = false
-        var engine: FlutterEngine? = null
-        var activityAttached = false
+        val engine: FlutterEngine? get() = AppFlutterEngine.engine
     }
 
     override fun onCreate() {
@@ -35,12 +34,12 @@ class BackgroundMessageService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Do not advertise message reception after process death without a live engine.
-        if (engine == null) {
+        if (!BuildConfig.DIRECT_DISTRIBUTION_FEATURES || engine == null) {
             stopSelf()
             return START_NOT_STICKY
         }
         val calling = intent?.getBooleanExtra("calling", false) == true
-        val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java),
+        val open = PendingIntent.getActivity(this, 0, AppLaunchIntent.create(this),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notification = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_background_message)
@@ -73,9 +72,7 @@ class BackgroundMessageService : Service() {
             @Suppress("DEPRECATION")
             stopForeground(true)
         }
-        if (!activityAttached) {
-            MainActivity.releaseBackgroundEngine()
-        }
+        AppFlutterEngine.serviceStopped()
         super.onDestroy()
     }
 }

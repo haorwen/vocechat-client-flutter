@@ -37,6 +37,22 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
+    buildFeatures {
+        buildConfig = true
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        standalone {
+            dimension = "distribution"
+            buildConfigField "boolean", "DIRECT_DISTRIBUTION_FEATURES", "true"
+        }
+        play {
+            dimension = "distribution"
+            buildConfigField "boolean", "DIRECT_DISTRIBUTION_FEATURES", "false"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8

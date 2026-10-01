@@ -113,6 +113,30 @@ abstract class AppL10n {
   /// **'VoceChat'**
   String get appTitle;
 
+  /// No description provided for @appLoadingSlowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading is taking longer than usual'**
+  String get appLoadingSlowTitle;
+
+  /// No description provided for @appLoadingSlowBody.
+  ///
+  /// In en, this message translates to:
+  /// **'We are still trying to load the app. You can keep waiting or retry. Your saved accounts will not be removed.'**
+  String get appLoadingSlowBody;
+
+  /// No description provided for @appRecoveryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to display this page'**
+  String get appRecoveryTitle;
+
+  /// No description provided for @appRecoveryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong while loading the interface. Please retry. Your saved accounts will not be removed.'**
+  String get appRecoveryBody;
+
   /// No description provided for @actionCancel.
   ///
   /// In en, this message translates to:

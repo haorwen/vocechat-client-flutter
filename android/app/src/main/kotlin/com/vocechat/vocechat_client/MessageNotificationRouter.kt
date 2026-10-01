@@ -4,7 +4,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -24,6 +23,16 @@ internal object MessageNotificationRouter {
     private var store: MessageNotificationStore? = null
     private fun store(context: Context): MessageNotificationStore = store
         ?: MessageNotificationStore(context).also { store = it }
+
+    /** Release a cached database connection when its application environment
+     * is torn down. Receipts remain on disk and the next delivery reopens it.
+     */
+    @Synchronized
+    internal fun closeStore() {
+        val previous = store
+        store = null
+        previous?.close()
+    }
 
     @Synchronized
     fun configure(context: Context, session: String, muted: List<String>?) {
@@ -59,7 +68,7 @@ internal object MessageNotificationRouter {
         if (!display) return false // foreground/filtered messages also consume their key
 
         val tag = "voce-message:${message.session}:${message.target}"
-        val intent = Intent(context, MainActivity::class.java)
+        val intent = AppLaunchIntent.create(context)
             .setAction("chat.voce.MESSAGE")
             .setData(Uri.parse("vocechat-notification://open/${Uri.encode(message.session)}/${message.target}"))
             .putExtra("background_target", message.target)

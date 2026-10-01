@@ -3,6 +3,12 @@
 
   "appTitle": "VoceChat",
 
+  "appLoadingSlowTitle": "読み込みに時間がかかっています",
+  "appLoadingSlowBody": "アプリの読み込みを続けています。このまま待つか、再試行してください。保存済みのアカウントは削除されません。",
+
+  "appRecoveryTitle": "このページを表示できません",
+  "appRecoveryBody": "画面の読み込み中にエラーが発生しました。再試行してください。保存済みのアカウントは削除されません。",
+
   "actionCancel": "キャンセル",
   "actionOpen": "開く",
   "actionChange": "変更",

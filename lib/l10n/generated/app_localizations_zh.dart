@@ -10,6 +10,18 @@ class AppL10nZh extends AppL10n {
   String get appTitle => 'VoceChat';
 
   @override
+  String get appLoadingSlowTitle => '加载时间较长';
+
+  @override
+  String get appLoadingSlowBody => '仍在尝试加载。你可以继续等待，或点击重试。已保存的账号不会被删除。';
+
+  @override
+  String get appRecoveryTitle => '页面暂时无法显示';
+
+  @override
+  String get appRecoveryBody => '加载界面时发生错误，请点击重试。已保存的账号不会被删除。';
+
+  @override
   String get actionCancel => '取消';
 
   @override

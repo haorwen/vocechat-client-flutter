@@ -93,7 +93,8 @@ class AccountSwitcherList extends ConsumerStatefulWidget {
 class _AccountSwitcherListState extends ConsumerState<AccountSwitcherList> {
   String? _switchingId;
 
-  Future<void> _switchTo(AccountConfig account, String? currentAccountId) async {
+  Future<void> _switchTo(
+      AccountConfig account, String? currentAccountId) async {
     if (account.accountId == currentAccountId || _switchingId != null) return;
     final l = AppL10n.of(context);
     setState(() => _switchingId = account.accountId);
@@ -111,6 +112,12 @@ class _AccountSwitcherListState extends ConsumerState<AccountSwitcherList> {
         );
       }
       if (widget.dismissOnSwitch) Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l.accountSwitcherSwitchFailed)),
+        );
+      }
     } finally {
       if (mounted) setState(() => _switchingId = null);
     }
@@ -127,7 +134,9 @@ class _AccountSwitcherListState extends ConsumerState<AccountSwitcherList> {
       danger: true,
     );
     if (ok != true) return;
-    await ref.read(authControllerProvider.notifier).removeAccount(account.accountId);
+    await ref
+        .read(authControllerProvider.notifier)
+        .removeAccount(account.accountId);
   }
 
   void _addAccount() {
@@ -298,8 +307,9 @@ class _AddAccountScreenState extends ConsumerState<_AddAccountScreen> {
         Navigator.of(context).pop();
       } else {
         final err = ref.read(authControllerProvider).error;
-        setState(() => _error =
-            err != null ? _loginErrorMessage(err) : AppL10n.of(context).errorRequestFailed);
+        setState(() => _error = err != null
+            ? _loginErrorMessage(err)
+            : AppL10n.of(context).errorRequestFailed);
       }
     } catch (e) {
       setState(() => _error = _loginErrorMessage(e));

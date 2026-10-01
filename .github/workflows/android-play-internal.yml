@@ -1,0 +1,157 @@
+name: Android Play Internal Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'lib/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - 'test/core/background/**'
+      - 'test/core/notifications/**'
+      - 'test/features/app_update/**'
+      - 'tool/play_release/**'
+      - '.github/workflows/android-play-internal.yml'
+  workflow_dispatch:
+    inputs:
+      release_status:
+        description: 'completed 发布给内部测试者；draft 仅建立草稿'
+        type: choice
+        options: [completed, draft]
+        default: completed
+      changes_not_sent_for_review:
+        description: '仅当 Play 要求先在控制台手动送审时启用'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Do not interrupt an upload/edit commit already in progress.
+concurrency:
+  group: google-play-internal
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: google-play-internal
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check release tooling
+        run: python3 -m unittest discover -s tool/play_release -p 'test_*.py'
+
+      - name: Prepare signing and Firebase config
+        id: release
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          PLAY_VERSION_CODE_BASE: ${{ vars.PLAY_VERSION_CODE_BASE }}
+        run: python3 tool/play_release/prepare.py
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Validate upload keystore
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          keytool -list -keystore "$RUNNER_TEMP/play-upload.keystore" \
+            -storepass:env ANDROID_KEYSTORE_PASSWORD -alias "$ANDROID_KEY_ALIAS" > /dev/null
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ vars.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Test background messaging and updater
+        run: flutter test --no-pub test/core/background test/core/notifications test/features/app_update
+
+      - name: Test Play feature exclusions
+        run: flutter test --no-pub --flavor play test/core/background/play_distribution_test.dart
+
+      - name: Build signed Play bundle
+        env:
+          VERSION_CODE: ${{ steps.release.outputs.version_code }}
+        run: flutter build appbundle --release --flavor play --no-pub --build-number="$VERSION_CODE"
+
+      - name: Inspect final AAB manifest
+        env:
+          VERSION_CODE: ${{ steps.release.outputs.version_code }}
+        run: |
+          curl --fail --location --retry 3 \
+            https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar \
+            --output "$RUNNER_TEMP/bundletool.jar"
+          python3 - <<'PY'
+          import hashlib, os
+          from pathlib import Path
+          jar = Path(os.environ['RUNNER_TEMP']) / 'bundletool.jar'
+          expected = 'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29'
+          if hashlib.sha256(jar.read_bytes()).hexdigest() != expected:
+              raise SystemExit('bundletool checksum mismatch')
+          PY
+          java -jar "$RUNNER_TEMP/bundletool.jar" dump manifest \
+            --bundle=build/app/outputs/bundle/playRelease/app-play-release.aab \
+            --module=base > "$RUNNER_TEMP/play-manifest.xml"
+          python3 tool/play_release/verify_manifest.py "$RUNNER_TEMP/play-manifest.xml" "$VERSION_CODE"
+
+      - name: Save signed AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoceChat-Play-${{ steps.release.outputs.version_code }}
+          path: build/app/outputs/bundle/playRelease/app-play-release.aab
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload to Google Play internal testing
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.vocechat.vocechat_client
+          releaseFiles: build/app/outputs/bundle/playRelease/app-play-release.aab
+          releaseName: ${{ steps.release.outputs.version_name }} (${{ steps.release.outputs.version_code }})
+          tracks: internal
+          status: ${{ inputs.release_status || 'completed' }}
+          changesNotSentForReview: ${{ inputs.changes_not_sent_for_review && 'true' || 'false' }}
+
+      - name: Release summary
+        env:
+          VERSION_NAME: ${{ steps.release.outputs.version_name }}
+          VERSION_CODE: ${{ steps.release.outputs.version_code }}
+          RELEASE_STATUS: ${{ inputs.release_status || 'completed' }}
+        run: |
+          {
+            echo "Google Play internal testing upload committed."
+            echo "Version: $VERSION_NAME ($VERSION_CODE)"
+            echo "Release status: $RELEASE_STATUS"
+            echo "Background keep-alive and APK updater excluded; FCM enabled."
+            echo "Availability to testers is subject to Google Play processing/review."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove temporary credentials
+        if: always()
+        run: |
+          rm -f android/key.properties android/app/google-services.json "$RUNNER_TEMP/play-upload.keystore"

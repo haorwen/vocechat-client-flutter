@@ -10,6 +10,18 @@ class AppL10nEs extends AppL10n {
   String get appTitle => 'VoceChat';
 
   @override
+  String get appLoadingSlowTitle => 'La carga está tardando más de lo habitual';
+
+  @override
+  String get appLoadingSlowBody => 'Seguimos intentando cargar la aplicación. Puedes seguir esperando o volver a intentarlo. Tus cuentas guardadas no se eliminarán.';
+
+  @override
+  String get appRecoveryTitle => 'No se puede mostrar esta página';
+
+  @override
+  String get appRecoveryBody => 'Se produjo un error al cargar la interfaz. Vuelve a intentarlo. Tus cuentas guardadas no se eliminarán.';
+
+  @override
   String get actionCancel => 'Cancelar';
 
   @override

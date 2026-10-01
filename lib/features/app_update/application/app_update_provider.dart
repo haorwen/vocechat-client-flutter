@@ -2,12 +2,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../../core/config/distribution.dart';
 import '../../../core/network/dio_client.dart';
 import '../data/android_update_api.dart';
 import '../domain/android_release.dart';
 
-final androidUpdateSupportedProvider = Provider<bool>(
-    (ref) => !kIsWeb && defaultTargetPlatform == TargetPlatform.android);
+final androidUpdateSupportedProvider = Provider<bool>((ref) =>
+    supportsDirectDistributionFeatures &&
+    !kIsWeb &&
+    defaultTargetPlatform == TargetPlatform.android);
 
 final androidUpdateApiProvider = Provider<AndroidUpdateApi>(
   (ref) => AndroidUpdateApi(ref.read(dioClientProvider).dio),

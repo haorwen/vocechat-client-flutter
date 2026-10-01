@@ -12,17 +12,24 @@ import '../utils/app_log.dart';
 import 'background_lifecycle.dart';
 import 'background_preferences.dart';
 
+// MethodChannel has one process-wide Dart handler. During a ProviderScope
+// replacement Flutter mounts the new scope before disposing the old one.
+Object? _backgroundRuntimeOwner;
+
 /// One app-scoped coordinator. Only starts foreground services from a visible
 /// activity; Android 12+ forbids arbitrary service starts from the background.
 final backgroundRuntimeProvider = Provider<void>((ref) {
   if (!isAndroidBackgroundSupported) return;
   var disposed = false;
+  final owner = Object();
+  _backgroundRuntimeOwner = owner;
+  bool isCurrent() => !disposed && identical(_backgroundRuntimeOwner, owner);
   Future<void> queue = Future.value();
   String? lastRequest;
   var revision = 0;
 
   Future<void> takeTap() async {
-    if (disposed ||
+    if (!isCurrent() ||
         ref.read(authControllerProvider).isLoading ||
         ref.read(accountStoreProvider).isLoading) {
       return;
@@ -35,7 +42,7 @@ final backgroundRuntimeProvider = Provider<void>((ref) {
           () => 'Background notification tap unavailable: $error');
       return;
     }
-    if (disposed || data == null) return;
+    if (!isCurrent() || data == null) return;
     if (data['session'] !=
         ref.read(accountStoreProvider).valueOrNull?.currentAccountId) {
       return;
@@ -47,7 +54,7 @@ final backgroundRuntimeProvider = Provider<void>((ref) {
   }
 
   Future<void> sync() async {
-    if (disposed) return;
+    if (!isCurrent()) return;
     final generation = revision;
     final auth = ref.read(authControllerProvider);
     // Token renewal must not tear down a live service.
@@ -65,7 +72,7 @@ final backgroundRuntimeProvider = Provider<void>((ref) {
         ...muted.mutedGroups.map((id) => 'g-$id'),
       ],
     });
-    if (disposed || generation != revision) return;
+    if (!isCurrent() || generation != revision) return;
     final voice = ref.read(voiceControllerProvider);
     final calling = voice != null && !voice.joining;
     final background = ref.read(androidBackgroundedProvider);
@@ -81,7 +88,7 @@ final backgroundRuntimeProvider = Provider<void>((ref) {
       return;
     }
     try {
-      if (disposed || generation != revision) return;
+      if (!isCurrent() || generation != revision) return;
       await backgroundChannel.invokeMethod('sync', {
         'session': enabled ? session : '',
         'calling': calling,
@@ -91,7 +98,7 @@ final backgroundRuntimeProvider = Provider<void>((ref) {
       // startForegroundService is asynchronous; do not claim it is running
       // based only on the start request.
       await Future<void>.delayed(const Duration(milliseconds: 200));
-      if (!disposed) {
+      if (isCurrent()) {
         await ref.read(backgroundPreferencesProvider.notifier).refresh();
       }
     } catch (error) {
@@ -100,6 +107,7 @@ final backgroundRuntimeProvider = Provider<void>((ref) {
   }
 
   void schedule() {
+    if (!isCurrent()) return;
     revision++;
     queue = queue.then((_) async {
       try {
@@ -121,6 +129,7 @@ final backgroundRuntimeProvider = Provider<void>((ref) {
   ref.listen(voiceControllerProvider.select((s) => s != null && !s.joining),
       (_, __) => schedule());
   ref.listen(androidBackgroundedProvider, (_, background) {
+    if (!isCurrent()) return;
     if (background && ref.read(voiceControllerProvider) == null) {
       PaintingBinding.instance.imageCache.clear();
     }
@@ -138,6 +147,9 @@ final backgroundRuntimeProvider = Provider<void>((ref) {
   schedule();
   ref.onDispose(() {
     disposed = true;
-    backgroundChannel.setMethodCallHandler(null);
+    if (identical(_backgroundRuntimeOwner, owner)) {
+      _backgroundRuntimeOwner = null;
+      backgroundChannel.setMethodCallHandler(null);
+    }
   });
 });

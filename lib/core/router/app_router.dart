@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,16 +16,66 @@ import '../../features/contacts/presentation/contacts_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/messages/presentation/chat_screen.dart';
 import '../storage/server_store.dart';
+import '../storage/account_store.dart';
+import '../recovery/app_recovery.dart';
+import '../../l10n/generated/app_localizations.dart';
 
 // ---------------------------------------------------------------------------
 // Splash (thin placeholder until auth guard is wired)
 // ---------------------------------------------------------------------------
 
-class SplashScreen extends StatelessWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends ConsumerState<SplashScreen> {
+  Timer? _timeout;
+  bool _waitingTooLong = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimeout();
+  }
+
+  void _startTimeout() {
+    _timeout?.cancel();
+    _timeout = Timer(const Duration(seconds: 15), () {
+      if (mounted) setState(() => _waitingTooLong = true);
+    });
+  }
+
+  void _retry() {
+    final recovery = AppRecoveryHost.maybeOf(context);
+    if (recovery != null) {
+      recovery.retry();
+      return;
+    }
+    ref.invalidate(serverStoreProvider);
+    ref.invalidate(accountStoreProvider);
+    ref.invalidate(authControllerProvider);
+    setState(() => _waitingTooLong = false);
+    _startTimeout();
+  }
+
+  @override
+  void dispose() {
+    _timeout?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_waitingTooLong) {
+      final l = AppL10n.of(context);
+      return AppRecoveryPage(
+          onRetry: _retry,
+          title: l.appLoadingSlowTitle,
+          body: l.appLoadingSlowBody);
+    }
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       body: Center(
@@ -37,8 +89,8 @@ class SplashScreen extends StatelessWidget {
                 color: cs.primaryContainer,
                 borderRadius: BorderRadius.circular(22),
               ),
-              child: Icon(Icons.chat_bubble_rounded,
-                  size: 42, color: cs.primary),
+              child:
+                  Icon(Icons.chat_bubble_rounded, size: 42, color: cs.primary),
             ),
             const SizedBox(height: 24),
             CircularProgressIndicator(color: cs.primary),
@@ -67,14 +119,41 @@ class _RouterRefreshNotifier extends ChangeNotifier {
 
 final goRouterProvider = Provider<GoRouter>((ref) {
   final refreshNotifier = _RouterRefreshNotifier();
+  var disposed = false;
+  final consuming = <String>{};
+  // A redirect can run while Router is mounting. Acknowledging the tap on
+  // next frame avoids mutating Riverpod during that build, and the
+  // equality check preserves a newer tap delivered before this one settles.
+  void consumeLater(String target) {
+    if (!consuming.add(target)) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      consuming.remove(target);
+      if (!disposed && ref.read(fcmPendingChatTargetProvider) == target) {
+        ref.read(fcmPendingChatTargetProvider.notifier).state = null;
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
   ref.listen(authControllerProvider, (_, __) => refreshNotifier.refresh());
   ref.listen(serverStoreProvider, (_, __) => refreshNotifier.refresh());
-  ref.listen(fcmPendingChatTargetProvider, (_, __) => refreshNotifier.refresh());
-  ref.onDispose(refreshNotifier.dispose);
+  ref.listen(fcmPendingChatTargetProvider, (_, next) {
+    // Clearing an acknowledged tap must not re-parse the old route before
+    // Router has published the newly matched location back to its provider.
+    if (next != null) refreshNotifier.refresh();
+  });
+  late final GoRouter router;
+  ref.onDispose(() {
+    disposed = true;
+    router.dispose();
+    refreshNotifier.dispose();
+  });
 
-  return GoRouter(
+  router = GoRouter(
     initialLocation: '/splash',
     refreshListenable: refreshNotifier,
+    errorBuilder: (context, state) =>
+        AppRecoveryPage(onRetry: () => router.go('/home')),
     redirect: (context, state) {
       final location = state.matchedLocation;
       final authAsync = ref.read(authControllerProvider);
@@ -87,8 +166,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
       final serverState = serverAsync.valueOrNull;
       final hasServer = serverState?.currentServerId != null &&
-          (serverState?.servers.any(
-                  (s) => s.id == serverState.currentServerId) ??
+          (serverState?.servers
+                  .any((s) => s.id == serverState.currentServerId) ??
               false);
 
       // No server configured → straight to picker (auth is irrelevant here)
@@ -121,12 +200,30 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       const authScreens = ['/login', '/register', '/splash'];
       if (authScreens.contains(location)) return '/home';
 
-      // FCM notification tap: navigate to the target chat and clear the
-      // pending state so the redirect only fires once.
+      // Keep redirect free of synchronous provider writes. Consume only once
+      // the target is matched, so a second evaluation cannot undo the tap.
       final pendingFcm = ref.read(fcmPendingChatTargetProvider);
       if (pendingFcm != null) {
-        ref.read(fcmPendingChatTargetProvider.notifier).state = null;
-        return '/home/chat/$pendingFcm';
+        if (!RegExp(r'^[ug]-\d+$').hasMatch(pendingFcm)) {
+          consumeLater(pendingFcm);
+        } else {
+          final target = '/home/chat/$pendingFcm';
+          if (location != target) return target;
+          consumeLater(pendingFcm);
+        }
+      }
+
+      // Native notifications and app_links own these external intents. If
+      // Flutter also forwards the URI, retain the current app page instead
+      // of replacing the chat with an unmatched route.
+      if (state.uri.scheme == 'vocechat-notification' ||
+          state.uri.scheme == 'vocechat') {
+        final current = router.routerDelegate.currentConfiguration;
+        return !current.isError &&
+                current.uri.scheme.isEmpty &&
+                current.uri.path.isNotEmpty
+            ? current.uri.toString()
+            : '/home';
       }
 
       // Validate nested chat route IDs — redirect invalid ones to /home.
@@ -147,7 +244,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
       return null;
     },
-    routes: [
+    routes: ref.read(appRoutesProvider),
+  );
+  return router;
+});
+
+// Route builders are injectable so navigation can be checked independently
+// from network/platform-heavy screens.
+final appRoutesProvider = Provider<List<RouteBase>>((ref) => [
       GoRoute(
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
@@ -162,8 +266,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/register',
-        builder: (context, state) =>
-            RegisterScreen(magicToken: state.extra as String?),
+        builder: (context, state) => RegisterScreen(
+            magicToken: state.extra is String ? state.extra as String : null),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
@@ -198,8 +302,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/contacts',
-                builder: (context, state) =>
-                    const ContactsScreen(),
+                builder: (context, state) => const ContactsScreen(),
               ),
             ],
           ),
@@ -207,13 +310,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/settings',
-                builder: (context, state) =>
-                    const SettingsScreen(),
+                builder: (context, state) => const SettingsScreen(),
               ),
             ],
           ),
         ],
       ),
-    ],
-  );
-});
+    ]);

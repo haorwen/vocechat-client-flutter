@@ -2,8 +2,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config/distribution.dart';
+
 bool get isAndroidBackgroundSupported =>
-    !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+    supportsDirectDistributionFeatures &&
+    !kIsWeb &&
+    defaultTargetPlatform == TargetPlatform.android;
 
 const backgroundChannel = MethodChannel('chat.voce/background');
 

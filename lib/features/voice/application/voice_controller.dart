@@ -40,10 +40,29 @@ final agoraRtcEngineFactoryProvider = Provider<RtcEngine Function()>(
   (ref) => createAgoraRtcEngine,
 );
 
+final agoraPipControllerFactoryProvider =
+    Provider<AgoraPipController Function(RtcEngine)>(
+  (ref) => (engine) => engine.createPipController(),
+);
+
+final voiceResourceCleanupTimeoutProvider = Provider<Duration>(
+  (ref) => const Duration(seconds: 2),
+);
+
+// Agora owns process-wide native resources. A new ProviderScope created by UI
+// recovery must not create its engine while the previous scope is releasing it.
+Future<void>? _pendingEngineRelease;
+
 @Riverpod(keepAlive: true)
 class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   RtcEngine? _engine;
+  Future<void>? _engineInitialization;
+  Future<RtcEngine>? _engineSetup;
+  int _callGeneration = 0;
+  RtcEngineEventHandler? _eventHandler;
   AgoraPipController? _pipController;
+  bool _disposed = false;
+  late Duration _cleanupTimeout;
   String? _channelName;
   int? _localUid;
   int? _desiredPipRemoteUid;
@@ -70,14 +89,16 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
 
   @override
   VoicingInfo? build() {
+    _cleanupTimeout = ref.read(voiceResourceCleanupTimeoutProvider);
     WidgetsBinding.instance.addObserver(this);
     members.addListener(_syncPictureInPictureEligibility);
     ref.onDispose(() {
+      _disposed = true;
       WidgetsBinding.instance.removeObserver(this);
       members.removeListener(_syncPictureInPictureEligibility);
+      _beginNativeDisposal();
       pictureInPictureRemoteUid.dispose();
       members.dispose();
-      unawaited(_disposeNativeResources());
     });
     return null;
   }
@@ -85,171 +106,280 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   final ValueNotifier<VoicingMembers> members =
       ValueNotifier(const VoicingMembers());
 
-  Future<void> _disposeNativeResources() async {
+  void _beginNativeDisposal() {
     final pipController = _pipController;
     final engine = _engine;
+    final initializing = _engineInitialization;
+    final handler = _eventHandler;
+    _engine = null;
+    _engineInitialization = null;
+    _pipController = null;
+    _eventHandler = null;
+    _channelName = null;
+    _localUid = null;
+    _desiredPipRemoteUid = null;
+    if (engine == null && pipController == null) return;
+
+    if (engine != null && handler != null) {
+      try {
+        engine.unregisterEventHandler(handler);
+      } catch (error, stack) {
+        AppLog.e(LogTag.voice, () => 'voice event handler cleanup failed',
+            error: error, stackTrace: stack);
+      }
+    }
+    final cleanup =
+        _disposeNativeResources(engine, pipController, initializing);
+    _pendingEngineRelease = cleanup;
+    unawaited(cleanup.then<void>((_) {
+      if (identical(_pendingEngineRelease, cleanup)) {
+        _pendingEngineRelease = null;
+      }
+    }, onError: (Object error, StackTrace stack) {
+      // Keep the failed barrier: creating another native singleton after a
+      // failed release is unsafe. A subsequent call reports that failure.
+      AppLog.e(LogTag.voice, () => 'voice engine release failed',
+          error: error, stackTrace: stack);
+    }));
+  }
+
+  Future<void> _disposeNativeResources(
+    RtcEngine? engine,
+    AgoraPipController? pipController,
+    Future<void>? initializing,
+  ) async {
+    final pendingNativeCalls = <Future<void>>[];
+    var initializationFinished = initializing == null;
+    if (initializing != null) {
+      pendingNativeCalls.add(initializing.then<void>(
+        (_) => initializationFinished = true,
+        onError: (Object _, StackTrace __) => initializationFinished = true,
+      ));
+    }
+    Future<void> attempt(
+        String operation, Future<void> Function() action) async {
+      final pending = Future<void>.sync(action);
+      // A timeout only stops our wait, not the native call. Keep the barrier
+      // until late native calls settle so they cannot affect a new engine.
+      pendingNativeCalls.add(
+          pending.then<void>((_) {}, onError: (Object _, StackTrace __) {}));
+      try {
+        await pending.timeout(_cleanupTimeout);
+      } catch (error, stack) {
+        AppLog.e(LogTag.voice, () => '$operation during voice cleanup failed',
+            error: error, stackTrace: stack);
+      }
+    }
+
+    if (initializing != null) {
+      await attempt('finishing engine initialization', () => initializing);
+    }
     if (pipController != null) {
-      await pipController.dispose();
+      await attempt('finishing PiP operations', () => _pipOperations);
+      await attempt('disposing PiP', pipController.dispose);
     }
     if (engine != null) {
-      await engine.leaveChannel();
+      await attempt('leaving channel', engine.leaveChannel);
+      // Always reach release even if PiP/leave throws or never responds. The
+      // UI does not await it. New calls use a bounded wait on this *actual*
+      // release future, so a hung release cannot race a replacement engine.
+      final releaseBeforeInitialized = !initializationFinished;
       await engine.release();
+      await Future.wait(pendingNativeCalls);
+      if (releaseBeforeInitialized) {
+        // initialize completed after the first release attempt. Release again
+        // before permitting a new engine, rather than leaking the late engine.
+        await engine.release();
+      }
     }
   }
 
-  Future<RtcEngine> _ensureEngine(String appId) async {
+  Future<RtcEngine> _ensureEngine(String appId) {
+    final active = _engineSetup;
+    if (active != null) return active;
+    final setup = _createEngine(appId);
+    _engineSetup = setup;
+    return setup.whenComplete(() {
+      if (identical(_engineSetup, setup)) _engineSetup = null;
+    });
+  }
+
+  Future<RtcEngine> _createEngine(String appId) async {
+    if (_disposed) throw StateError('Voice controller has been disposed');
     final existing = _engine;
     if (existing != null) return existing;
 
+    await _pendingEngineRelease?.timeout(_cleanupTimeout * 4);
+    if (_disposed) throw StateError('Voice controller has been disposed');
     final engine = ref.read(agoraRtcEngineFactoryProvider)();
-    await engine.initialize(RtcEngineContext(appId: appId));
-    if (!kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.android ||
-            defaultTargetPlatform == TargetPlatform.iOS)) {
-      _pipController = engine.createPipController();
-    }
-    await engine.enableAudioVolumeIndication(
-      interval: 150,
-      smooth: 3,
-      reportVad: false,
-    );
+    // Own an initializing engine too, so recovery can release it even before
+    // the platform's initialize response has arrived.
+    _engine = engine;
+    try {
+      final initializing = engine.initialize(RtcEngineContext(appId: appId));
+      _engineInitialization = initializing;
+      await initializing;
+      _engineInitialization = null;
+      if (_disposed) throw StateError('Voice controller has been disposed');
+      if (!kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.android ||
+              defaultTargetPlatform == TargetPlatform.iOS)) {
+        _pipController = ref.read(agoraPipControllerFactoryProvider)(engine);
+      }
+      await engine.enableAudioVolumeIndication(
+        interval: 150,
+        smooth: 3,
+        reportVad: false,
+      );
+      if (_disposed) throw StateError('Voice controller has been disposed');
 
-    final handler = RtcEngineEventHandler(
-      onJoinChannelSuccess: (connection, elapsed) {
-        if (!_isCurrentConnection(connection)) return;
-        AppLog.d(
-            LogTag.voice, () => '🎙️ joined channel=${connection.channelId}');
-        final current = state!;
-        _upsertMember(_localUid!, const VoicingMemberInfo());
-        state = current.copyWith(
-          joining: false,
-          connectionState: VoiceConnectionState.connected,
-        );
-        _syncPictureInPictureEligibility();
-        unawaited(ref
-            .read(avoInteractionControllerProvider.notifier)
-            .joinRoom(current.context));
-      },
-      onUserJoined: (connection, remoteUid, elapsed) {
-        if (!_isCurrentConnection(connection)) return;
-        AppLog.d(
-            LogTag.voice,
-            () =>
-                'remote joined channel=${connection.channelId} uid=$remoteUid');
-        _upsertMember(remoteUid, const VoicingMemberInfo());
-      },
-      onUserOffline: (connection, remoteUid, reason) {
-        if (!_isCurrentConnection(connection)) return;
-        if (reason == UserOfflineReasonType.userOfflineQuit ||
-            reason == UserOfflineReasonType.userOfflineDropped) {
-          _removeMember(remoteUid);
-        }
-      },
-      onUserMuteAudio: (connection, remoteUid, muted) {
-        _patchMember(remoteUid, (m) => m.copyWith(muted: muted));
-      },
-      onUserMuteVideo: (connection, remoteUid, muted) {
-        _patchMember(
-          remoteUid,
-          (m) => m.copyWith(
-              video: !muted, shareScreen: muted ? false : m.shareScreen),
-        );
-      },
-      onRemoteVideoStateChanged:
-          (connection, remoteUid, videoState, reason, elapsed) {
-        final bool? videoEnabled = switch (reason) {
-          RemoteVideoStateReason.remoteVideoStateReasonRemoteMuted ||
-          RemoteVideoStateReason.remoteVideoStateReasonRemoteOffline =>
-            false,
-          RemoteVideoStateReason.remoteVideoStateReasonRemoteUnmuted => true,
-          _ when videoState == RemoteVideoState.remoteVideoStateDecoding =>
-            true,
-          _ => null,
-        };
-        if (videoEnabled != null) {
+      final handler = RtcEngineEventHandler(
+        onJoinChannelSuccess: (connection, elapsed) {
+          if (!_isCurrentConnection(connection)) return;
+          AppLog.d(
+              LogTag.voice, () => '🎙️ joined channel=${connection.channelId}');
+          final current = state!;
+          _upsertMember(_localUid!, const VoicingMemberInfo());
+          state = current.copyWith(
+            joining: false,
+            connectionState: VoiceConnectionState.connected,
+          );
+          _syncPictureInPictureEligibility();
+          unawaited(ref
+              .read(avoInteractionControllerProvider.notifier)
+              .joinRoom(current.context));
+        },
+        onUserJoined: (connection, remoteUid, elapsed) {
+          if (!_isCurrentConnection(connection)) return;
+          AppLog.d(
+              LogTag.voice,
+              () =>
+                  'remote joined channel=${connection.channelId} uid=$remoteUid');
+          _upsertMember(remoteUid, const VoicingMemberInfo());
+        },
+        onUserOffline: (connection, remoteUid, reason) {
+          if (!_isCurrentConnection(connection)) return;
+          if (reason == UserOfflineReasonType.userOfflineQuit ||
+              reason == UserOfflineReasonType.userOfflineDropped) {
+            _removeMember(remoteUid);
+          }
+        },
+        onUserMuteAudio: (connection, remoteUid, muted) {
+          if (!_isCurrentConnection(connection)) return;
+          _patchMember(remoteUid, (m) => m.copyWith(muted: muted));
+        },
+        onUserMuteVideo: (connection, remoteUid, muted) {
+          if (!_isCurrentConnection(connection)) return;
           _patchMember(
             remoteUid,
             (m) => m.copyWith(
-              video: videoEnabled,
-              shareScreen: videoEnabled ? m.shareScreen : false,
-            ),
+                video: !muted, shareScreen: muted ? false : m.shareScreen),
           );
-        }
-      },
-      onAudioVolumeIndication:
-          (connection, speakers, speakerNumber, totalVolume) {
-        for (final s in speakers) {
-          final uid = s.uid;
-          final volume = s.volume;
-          if (uid == null || volume == null) continue;
-          // uid 0 in this callback means "the local user" — reflect it onto
-          // our own VoicingInfo isn't needed (we don't render our own
-          // speaking ring), so only track remotes here.
-          if (uid == 0) {
-            final current = state;
-            if (current != null) {
-              state = current.copyWith(speakingVolume: volume);
+        },
+        onRemoteVideoStateChanged:
+            (connection, remoteUid, videoState, reason, elapsed) {
+          if (!_isCurrentConnection(connection)) return;
+          final bool? videoEnabled = switch (reason) {
+            RemoteVideoStateReason.remoteVideoStateReasonRemoteMuted ||
+            RemoteVideoStateReason.remoteVideoStateReasonRemoteOffline =>
+              false,
+            RemoteVideoStateReason.remoteVideoStateReasonRemoteUnmuted => true,
+            _ when videoState == RemoteVideoState.remoteVideoStateDecoding =>
+              true,
+            _ => null,
+          };
+          if (videoEnabled != null) {
+            _patchMember(
+              remoteUid,
+              (m) => m.copyWith(
+                video: videoEnabled,
+                shareScreen: videoEnabled ? m.shareScreen : false,
+              ),
+            );
+          }
+        },
+        onAudioVolumeIndication:
+            (connection, speakers, speakerNumber, totalVolume) {
+          if (!_isCurrentConnection(connection)) return;
+          for (final s in speakers) {
+            final uid = s.uid;
+            final volume = s.volume;
+            if (uid == null || volume == null) continue;
+            // uid 0 in this callback means "the local user" — reflect it onto
+            // our own VoicingInfo isn't needed (we don't render our own
+            // speaking ring), so only track remotes here.
+            if (uid == 0) {
+              final current = state;
+              if (current != null) {
+                state = current.copyWith(speakingVolume: volume);
+              }
+              continue;
             }
-            continue;
+            _patchMember(uid, (m) => m.copyWith(speakingVolume: volume));
           }
-          _patchMember(uid, (m) => m.copyWith(speakingVolume: volume));
-        }
-      },
-      onNetworkQuality: (connection, remoteUid, txQuality, rxQuality) {
-        if (remoteUid != 0) return;
-        state = state?.copyWith(downlinkNetworkQuality: rxQuality.value());
-      },
-      onConnectionStateChanged: (connection, connectionState, reason) {
-        if (!_isCurrentConnection(connection)) return;
-        AppLog.d(
+        },
+        onNetworkQuality: (connection, remoteUid, txQuality, rxQuality) {
+          if (!_isCurrentConnection(connection)) return;
+          if (remoteUid != 0) return;
+          state = state?.copyWith(downlinkNetworkQuality: rxQuality.value());
+        },
+        onConnectionStateChanged: (connection, connectionState, reason) {
+          if (!_isCurrentConnection(connection)) return;
+          AppLog.d(
+              LogTag.voice,
+              () =>
+                  'channel=${connection.channelId} state=$connectionState reason=$reason');
+          state = state?.copyWith(
+            connectionState: _mapConnectionState(connectionState),
+            joining:
+                connectionState == ConnectionStateType.connectionStateFailed ||
+                        connectionState ==
+                            ConnectionStateType.connectionStateDisconnected
+                    ? false
+                    : state!.joining,
+          );
+          _syncPictureInPictureEligibility();
+        },
+        onLocalVideoStateChanged: (source, videoState, reason) {
+          if (_disposed || !_isScreenSource(source)) return;
+          AppLog.d(
             LogTag.voice,
-            () =>
-                'channel=${connection.channelId} state=$connectionState reason=$reason');
-        state = state?.copyWith(
-          connectionState: _mapConnectionState(connectionState),
-          joining:
-              connectionState == ConnectionStateType.connectionStateFailed ||
-                      connectionState ==
-                          ConnectionStateType.connectionStateDisconnected
-                  ? false
-                  : state!.joining,
-        );
-        _syncPictureInPictureEligibility();
-      },
-      onLocalVideoStateChanged: (source, videoState, reason) {
-        if (!_isScreenSource(source)) return;
-        AppLog.d(
-          LogTag.voice,
-          () => 'screen capture state=$videoState reason=$reason',
-        );
-        if (videoState == LocalVideoStreamState.localVideoStreamStateFailed ||
-            videoState == LocalVideoStreamState.localVideoStreamStateStopped) {
-          final current = state;
-          if (current != null && current.shareScreen) {
-            state = current.copyWith(shareScreen: false);
+            () => 'screen capture state=$videoState reason=$reason',
+          );
+          if (videoState == LocalVideoStreamState.localVideoStreamStateFailed ||
+              videoState ==
+                  LocalVideoStreamState.localVideoStreamStateStopped) {
+            final current = state;
+            if (current != null && current.shareScreen) {
+              state = current.copyWith(shareScreen: false);
+            }
           }
-        }
-      },
-      onPermissionError: (permissionType) {
-        AppLog.w(
-          LogTag.voice,
-          () => 'Agora permission denied: $permissionType',
-        );
-      },
-      onError: (code, message) {
-        AppLog.e(
+        },
+        onPermissionError: (permissionType) {
+          AppLog.w(
             LogTag.voice,
-            () =>
-                'Agora error channel=$_channelName code=$code message=$message');
-      },
-    );
-    engine.registerEventHandler(handler);
+            () => 'Agora permission denied: $permissionType',
+          );
+        },
+        onError: (code, message) {
+          AppLog.e(
+              LogTag.voice,
+              () =>
+                  'Agora error channel=$_channelName code=$code message=$message');
+        },
+      );
+      _eventHandler = handler;
+      engine.registerEventHandler(handler);
 
-    _engine = engine;
-    return engine;
+      return engine;
+    } catch (_) {
+      if (!_disposed) _beginNativeDisposal();
+      rethrow;
+    }
   }
 
   bool _isCurrentConnection(RtcConnection connection) =>
+      !_disposed &&
       state != null &&
       _channelName != null &&
       connection.channelId == _channelName &&
@@ -271,6 +401,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   }
 
   void _syncPictureInPictureEligibility() {
+    if (_disposed) return;
     final remoteUid = remoteVideoUidForPictureInPicture(
       call: state,
       members: members.value,
@@ -286,7 +417,11 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   }
 
   void _queuePipOperation(Future<void> Function() operation) {
-    _pipOperations = _pipOperations.then((_) => operation()).onError(
+    if (_disposed) return;
+    _pipOperations = _pipOperations.then<void>((_) async {
+      if (_disposed) return;
+      await operation();
+    }).onError(
       (error, stackTrace) {
         AppLog.e(
           LogTag.voice,
@@ -299,6 +434,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   }
 
   Future<void> _applyPictureInPictureConfiguration() async {
+    if (_disposed) return;
     final pipController = _pipController;
     final remoteUid = _desiredPipRemoteUid;
     final channelName = _channelName;
@@ -321,11 +457,13 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
 
     if (_configuredPipRemoteUid != null) {
       await pipController.pipDispose();
+      if (_disposed) return;
       _configuredPipRemoteUid = null;
     }
-    if (!await pipController.pipIsSupported()) return;
+    if (!await pipController.pipIsSupported() || _disposed) return;
 
     final autoEnterSupported = await pipController.pipIsAutoEnterSupported();
+    if (_disposed) return;
     // Android is started explicitly after the final Dart-side eligibility
     // check. Native auto-enter can race a remote camera-off/member-join event.
     _pipAutoEnterEnabled =
@@ -366,7 +504,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
             ],
             controlStyle: 2,
           );
-    if (!await pipController.pipSetup(options)) return;
+    if (!await pipController.pipSetup(options) || _disposed) return;
 
     _configuredPipRemoteUid = remoteUid;
     if (_desiredPipRemoteUid != remoteUid) {
@@ -377,6 +515,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   }
 
   Future<void> _enterPictureInPictureIfEligible() async {
+    if (_disposed) return;
     final pipController = _pipController;
     final remoteUid = _desiredPipRemoteUid;
     if (pipController == null ||
@@ -389,6 +528,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     if (defaultTargetPlatform == TargetPlatform.android) {
       pictureInPictureRemoteUid.value = remoteUid;
       await WidgetsBinding.instance.endOfFrame;
+      if (_disposed) return;
       if (_desiredPipRemoteUid != remoteUid ||
           _appLifecycleState == AppLifecycleState.resumed) {
         pictureInPictureRemoteUid.value = null;
@@ -397,12 +537,14 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     }
 
     if (!_pipAutoEnterEnabled && !await pipController.isPipActivated()) {
+      if (_disposed) return;
       await pipController.pipStart();
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_disposed) return;
     _appLifecycleState = state;
     switch (state) {
       case AppLifecycleState.resumed:
@@ -423,6 +565,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   }
 
   void _upsertMember(int uid, VoicingMemberInfo info) {
+    if (_disposed) return;
     final current = members.value;
     if (current.ids.contains(uid)) return;
     members.value = current.copyWith(
@@ -432,6 +575,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   }
 
   void _removeMember(int uid) {
+    if (_disposed) return;
     final current = members.value;
     if (!current.ids.contains(uid)) return;
     final nextById = Map<int, VoicingMemberInfo>.from(current.byId)
@@ -447,6 +591,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     int uid,
     VoicingMemberInfo Function(VoicingMemberInfo) patch,
   ) {
+    if (_disposed) return;
     final current = members.value;
     if (!current.ids.contains(uid)) return;
     final existing = current.byId[uid] ?? const VoicingMemberInfo();
@@ -465,9 +610,12 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   /// while [context] still points to the caller for chat navigation and Avo.
   /// Both participants must request a token for the callee's RTC channel.
   Future<void> join(MessageTarget context, {int? dmChannelOwnerUid}) async {
+    if (_disposed) return;
     if (state != null || _channelName != null) {
       await leave();
     }
+    if (_disposed) return;
+    final generation = ++_callGeneration;
     members.value = const VoicingMembers();
     state = VoicingInfo(
       context: context,
@@ -480,8 +628,10 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
         user: (t) => api.generateToken(uid: dmChannelOwnerUid ?? t.uid),
         group: (t) => api.generateToken(gid: t.gid),
       );
+      if (_disposed || generation != _callGeneration) return;
 
       final engine = await _ensureEngine(token.appId);
+      if (_disposed || generation != _callGeneration) return;
       // Native joinChannel completes when the request is accepted. Only
       // onJoinChannelSuccess confirms membership (unlike Web client.join).
       _channelName = token.channelName;
@@ -504,6 +654,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
         ),
       );
     } catch (e, st) {
+      if (_disposed || generation != _callGeneration) return;
       AppLog.e(LogTag.voice, () => 'join failed', error: e, stackTrace: st);
       _channelName = null;
       _localUid = null;
@@ -515,7 +666,10 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   }
 
   Future<void> leave() async {
+    if (_disposed) return;
+    _callGeneration++;
     final engine = _engine;
+    final hadChannel = _channelName != null;
     final current = state;
     unawaited(ref.read(avoInteractionControllerProvider.notifier).leaveRoom());
     _channelName = null;
@@ -524,12 +678,17 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     members.value = const VoicingMembers();
     _syncPictureInPictureEligibility();
     await _pipOperations;
+    if (_disposed) return;
 
-    if (engine != null) {
+    // A second join can cancel the first while its shared engine is still
+    // initializing. There is no native channel to leave in that case.
+    if (engine != null && hadChannel) {
       if (current?.shareScreen ?? false) {
         await engine.stopScreenCapture();
+        if (_disposed) return;
       }
       await engine.leaveChannel();
+      if (_disposed) return;
       await engine.stopPreview();
     }
   }
@@ -539,10 +698,12 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
 
   Future<void> setMuted(bool muted) async {
+    if (_disposed) return;
     final engine = _engine;
     final current = state;
     if (engine == null || current == null) return;
     await engine.muteLocalAudioStream(muted);
+    if (_disposed) return;
     // Web parity: unmuting clears deafen (you can't hear others while
     // deafened, so re-enabling your mic implies you want audio back too).
     state = current.copyWith(
@@ -555,11 +716,14 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   }
 
   Future<void> setDeafen(bool deafen) async {
+    if (_disposed) return;
     final engine = _engine;
     final current = state;
     if (engine == null || current == null) return;
     await engine.muteLocalAudioStream(deafen);
+    if (_disposed) return;
     await engine.muteAllRemoteAudioStreams(deafen);
+    if (_disposed) return;
     state = current.copyWith(deafen: deafen, muted: deafen);
   }
 
@@ -568,31 +732,41 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
 
   Future<void> openCamera() async {
+    if (_disposed) return;
     final engine = _engine;
     final current = state;
     if (engine == null || current == null) return;
     if (current.shareScreen) await _stopShareScreenInternal(engine);
+    if (_disposed) return;
     await engine.enableLocalVideo(true);
+    if (_disposed) return;
     await engine.muteLocalVideoStream(false);
+    if (_disposed) return;
     await engine.startPreview();
+    if (_disposed) return;
     await engine.updateChannelMediaOptions(
       const ChannelMediaOptions(
         publishCameraTrack: true,
         publishScreenTrack: false,
       ),
     );
+    if (_disposed) return;
     state = (state ?? current).copyWith(video: true, shareScreen: false);
   }
 
   Future<void> closeCamera() async {
+    if (_disposed) return;
     final engine = _engine;
     final current = state;
     if (engine == null || current == null) return;
     await engine.muteLocalVideoStream(true);
+    if (_disposed) return;
     await engine.updateChannelMediaOptions(
       const ChannelMediaOptions(publishCameraTrack: false),
     );
+    if (_disposed) return;
     await engine.stopPreview();
+    if (_disposed) return;
     state = current.copyWith(video: false);
   }
 
@@ -601,10 +775,12 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   }
 
   Future<void> startShareScreen() async {
+    if (_disposed) return;
     final engine = _engine;
     final current = state;
     if (engine == null || current == null) return;
     if (current.video) await closeCamera();
+    if (_disposed) return;
 
     final desktop = defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.macOS;
@@ -619,6 +795,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
           iconSize: const SIZE(width: 1, height: 1),
           includeScreen: true,
         );
+        if (_disposed) return;
         final screens = sources
             .where(
               (source) =>
@@ -646,6 +823,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
             frameRate: 15,
           ),
         );
+        if (_disposed) return;
         captureStarted = true;
         await engine.updateChannelMediaOptions(
           const ChannelMediaOptions(
@@ -663,6 +841,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
             captureVideo: true,
           ),
         );
+        if (_disposed) return;
         captureStarted = true;
         await engine.updateChannelMediaOptions(
           const ChannelMediaOptions(
@@ -671,8 +850,10 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
           ),
         );
       }
+      if (_disposed) return;
       state = (state ?? current).copyWith(shareScreen: true, video: false);
     } catch (error, stackTrace) {
+      if (_disposed) return;
       if (captureStarted) {
         try {
           await engine.stopScreenCapture();
@@ -696,15 +877,18 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   }
 
   Future<void> stopShareScreen() async {
+    if (_disposed) return;
     final engine = _engine;
     final current = state;
     if (engine == null || current == null) return;
     await _stopShareScreenInternal(engine);
+    if (_disposed) return;
     state = current.copyWith(shareScreen: false);
   }
 
   Future<void> _stopShareScreenInternal(RtcEngine engine) async {
     await engine.stopScreenCapture();
+    if (_disposed) return;
     if (defaultTargetPlatform == TargetPlatform.windows ||
         defaultTargetPlatform == TargetPlatform.macOS) {
       await engine.updateChannelMediaOptions(
@@ -727,10 +911,12 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
 
   void pin(int uid) {
+    if (_disposed) return;
     members.value = members.value.copyWith(pin: uid);
   }
 
   void unpin() {
+    if (_disposed) return;
     members.value = members.value.copyWith(pin: null);
   }
 }

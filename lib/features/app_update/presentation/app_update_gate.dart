@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/distribution.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../application/app_update_controller.dart';
 import 'apk_download_panel.dart';
@@ -42,6 +43,7 @@ class _AppUpdateGateState extends ConsumerState<AppUpdateGate> {
 
   @override
   Widget build(BuildContext context) {
+    if (!supportsDirectDistributionFeatures) return widget.child;
     final prompt = ref.watch(appUpdateControllerProvider).valueOrNull;
     final release = prompt?.release;
     final showing = prompt != null;

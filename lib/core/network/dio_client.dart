@@ -170,6 +170,53 @@ class _AuthInterceptor extends Interceptor {
 
   @override
   Future<void> onRequest(
+      RequestOptions options, RequestInterceptorHandler handler) async {
+    try {
+      await _onRequest(options, handler);
+    } catch (error, stackTrace) {
+      if (!handler.isCompleted) {
+        handler.reject(DioException(
+            requestOptions: options, error: error, stackTrace: stackTrace));
+      }
+    }
+  }
+
+  @override
+  Future<void> onResponse(
+      Response response, ResponseInterceptorHandler handler) async {
+    try {
+      await _onResponse(response, handler);
+    } catch (error, stackTrace) {
+      if (!handler.isCompleted) {
+        handler.reject(DioException(
+            requestOptions: response.requestOptions,
+            response: response,
+            error: error,
+            stackTrace: stackTrace));
+      }
+    }
+  }
+
+  @override
+  Future<void> onError(
+      DioException error, ErrorInterceptorHandler handler) async {
+    // Dio awaits handler.future, not this async callback. An uncaught cast or
+    // disposed-provider error would otherwise leave the request pending forever.
+    try {
+      await _onError(error, handler);
+    } catch (failure, stackTrace) {
+      if (!handler.isCompleted) {
+        handler.reject(DioException(
+            requestOptions: error.requestOptions,
+            response: error.response,
+            type: error.type,
+            error: failure,
+            stackTrace: stackTrace));
+      }
+    }
+  }
+
+  Future<void> _onRequest(
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
@@ -223,8 +270,7 @@ class _AuthInterceptor extends Interceptor {
     handler.next(options);
   }
 
-  @override
-  Future<void> onResponse(
+  Future<void> _onResponse(
     Response response,
     ResponseInterceptorHandler handler,
   ) async {
@@ -248,8 +294,7 @@ class _AuthInterceptor extends Interceptor {
     handler.next(response);
   }
 
-  @override
-  Future<void> onError(
+  Future<void> _onError(
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
@@ -344,11 +389,15 @@ class _AuthInterceptor extends Interceptor {
       String message = 'HTTP $statusCode';
       String? code;
       if (data is Map<String, dynamic>) {
-        message = (data['msg'] as String?) ??
-            (data['message'] as String?) ??
-            (data['error'] as String?) ??
-            message;
-        code = data['code'] as String?;
+        for (final key in ['msg', 'message', 'error']) {
+          final value = data[key];
+          if (value is String && value.isNotEmpty) {
+            message = value;
+            break;
+          }
+        }
+        final value = data['code'];
+        if (value is String || value is num) code = value.toString();
       } else if (data is String && data.isNotEmpty) {
         message = data;
       }

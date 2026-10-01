@@ -4,6 +4,12 @@
   "appTitle": "VoceChat",
   "@appTitle": {"description": "Application title"},
 
+  "appLoadingSlowTitle": "Loading is taking longer than usual",
+  "appLoadingSlowBody": "We are still trying to load the app. You can keep waiting or retry. Your saved accounts will not be removed.",
+
+  "appRecoveryTitle": "Unable to display this page",
+  "appRecoveryBody": "Something went wrong while loading the interface. Please retry. Your saved accounts will not be removed.",
+
   "actionCancel": "Cancel",
   "actionOpen": "Open",
   "actionChange": "Change",

@@ -6,7 +6,7 @@ part of 'fcm_service.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$fcmServiceHash() => r'8c1d370a6d629255d438a78d664b512b38afa44a';
+String _$fcmServiceHash() => r'42bd69b16f8b7d325d1953197c76fc23ea2f1303';
 
 /// Initialises Firebase Messaging on Android/iOS and wires up notification
 /// tap handlers. keepAlive ensures listeners are never torn down for the app's

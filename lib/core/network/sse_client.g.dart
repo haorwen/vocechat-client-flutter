@@ -6,7 +6,7 @@ part of 'sse_client.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$sseEventsHash() => r'21a4fb510f13586ce132508ae1fb88c3cf0b2161';
+String _$sseEventsHash() => r'a47f128f5017b5550a0b5d5912b4e2d3ab236bcd';
 
 /// See also [sseEvents].
 @ProviderFor(sseEvents)

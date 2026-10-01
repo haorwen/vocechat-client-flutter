@@ -10,6 +10,18 @@ class AppL10nFr extends AppL10n {
   String get appTitle => 'VoceChat';
 
   @override
+  String get appLoadingSlowTitle => 'Le chargement prend plus de temps que prévu';
+
+  @override
+  String get appLoadingSlowBody => 'Nous essayons toujours de charger l’application. Vous pouvez patienter ou réessayer. Vos comptes enregistrés ne seront pas supprimés.';
+
+  @override
+  String get appRecoveryTitle => 'Impossible d’afficher cette page';
+
+  @override
+  String get appRecoveryBody => 'Une erreur est survenue lors du chargement de l’interface. Réessayez. Vos comptes enregistrés ne seront pas supprimés.';
+
+  @override
   String get actionCancel => 'Annuler';
 
   @override

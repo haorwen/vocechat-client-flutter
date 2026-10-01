@@ -10,6 +10,18 @@ class AppL10nRu extends AppL10n {
   String get appTitle => 'VoceChat';
 
   @override
+  String get appLoadingSlowTitle => 'Загрузка занимает больше времени, чем обычно';
+
+  @override
+  String get appLoadingSlowBody => 'Мы всё ещё пытаемся загрузить приложение. Можно подождать или повторить попытку. Сохранённые аккаунты не будут удалены.';
+
+  @override
+  String get appRecoveryTitle => 'Не удалось отобразить страницу';
+
+  @override
+  String get appRecoveryBody => 'При загрузке интерфейса произошла ошибка. Повторите попытку. Сохранённые аккаунты не будут удалены.';
+
+  @override
   String get actionCancel => 'Отмена';
 
   @override
