@@ -2279,6 +2279,18 @@ abstract class AppL10n {
   /// **'Avo saved'**
   String get avoSaved;
 
+  /// No description provided for @avoServerUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'The server does not support saving Avo avatars.'**
+  String get avoServerUnsupported;
+
+  /// No description provided for @avoServerVersionUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'The current server (version {version}) does not support saving Avo avatars.'**
+  String avoServerVersionUnsupported(String version);
+
   /// No description provided for @avoSaveFailed.
   ///
   /// In en, this message translates to:

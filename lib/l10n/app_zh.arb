@@ -403,6 +403,8 @@
   "avoEnergy": "活力 {percent}%",
   "avoSave": "保存",
   "avoSaved": "Avo 已保存",
+  "avoServerUnsupported": "服务端不支持保存 Avo 形象。",
+  "avoServerVersionUnsupported": "当前服务端（版本 {version}）不支持保存 Avo 形象。",
   "avoSaveFailed": "无法保存 Avo：{error}",
   "avoPreviewHint": "将指针移到 Avo 上，轻抚它的身体，或点击它。",
   "avoPreviewNameLabel": "名称（默认 Han）",

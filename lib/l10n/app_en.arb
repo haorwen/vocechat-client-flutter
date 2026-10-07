@@ -493,6 +493,15 @@
   },
   "avoSave": "Save",
   "avoSaved": "Avo saved",
+  "avoServerUnsupported": "The server does not support saving Avo avatars.",
+  "avoServerVersionUnsupported": "The current server (version {version}) does not support saving Avo avatars.",
+  "@avoServerVersionUnsupported": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "avoSaveFailed": "Unable to save Avo: {error}",
   "@avoSaveFailed": {
     "placeholders": {

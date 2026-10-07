@@ -96,8 +96,15 @@ class _AvoSettingsCardState extends ConsumerState<AvoSettingsCard> {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(AppL10n.of(context).avoSaved)));
       }
-      // Some compatible servers return a partial user without avo_params; the
-      // authenticated refresh above remains the source of truth in that case.
+    } on AvoUnsupportedException catch (e) {
+      if (mounted) {
+        final l = AppL10n.of(context);
+        final version = e.serverVersion;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(version == null
+                ? l.avoServerUnsupported
+                : l.avoServerVersionUnsupported(version))));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

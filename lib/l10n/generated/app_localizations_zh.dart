@@ -1153,6 +1153,14 @@ class AppL10nZh extends AppL10n {
   String get avoSaved => 'Avo 已保存';
 
   @override
+  String get avoServerUnsupported => '服务端不支持保存 Avo 形象。';
+
+  @override
+  String avoServerVersionUnsupported(String version) {
+    return '当前服务端（版本 $version）不支持保存 Avo 形象。';
+  }
+
+  @override
   String avoSaveFailed(String error) {
     return '无法保存 Avo：$error';
   }

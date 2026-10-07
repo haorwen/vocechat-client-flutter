@@ -1153,6 +1153,14 @@ class AppL10nEn extends AppL10n {
   String get avoSaved => 'Avo saved';
 
   @override
+  String get avoServerUnsupported => 'The server does not support saving Avo avatars.';
+
+  @override
+  String avoServerVersionUnsupported(String version) {
+    return 'The current server (version $version) does not support saving Avo avatars.';
+  }
+
+  @override
   String avoSaveFailed(String error) {
     return 'Unable to save Avo: $error';
   }
