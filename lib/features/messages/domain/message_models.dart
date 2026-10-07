@@ -175,6 +175,10 @@ class ChatMessage with _$ChatMessage {
     // app restart.
     @JsonKey(name: 'edited_content') String? editedContent,
     @JsonKey(name: 'edited_content_type') String? editedContentType,
+    // Client-only ordering for an unconfirmed row. Persist the server mid
+    // known at insertion so a failed send keeps its position after a reload.
+    @JsonKey(name: 'local_order_anchor', includeIfNull: false)
+    int? localOrderAnchor,
   }) = _ChatMessage;
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) =>

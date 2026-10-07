@@ -15,6 +15,7 @@ _$ChatMessageImpl _$$ChatMessageImplFromJson(Map<String, dynamic> json) =>
       detail: _messageDetailFromJson(json['detail'] as Map<String, dynamic>),
       editedContent: json['edited_content'] as String?,
       editedContentType: json['edited_content_type'] as String?,
+      localOrderAnchor: (json['local_order_anchor'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$$ChatMessageImplToJson(_$ChatMessageImpl instance) =>
@@ -26,4 +27,6 @@ Map<String, dynamic> _$$ChatMessageImplToJson(_$ChatMessageImpl instance) =>
       'detail': _messageDetailToJson(instance.detail),
       'edited_content': instance.editedContent,
       'edited_content_type': instance.editedContentType,
+      if (instance.localOrderAnchor case final value?)
+        'local_order_anchor': value,
     };

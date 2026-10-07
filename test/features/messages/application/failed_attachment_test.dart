@@ -90,6 +90,34 @@ void main() {
     expect(rows().map((row) => row.mid), [101, 100, mid, 1]);
   });
 
+  test('restored failed attachment keeps its place and cannot retry as text',
+      () async {
+    final mid = await failUpload();
+    controller.applyIncomingMessage(message(101, createdAt: 1));
+    await Future<void>.delayed(Duration.zero);
+    expect(rows().map((row) => row.mid), [101, mid, 1]);
+
+    container.invalidate(chatControllerProvider(target));
+    await container.read(chatControllerProvider(target).future);
+    controller = container.read(chatControllerProvider(target).notifier);
+
+    expect(controller.statusFor(mid), MessageSendStatus.failed);
+    expect(controller.localBytesFor(mid), isNull);
+    expect(rows().map((row) => row.mid), [101, mid, 1]);
+
+    controller.applyIncomingMessage(message(102, createdAt: 1));
+    await Future<void>.delayed(Duration.zero);
+    expect(rows().map((row) => row.mid), [102, 101, mid, 1]);
+
+    final postCount =
+        requests.where((request) => request.method == 'POST').length;
+    await controller.retrySend(mid);
+    expect(requests.where((request) => request.method == 'POST').length,
+        postCount);
+    expect(controller.statusFor(mid), MessageSendStatus.failed);
+    expect(rows().map((row) => row.mid), [102, 101, mid, 1]);
+  });
+
   test('failed ephemeral upload expires and releases preview and retry state',
       () async {
     container.read(burnAfterReadProvider.notifier).applySnapshot({}, {42: 1});

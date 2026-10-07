@@ -1050,9 +1050,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                               _toggleSelected(msg.mid),
                                           onEnterSelect: () =>
                                               _enterSelectMode(msg.mid),
-                                          onRetry: msg.mid < 0 &&
-                                                  statuses[msg.mid] ==
-                                                      MessageSendStatus.failed
+                                          onRetry: ref
+                                                  .read(chatControllerProvider(
+                                                          _target)
+                                                      .notifier)
+                                                  .canRetrySend(msg.mid)
                                               ? () => ref
                                                   .read(chatControllerProvider(
                                                           _target)

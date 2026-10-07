@@ -1173,7 +1173,11 @@ mixin _$ChatMessage {
   @JsonKey(name: 'edited_content')
   String? get editedContent => throw _privateConstructorUsedError;
   @JsonKey(name: 'edited_content_type')
-  String? get editedContentType => throw _privateConstructorUsedError;
+  String? get editedContentType =>
+      throw _privateConstructorUsedError; // Client-only ordering for an unconfirmed row. Persist the server mid
+// known at insertion so a failed send keeps its position after a reload.
+  @JsonKey(name: 'local_order_anchor', includeIfNull: false)
+  int? get localOrderAnchor => throw _privateConstructorUsedError;
 
   /// Serializes this ChatMessage to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -1200,7 +1204,9 @@ abstract class $ChatMessageCopyWith<$Res> {
       @JsonKey(fromJson: _messageDetailFromJson, toJson: _messageDetailToJson)
       MessageDetail detail,
       @JsonKey(name: 'edited_content') String? editedContent,
-      @JsonKey(name: 'edited_content_type') String? editedContentType});
+      @JsonKey(name: 'edited_content_type') String? editedContentType,
+      @JsonKey(name: 'local_order_anchor', includeIfNull: false)
+      int? localOrderAnchor});
 
   $MessageTargetCopyWith<$Res> get target;
   $MessageDetailCopyWith<$Res> get detail;
@@ -1228,6 +1234,7 @@ class _$ChatMessageCopyWithImpl<$Res, $Val extends ChatMessage>
     Object? detail = null,
     Object? editedContent = freezed,
     Object? editedContentType = freezed,
+    Object? localOrderAnchor = freezed,
   }) {
     return _then(_value.copyWith(
       mid: null == mid
@@ -1258,6 +1265,10 @@ class _$ChatMessageCopyWithImpl<$Res, $Val extends ChatMessage>
           ? _value.editedContentType
           : editedContentType // ignore: cast_nullable_to_non_nullable
               as String?,
+      localOrderAnchor: freezed == localOrderAnchor
+          ? _value.localOrderAnchor
+          : localOrderAnchor // ignore: cast_nullable_to_non_nullable
+              as int?,
     ) as $Val);
   }
 
@@ -1299,7 +1310,9 @@ abstract class _$$ChatMessageImplCopyWith<$Res>
       @JsonKey(fromJson: _messageDetailFromJson, toJson: _messageDetailToJson)
       MessageDetail detail,
       @JsonKey(name: 'edited_content') String? editedContent,
-      @JsonKey(name: 'edited_content_type') String? editedContentType});
+      @JsonKey(name: 'edited_content_type') String? editedContentType,
+      @JsonKey(name: 'local_order_anchor', includeIfNull: false)
+      int? localOrderAnchor});
 
   @override
   $MessageTargetCopyWith<$Res> get target;
@@ -1327,6 +1340,7 @@ class __$$ChatMessageImplCopyWithImpl<$Res>
     Object? detail = null,
     Object? editedContent = freezed,
     Object? editedContentType = freezed,
+    Object? localOrderAnchor = freezed,
   }) {
     return _then(_$ChatMessageImpl(
       mid: null == mid
@@ -1357,6 +1371,10 @@ class __$$ChatMessageImplCopyWithImpl<$Res>
           ? _value.editedContentType
           : editedContentType // ignore: cast_nullable_to_non_nullable
               as String?,
+      localOrderAnchor: freezed == localOrderAnchor
+          ? _value.localOrderAnchor
+          : localOrderAnchor // ignore: cast_nullable_to_non_nullable
+              as int?,
     ));
   }
 }
@@ -1373,7 +1391,9 @@ class _$ChatMessageImpl extends _ChatMessage {
       @JsonKey(fromJson: _messageDetailFromJson, toJson: _messageDetailToJson)
       required this.detail,
       @JsonKey(name: 'edited_content') this.editedContent,
-      @JsonKey(name: 'edited_content_type') this.editedContentType})
+      @JsonKey(name: 'edited_content_type') this.editedContentType,
+      @JsonKey(name: 'local_order_anchor', includeIfNull: false)
+      this.localOrderAnchor})
       : super._();
 
   factory _$ChatMessageImpl.fromJson(Map<String, dynamic> json) =>
@@ -1404,10 +1424,15 @@ class _$ChatMessageImpl extends _ChatMessage {
   @override
   @JsonKey(name: 'edited_content_type')
   final String? editedContentType;
+// Client-only ordering for an unconfirmed row. Persist the server mid
+// known at insertion so a failed send keeps its position after a reload.
+  @override
+  @JsonKey(name: 'local_order_anchor', includeIfNull: false)
+  final int? localOrderAnchor;
 
   @override
   String toString() {
-    return 'ChatMessage(mid: $mid, fromUid: $fromUid, createdAt: $createdAt, target: $target, detail: $detail, editedContent: $editedContent, editedContentType: $editedContentType)';
+    return 'ChatMessage(mid: $mid, fromUid: $fromUid, createdAt: $createdAt, target: $target, detail: $detail, editedContent: $editedContent, editedContentType: $editedContentType, localOrderAnchor: $localOrderAnchor)';
   }
 
   @override
@@ -1424,13 +1449,15 @@ class _$ChatMessageImpl extends _ChatMessage {
             (identical(other.editedContent, editedContent) ||
                 other.editedContent == editedContent) &&
             (identical(other.editedContentType, editedContentType) ||
-                other.editedContentType == editedContentType));
+                other.editedContentType == editedContentType) &&
+            (identical(other.localOrderAnchor, localOrderAnchor) ||
+                other.localOrderAnchor == localOrderAnchor));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(runtimeType, mid, fromUid, createdAt, target,
-      detail, editedContent, editedContentType);
+      detail, editedContent, editedContentType, localOrderAnchor);
 
   /// Create a copy of ChatMessage
   /// with the given fields replaced by the non-null parameter values.
@@ -1458,8 +1485,9 @@ abstract class _ChatMessage extends ChatMessage {
       @JsonKey(fromJson: _messageDetailFromJson, toJson: _messageDetailToJson)
       required final MessageDetail detail,
       @JsonKey(name: 'edited_content') final String? editedContent,
-      @JsonKey(name: 'edited_content_type')
-      final String? editedContentType}) = _$ChatMessageImpl;
+      @JsonKey(name: 'edited_content_type') final String? editedContentType,
+      @JsonKey(name: 'local_order_anchor', includeIfNull: false)
+      final int? localOrderAnchor}) = _$ChatMessageImpl;
   const _ChatMessage._() : super._();
 
   factory _ChatMessage.fromJson(Map<String, dynamic> json) =
@@ -1488,7 +1516,12 @@ abstract class _ChatMessage extends ChatMessage {
   String? get editedContent;
   @override
   @JsonKey(name: 'edited_content_type')
-  String? get editedContentType;
+  String?
+      get editedContentType; // Client-only ordering for an unconfirmed row. Persist the server mid
+// known at insertion so a failed send keeps its position after a reload.
+  @override
+  @JsonKey(name: 'local_order_anchor', includeIfNull: false)
+  int? get localOrderAnchor;
 
   /// Create a copy of ChatMessage
   /// with the given fields replaced by the non-null parameter values.

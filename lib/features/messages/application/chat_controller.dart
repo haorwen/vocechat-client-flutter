@@ -42,14 +42,64 @@ class ChatController extends _$ChatController {
   // New confirmed messages can then pass it without relying on device clocks.
   final Map<int, int> _localOrderAnchors = {};
 
-  void _publish(List<ChatMessage> messages) {
+  List<ChatMessage> _withLocalOrderAnchors(List<ChatMessage> messages) {
     final latestMid =
         messages.fold<int>(0, (mid, m) => m.mid > mid ? m.mid : mid);
-    for (final m in messages.where((m) => m.mid < 0)) {
-      _localOrderAnchors.putIfAbsent(m.mid, () => latestMid);
+    return messages.map((m) {
+      if (m.mid >= 0) {
+        return m.localOrderAnchor == null
+            ? m
+            : m.copyWith(localOrderAnchor: null);
+      }
+      final anchor = _localOrderAnchors.putIfAbsent(
+          m.mid, () => m.localOrderAnchor ?? latestMid);
+      return m.localOrderAnchor == anchor
+          ? m
+          : m.copyWith(localOrderAnchor: anchor);
+    }).toList();
+  }
+
+  void _publish(List<ChatMessage> messages) {
+    final anchored = _withLocalOrderAnchors(messages);
+    _messages = anchored;
+    state = AsyncData(anchored);
+  }
+
+  List<ChatMessage> _restoreCachedRows(List<ChatMessage> rows) {
+    final confirmedLocalIds = {
+      for (final m in [...rows, ...?_messages])
+        if (m.mid > 0 && _localIdOf(m) != null)
+          (m.fromUid, _localIdOf(m), m.displayContentType),
+    };
+    final restored = <ChatMessage>[];
+    for (final m in rows) {
+      if (m.mid < 0) {
+        // Older caches could retain the placeholder after an acknowledgement:
+        // snapshot writes upsert rows rather than replacing the conversation.
+        if (_localIdOf(m) != null &&
+            confirmedLocalIds
+                .contains((m.fromUid, _localIdOf(m), m.displayContentType))) {
+          _cache?.deleteMid(target, m.mid);
+          continue;
+        }
+        // Cached rows have no active request in this controller generation.
+        // Keep any current send's status if it started while reading the cache.
+        _statuses.putIfAbsent(m.mid, () => MessageSendStatus.failed);
+        _localOrderAnchors.putIfAbsent(
+            m.mid,
+            () =>
+                m.localOrderAnchor ??
+                // Legacy rows have no stored anchor. Infer their position
+                // once from timestamps, then persist the resulting server mid.
+                rows.fold<int>(0, (anchor, row) {
+                  return row.mid > anchor && row.createdAt <= m.createdAt
+                      ? row.mid
+                      : anchor;
+                }));
+      }
+      restored.add(m);
     }
-    _messages = messages;
-    state = AsyncData(messages);
+    return _withLocalOrderAnchors(restored);
   }
 
   int? _outgoingExpiresIn() {
@@ -82,7 +132,7 @@ class ChatController extends _$ChatController {
     final next = _withoutExpired(current);
     if (next.length != current.length) {
       _publish(next);
-      _persist(next);
+      _persist();
     }
     _scheduleExpiry(next);
   }
@@ -144,6 +194,20 @@ class ChatController extends _$ChatController {
 
   /// Return the send status for a given mid (null if unknown / from others).
   MessageSendStatus? statusFor(int mid) => _statuses[mid];
+
+  /// Restored attachments have no upload bytes; they can only be deleted.
+  bool canRetrySend(int mid) {
+    if (_statuses[mid] != MessageSendStatus.failed) return false;
+    if (_pendingFiles.containsKey(mid)) return true;
+    for (final m in _messages ?? const <ChatMessage>[]) {
+      if (m.mid != mid) continue;
+      final detail = m.detail;
+      return detail is NormalMessageDetail &&
+          (detail.contentType == 'text/plain' ||
+              detail.contentType == 'text/markdown');
+    }
+    return false;
+  }
 
   /// Local bytes for an optimistic file row (null once uploaded/confirmed or
   /// for messages from the server). Used by the UI to preview before upload.
@@ -224,7 +288,7 @@ class ChatController extends _$ChatController {
     final next = _mergeIncoming(current, batch);
     if (listEquals(next, current)) return;
     _publish(next);
-    _persist(next);
+    _persist();
     final maxMid = batch.fold<int>(0, (mid, m) => m.mid > mid ? m.mid : mid);
     if (maxMid > 0) _cache?.setCursor(maxMid);
   }
@@ -272,6 +336,7 @@ class ChatController extends _$ChatController {
             _localAttachments.remove(placeholderMid);
             _pendingFiles.remove(placeholderMid);
             _progress.remove(placeholderMid);
+            _cache?.deleteMid(target, placeholderMid);
           }
           mergedInPlace = true;
         }
@@ -392,7 +457,7 @@ class ChatController extends _$ChatController {
     // the chat list as "unsupported" rows.
     final cachedRaw = await cache.read(target);
     if (generation != _generation) return const [];
-    final cached = _withoutExpired(cachedRaw)
+    final cached = _withoutExpired(_restoreCachedRows(cachedRaw))
         .where((m) => m.detail is! ReactionMessageDetail)
         .toList(growable: false);
     _seenMids
@@ -406,12 +471,11 @@ class ChatController extends _$ChatController {
       final drained = _drainPending(cached);
       _publish(drained);
       _backgroundRefresh(cache);
-      // Persist the filtered snapshot so the cache stops carrying reaction
-      // rows forward across launches.
-      if (cachedRaw.length != cached.length) {
-        cache.scheduleWrite(target, drained);
+      // Persist restored anchors and remove filtered rows from the snapshot.
+      if (!listEquals(cachedRaw, _messages)) {
+        _persist();
       }
-      return drained;
+      return _messages!;
     }
 
     // 2. No cache: fetch history from server.
@@ -424,9 +488,9 @@ class ChatController extends _$ChatController {
 
     // Drain pending SSE messages that arrived during the await.
     final merged = _drainPending(messages);
-    _messages = merged;
-    if (merged.isNotEmpty) cache.scheduleWrite(target, merged);
-    return merged;
+    _messages = _withLocalOrderAnchors(merged);
+    if (merged.isNotEmpty) _persist();
+    return _messages!;
   }
 
   /// Best-effort refresh after we already painted from cache. We only need
@@ -453,7 +517,7 @@ class ChatController extends _$ChatController {
       final next = _mergeIncoming(current, fresh, matchOptimistic: false);
       if (listEquals(next, current)) return;
       _publish(next);
-      cache.scheduleWrite(target, next);
+      _persist();
       final maxMid = fresh
           .map((m) => m.mid)
           .where((m) => m > 0)
@@ -585,7 +649,7 @@ class ChatController extends _$ChatController {
       editedContentType: contentType,
     );
     _publish(updated);
-    _persist(updated);
+    _persist();
   }
 
   /// Apply a delete echo (from SSE or local optimistic). Idempotent.
@@ -602,7 +666,7 @@ class ChatController extends _$ChatController {
     _pendingFiles.remove(targetMid);
     _progress.remove(targetMid);
     _localOrderAnchors.remove(targetMid);
-    _persist(updated);
+    _persist();
     _cache?.deleteMid(target, targetMid);
   }
 
@@ -640,9 +704,9 @@ class ChatController extends _$ChatController {
       final aOptimistic = a.mid < 0;
       final bOptimistic = b.mid < 0;
       final aSending =
-          aOptimistic && _statuses[a.mid] != MessageSendStatus.failed;
+          aOptimistic && _statuses[a.mid] == MessageSendStatus.sending;
       final bSending =
-          bOptimistic && _statuses[b.mid] != MessageSendStatus.failed;
+          bOptimistic && _statuses[b.mid] == MessageSendStatus.sending;
       if (aSending != bSending) return aSending ? -1 : 1;
       if (aSending && bSending) {
         final time = b.createdAt.compareTo(a.createdAt);
@@ -693,12 +757,14 @@ class ChatController extends _$ChatController {
     final next = _sortedNewestFirst(rows);
     _seenMids.add(confirmed.mid);
     _publish(next);
-    _persist(next);
+    _persist();
+    _cache?.deleteMid(target, tempMid);
     _cache?.setCursor(confirmed.mid);
   }
 
-  void _persist(List<ChatMessage> snapshot) {
-    _cache?.scheduleWrite(target, snapshot);
+  void _persist() {
+    final snapshot = _messages;
+    if (snapshot != null) _cache?.scheduleWrite(target, snapshot);
   }
 
   int? _currentUid() {
@@ -964,7 +1030,7 @@ class ChatController extends _$ChatController {
     _progress.remove(tempMid);
     final next = _sortedNewestFirst(snapshot);
     _publish(next);
-    _persist(next);
+    _persist();
   }
 
   static Map<String, dynamic>? _propertiesOf(ChatMessage m) {
@@ -995,7 +1061,7 @@ class ChatController extends _$ChatController {
   /// Retry a previously failed send identified by [tempMid].
   Future<void> retrySend(int tempMid) async {
     final generation = _generation;
-    if (_statuses[tempMid] != MessageSendStatus.failed) return;
+    if (!canRetrySend(tempMid)) return;
     // File retry: re-run the upload from the cached bytes.
     final pendingFile = _pendingFiles[tempMid];
     if (pendingFile != null) {
@@ -1094,7 +1160,7 @@ class ChatController extends _$ChatController {
           final latest = _messages ?? const <ChatMessage>[];
           final next = _sortedNewestFirst([...latest, ...fresh]);
           _publish(next);
-          _persist(next);
+          _persist();
         }
       }
     } catch (_) {

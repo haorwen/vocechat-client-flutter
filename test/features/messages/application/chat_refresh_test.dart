@@ -16,11 +16,16 @@ const _target = MessageTarget.group(gid: 42);
 final _provider = chatControllerProvider(_target);
 
 ChatMessage _message(int mid,
-        {String content = 'history', int fromUid = 8, int? localId}) =>
+        {String content = 'history',
+        int fromUid = 8,
+        int createdAt = 1000,
+        int? localId,
+        int? localOrderAnchor}) =>
     ChatMessage(
       mid: mid,
       fromUid: fromUid,
-      createdAt: 1000,
+      createdAt: createdAt,
+      localOrderAnchor: localOrderAnchor,
       target: _target,
       detail: MessageDetail.normal(
           contentType: 'text/plain',
@@ -35,12 +40,14 @@ class _Auth extends AuthController {
 }
 
 class _Cache implements MessageCache {
-  _Cache(this.rows);
+  _Cache(this.rows, {this.readGate});
   List<ChatMessage> rows;
+  final Completer<List<ChatMessage>>? readGate;
+  final deleted = <int>[];
   @override
   Future<List<ChatMessage>> read(MessageTarget target,
           {int limit = 500}) async =>
-      List.of(rows);
+      readGate == null ? List.of(rows) : await readGate!.future;
   @override
   void scheduleWrite(MessageTarget target, List<ChatMessage> messages) {
     rows = List.of(messages);
@@ -50,6 +57,7 @@ class _Cache implements MessageCache {
   Future<void> setCursor(int mid) async {}
   @override
   Future<void> deleteMid(MessageTarget target, int mid) async {
+    deleted.add(mid);
     rows.removeWhere((m) => m.mid == mid);
   }
 
@@ -318,5 +326,201 @@ void main() {
     addTearDown(subscription.close);
     await controller.sendText('new message');
     expect(publishedStatus, MessageSendStatus.sent);
+  });
+
+  test('failed send keeps its place when cached chat is restored', () async {
+    final api = _Api()..holdEachSend = true;
+    final cache = _Cache([_message(20)]);
+    final container = await setup(cache, api);
+    final controller = container.read(_provider.notifier);
+    final sending = controller.sendText('failed while offline');
+    final tempMid = container.read(_provider).requireValue.first.mid;
+    api.sends.single.result.completeError(StateError('offline'));
+    await sending;
+    expect(controller.statusFor(tempMid), MessageSendStatus.failed);
+    expect(cache.rows.firstWhere((m) => m.mid == tempMid).localOrderAnchor, 20);
+
+    controller.applyIncomingMessage(_message(101, content: 'after reconnect'));
+    await _flush();
+    expect(container.read(_provider).requireValue.map((m) => m.mid),
+        [101, tempMid, 20]);
+
+    // SQLite restores JSON payloads after a controller or app restart.
+    cache.rows =
+        cache.rows.map((m) => ChatMessage.fromJson(m.toJson())).toList();
+    container.invalidate(_provider);
+    await container.read(_provider.future);
+    await _flush();
+    api.requests.last.result.complete([]);
+    await _flush();
+    final restored = container.read(_provider.notifier);
+    expect(restored.statusFor(tempMid), MessageSendStatus.failed);
+    expect(container.read(_provider).requireValue.map((m) => m.mid),
+        [101, tempMid, 20]);
+
+    restored
+        .applyIncomingMessage(_message(102, content: 'another new message'));
+    await _flush();
+    expect(container.read(_provider).requireValue.map((m) => m.mid),
+        [102, 101, tempMid, 20]);
+  });
+
+  test('local ordering anchor round-trips through cached JSON', () {
+    final local = _message(-44,
+        content: 'failed', fromUid: 7, localId: 44, localOrderAnchor: 20);
+    final json = local.toJson();
+    expect(json['local_order_anchor'], 20);
+    expect(ChatMessage.fromJson(json), local);
+
+    final noPreviousMessage = local.copyWith(localOrderAnchor: 0);
+    expect(
+        ChatMessage.fromJson(noPreviousMessage.toJson()).localOrderAnchor, 0);
+    json.remove('local_order_anchor');
+    expect(ChatMessage.fromJson(json).localOrderAnchor, isNull);
+  });
+
+  test('legacy cached local row restores as failed at its attempted send time',
+      () async {
+    final cache = _Cache([
+      _message(102, createdAt: 5000),
+      _message(101, createdAt: 3000),
+      _message(20, createdAt: 2000),
+      _message(19, createdAt: 2400),
+      _message(-44,
+          content: 'legacy failed', fromUid: 7, createdAt: 2500, localId: 44),
+    ]);
+    final container = await setup(cache, _Api());
+    final controller = container.read(_provider.notifier);
+    expect(controller.statusFor(-44), MessageSendStatus.failed);
+    expect(container.read(_provider).requireValue.map((m) => m.mid),
+        [102, 101, -44, 20, 19]);
+    expect(cache.rows.firstWhere((m) => m.mid == -44).localOrderAnchor, 20);
+
+    // Server mids still define order when an incoming timestamp is skewed.
+    controller.applyIncomingMessage(_message(103, createdAt: 500));
+    await _flush();
+    expect(container.read(_provider).requireValue.map((m) => m.mid),
+        [103, 102, 101, -44, 20, 19]);
+  });
+
+  test('successful retry deletes the persisted temporary row', () async {
+    final api = _Api()..holdEachSend = true;
+    final cache = _Cache([_message(20)]);
+    final container = await setup(cache, api);
+    final controller = container.read(_provider.notifier);
+    final sending = controller.sendText('retry me');
+    final tempMid = container.read(_provider).requireValue.first.mid;
+    api.sends.single.result.completeError(StateError('offline'));
+    await sending;
+    controller.applyIncomingMessage(_message(101));
+    await _flush();
+
+    final retry = controller.retrySend(tempMid);
+    expect(api.sends, hasLength(2));
+    expect(api.sends.last.localId, api.sends.first.localId);
+    api.sends.last.result.complete(100);
+    await retry;
+    expect(container.read(_provider).requireValue.map((m) => m.mid),
+        [101, 100, 20]);
+    expect(controller.statusFor(tempMid), isNull);
+    expect(controller.statusFor(100), MessageSendStatus.sent);
+    expect(cache.deleted, contains(tempMid),
+        reason:
+            'cache writes upsert rows, so a sent placeholder needs deletion');
+    expect(cache.rows.any((m) => m.mid == tempMid), isFalse);
+  });
+
+  for (final source in ['history', 'SSE']) {
+    test('$source confirmation removes a restored failed row from cache',
+        () async {
+      final api = _Api();
+      final cache = _Cache([
+        _message(-44,
+            content: 'delivered before disconnect',
+            fromUid: 7,
+            localId: 44,
+            localOrderAnchor: 20),
+        _message(20),
+      ]);
+      final container = await setup(cache, api, finishHistory: false);
+      await container.read(_provider.future);
+      final controller = container.read(_provider.notifier);
+      expect(controller.statusFor(-44), MessageSendStatus.failed);
+      final echo = _message(100,
+          content: 'delivered before disconnect', fromUid: 7, localId: 44);
+      if (source == 'history') {
+        api.requests.single.result.complete([echo]);
+      } else {
+        api.requests.single.result.complete([]);
+        controller.applyIncomingMessage(echo);
+      }
+      await _flush();
+      expect(
+          container.read(_provider).requireValue.map((m) => m.mid), [100, 20]);
+      expect(controller.statusFor(-44), isNull);
+      expect(controller.statusFor(100), MessageSendStatus.sent);
+      expect(cache.deleted, contains(-44));
+
+      container.invalidate(_provider);
+      await container.read(_provider.future);
+      await _flush();
+      api.requests.last.result.complete([]);
+      await _flush();
+      expect(
+          container.read(_provider).requireValue.map((m) => m.mid), [100, 20]);
+    });
+  }
+
+  test('cache restore removes an already confirmed temporary row', () async {
+    final cache = _Cache([
+      _message(100, content: 'delivered', fromUid: 7, localId: 44),
+      _message(20),
+      _message(-44,
+          content: 'delivered', fromUid: 7, localId: 44, localOrderAnchor: 20),
+    ]);
+    final container = await setup(cache, _Api());
+    expect(container.read(_provider).requireValue.map((m) => m.mid), [100, 20]);
+    expect(container.read(_provider.notifier).statusFor(-44), isNull);
+    expect(cache.deleted, contains(-44));
+    expect(cache.rows.any((m) => m.mid == -44), isFalse);
+  });
+
+  test('cache restore retains live sends while removing a confirmed old row',
+      () async {
+    final cachedRows = [
+      _message(-44,
+          content: 'delivered before disconnect',
+          fromUid: 7,
+          localId: 44,
+          localOrderAnchor: 20),
+      _message(20),
+    ];
+    final readGate = Completer<List<ChatMessage>>();
+    final cache = _Cache(List.of(cachedRows), readGate: readGate);
+    final api = _Api()..holdEachSend = true;
+    final container = await setup(cache, api, finishHistory: false);
+    final controller = container.read(_provider.notifier);
+    final sending = controller.sendText('new send while restoring');
+    final newTempMid = container.read(_provider).requireValue.first.mid;
+    controller.applyIncomingMessage(_message(100,
+        content: 'delivered before disconnect', fromUid: 7, localId: 44));
+    await _flush();
+
+    readGate.complete(cachedRows);
+    await _flush();
+    await container.read(_provider.future);
+    expect(container.read(_provider).requireValue.map((m) => m.mid),
+        [newTempMid, 100, 20]);
+    expect(controller.statusFor(newTempMid), MessageSendStatus.sending);
+    expect(controller.statusFor(-44), isNull);
+    expect(cache.deleted, contains(-44));
+
+    api.sends.single.result.complete(101);
+    await sending;
+    api.requests.single.result.complete([]);
+    await _flush();
+    expect(container.read(_provider).requireValue.map((m) => m.mid),
+        [101, 100, 20]);
+    expect(cache.rows.any((m) => m.mid < 0), isFalse);
   });
 }
