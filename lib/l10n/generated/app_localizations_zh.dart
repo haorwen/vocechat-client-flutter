@@ -1095,6 +1095,20 @@ class AppL10nZh extends AppL10n {
   String get voiceCameraOff => '关闭摄像头';
 
   @override
+  String get voiceSwitchCamera => '切换摄像头';
+
+  @override
+  String get voiceSelectCamera => '选择摄像头';
+
+  @override
+  String get voiceNoCameras => '没有可用的摄像头';
+
+  @override
+  String voiceCameraFallback(int index) {
+    return '摄像头 $index';
+  }
+
+  @override
   String get voiceShareScreen => '共享屏幕';
 
   @override

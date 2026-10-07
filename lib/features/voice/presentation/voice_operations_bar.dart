@@ -22,6 +22,7 @@ class VoiceOperationsBar extends ConsumerStatefulWidget {
 
 class _VoiceOperationsBarState extends ConsumerState<VoiceOperationsBar> {
   bool _openingFullscreen = false;
+  bool _cameraBusy = false;
   bool _screenShareBusy = false;
 
   @override
@@ -133,9 +134,21 @@ class _VoiceOperationsBarState extends ConsumerState<VoiceOperationsBar> {
                     tooltip: info.video ? l.voiceCameraOff : l.voiceCameraOn,
                     icon: info.video ? Icons.videocam : Icons.videocam_off,
                     active: info.video,
-                    onTap: () => info.video
-                        ? controller.closeCamera()
-                        : controller.openCamera(),
+                    onTap:
+                        _cameraBusy || _screenShareBusy ? null : _toggleCamera,
+                  ),
+                if (info.video &&
+                    !info.shareScreen &&
+                    (isVoiceCameraFlipSupported ||
+                        isVoiceCameraSelectionSupported))
+                  _ToolButton(
+                    tooltip: isVoiceCameraFlipSupported
+                        ? l.voiceSwitchCamera
+                        : l.voiceSelectCamera,
+                    icon: Icons.flip_camera_ios,
+                    active: false,
+                    onTap:
+                        _cameraBusy || _screenShareBusy ? null : _changeCamera,
                   ),
                 if (!kIsWeb &&
                     (defaultTargetPlatform == TargetPlatform.windows ||
@@ -145,7 +158,9 @@ class _VoiceOperationsBarState extends ConsumerState<VoiceOperationsBar> {
                     tooltip: l.voiceShareScreen,
                     icon: Icons.screen_share,
                     active: info.shareScreen,
-                    onTap: _screenShareBusy ? () {} : _toggleScreenShare,
+                    onTap: _screenShareBusy || _cameraBusy
+                        ? null
+                        : _toggleScreenShare,
                   ),
                 _ToolButton(
                   tooltip: widget.fullscreen
@@ -172,8 +187,105 @@ class _VoiceOperationsBarState extends ConsumerState<VoiceOperationsBar> {
     );
   }
 
+  Future<void> _toggleCamera() => _runCameraOperation(() async {
+        final controller = ref.read(voiceControllerProvider.notifier);
+        final info = ref.read(voiceControllerProvider);
+        if (info == null) return;
+        if (info.video) {
+          await controller.closeCamera();
+        } else {
+          await controller.openCamera();
+        }
+      });
+
+  Future<void> _changeCamera() => _runCameraOperation(() async {
+        final controller = ref.read(voiceControllerProvider.notifier);
+        final info = ref.read(voiceControllerProvider);
+        if (info == null || !info.video || info.shareScreen) return;
+        if (isVoiceCameraFlipSupported) {
+          await controller.switchCamera();
+          return;
+        }
+        if (!isVoiceCameraSelectionSupported) return;
+
+        // A device picker can outlive its call. Do not apply its selection if
+        // the camera is stopped or the call ends while the dialog is open.
+        var cameraStillActive = true;
+        final subscription = ref.listenManual<VoicingInfo?>(
+          voiceControllerProvider,
+          (_, next) {
+            if (next == null ||
+                !next.video ||
+                next.shareScreen ||
+                next.context != info.context) {
+              cameraStillActive = false;
+            }
+          },
+        );
+        try {
+          final cameras = await controller.getCameraDevices();
+          if (!mounted || !cameraStillActive || cameras == null) return;
+          final l = AppL10n.of(context);
+          if (cameras.devices.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l.voiceNoCameras)),
+            );
+            return;
+          }
+          final selected = await showDialog<String>(
+            context: context,
+            builder: (context) => SimpleDialog(
+              title: Text(l.voiceSelectCamera),
+              children: [
+                for (var index = 0; index < cameras.devices.length; index++)
+                  ListTile(
+                    leading: const Icon(Icons.videocam),
+                    title: Text(
+                      cameras.devices[index].name.isEmpty
+                          ? l.voiceCameraFallback(index + 1)
+                          : cameras.devices[index].name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    selected:
+                        cameras.devices[index].id == cameras.selectedDeviceId,
+                    trailing:
+                        cameras.devices[index].id == cameras.selectedDeviceId
+                            ? const Icon(Icons.check)
+                            : null,
+                    onTap: () =>
+                        Navigator.of(context).pop(cameras.devices[index].id),
+                  ),
+              ],
+            ),
+          );
+          if (!mounted || !cameraStillActive || selected == null) return;
+          if (selected != cameras.selectedDeviceId) {
+            await controller.selectCamera(selected);
+          }
+        } finally {
+          subscription.close();
+        }
+      });
+
+  Future<void> _runCameraOperation(Future<void> Function() action) async {
+    if (_cameraBusy || _screenShareBusy) return;
+    setState(() => _cameraBusy = true);
+    try {
+      await action();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppL10n.of(context).errorPrefix('$error'))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _cameraBusy = false);
+    }
+  }
+
   Future<void> _toggleScreenShare() async {
-    if (_screenShareBusy) return;
+    if (_screenShareBusy || _cameraBusy) return;
     setState(() => _screenShareBusy = true);
     try {
       final controller = ref.read(voiceControllerProvider.notifier);
@@ -254,15 +366,17 @@ class _ToolButton extends StatelessWidget {
   final IconData icon;
   final bool active;
   final bool danger;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = danger
-        ? Colors.red
-        : active
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).iconTheme.color;
+    final color = onTap == null
+        ? Theme.of(context).disabledColor
+        : danger
+            ? Colors.red
+            : active
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).iconTheme.color;
     return Tooltip(
       message: tooltip,
       child: IconButton(

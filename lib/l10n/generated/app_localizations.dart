@@ -2171,6 +2171,30 @@ abstract class AppL10n {
   /// **'Turn off camera'**
   String get voiceCameraOff;
 
+  /// No description provided for @voiceSwitchCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch camera'**
+  String get voiceSwitchCamera;
+
+  /// No description provided for @voiceSelectCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Select camera'**
+  String get voiceSelectCamera;
+
+  /// No description provided for @voiceNoCameras.
+  ///
+  /// In en, this message translates to:
+  /// **'No cameras available'**
+  String get voiceNoCameras;
+
+  /// No description provided for @voiceCameraFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera {index}'**
+  String voiceCameraFallback(int index);
+
   /// No description provided for @voiceShareScreen.
   ///
   /// In en, this message translates to:

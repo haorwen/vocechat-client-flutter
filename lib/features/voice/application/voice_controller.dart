@@ -36,6 +36,16 @@ bool get isVoiceCallingSupported =>
     defaultTargetPlatform == TargetPlatform.macOS ||
     defaultTargetPlatform == TargetPlatform.windows;
 
+bool get isVoiceCameraFlipSupported =>
+    !kIsWeb &&
+    (defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS);
+
+bool get isVoiceCameraSelectionSupported =>
+    !kIsWeb &&
+    (defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.macOS);
+
 final agoraRtcEngineFactoryProvider = Provider<RtcEngine Function()>(
   (ref) => createAgoraRtcEngine,
 );
@@ -736,22 +746,23 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     final engine = _engine;
     final current = state;
     if (engine == null || current == null) return;
+    final generation = _callGeneration;
     if (current.shareScreen) await _stopShareScreenInternal(engine);
-    if (_disposed) return;
+    if (!_isCurrentCameraCall(engine, generation)) return;
     await engine.enableLocalVideo(true);
-    if (_disposed) return;
+    if (!_isCurrentCameraCall(engine, generation)) return;
     await engine.muteLocalVideoStream(false);
-    if (_disposed) return;
+    if (!_isCurrentCameraCall(engine, generation)) return;
     await engine.startPreview();
-    if (_disposed) return;
+    if (!_isCurrentCameraCall(engine, generation)) return;
     await engine.updateChannelMediaOptions(
       const ChannelMediaOptions(
         publishCameraTrack: true,
         publishScreenTrack: false,
       ),
     );
-    if (_disposed) return;
-    state = (state ?? current).copyWith(video: true, shareScreen: false);
+    if (!_isCurrentCameraCall(engine, generation)) return;
+    state = state!.copyWith(video: true, shareScreen: false);
   }
 
   Future<void> closeCamera() async {
@@ -759,19 +770,73 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     final engine = _engine;
     final current = state;
     if (engine == null || current == null) return;
+    final generation = _callGeneration;
     await engine.muteLocalVideoStream(true);
-    if (_disposed) return;
+    if (!_isCurrentCameraCall(engine, generation)) return;
     await engine.updateChannelMediaOptions(
       const ChannelMediaOptions(publishCameraTrack: false),
     );
-    if (_disposed) return;
+    if (!_isCurrentCameraCall(engine, generation)) return;
     await engine.stopPreview();
-    if (_disposed) return;
-    state = current.copyWith(video: false);
+    if (!_isCurrentCameraCall(engine, generation)) return;
+    state = state!.copyWith(video: false);
   }
 
   Future<void> switchCamera() async {
-    await _engine?.switchCamera();
+    if (!isVoiceCameraFlipSupported || _disposed) return;
+    final engine = _engine;
+    if (engine == null || !_canChangeCamera(engine, _callGeneration)) return;
+    await engine.switchCamera();
+  }
+
+  Future<VoiceCameraDevices?> getCameraDevices() async {
+    if (!isVoiceCameraSelectionSupported || _disposed) return null;
+    final engine = _engine;
+    final generation = _callGeneration;
+    if (engine == null || !_canChangeCamera(engine, generation)) return null;
+
+    final manager = engine.getVideoDeviceManager();
+    final available = await manager.enumerateVideoDevices();
+    if (!_canChangeCamera(engine, generation)) return null;
+    final devices = available
+        .where((device) => device.deviceId?.trim().isNotEmpty ?? false)
+        .map((device) => VoiceCameraDevice(
+              id: device.deviceId!,
+              name: device.deviceName?.trim() ?? '',
+            ))
+        .toList(growable: false);
+    if (devices.isEmpty) return const VoiceCameraDevices(devices: []);
+
+    final selectedDeviceId = await manager.getDevice();
+    if (!_canChangeCamera(engine, generation)) return null;
+    return VoiceCameraDevices(
+      devices: List.unmodifiable(devices),
+      selectedDeviceId: selectedDeviceId,
+    );
+  }
+
+  Future<void> selectCamera(String deviceId) async {
+    if (!isVoiceCameraSelectionSupported ||
+        _disposed ||
+        deviceId.trim().isEmpty) {
+      return;
+    }
+    final engine = _engine;
+    if (engine == null || !_canChangeCamera(engine, _callGeneration)) return;
+    await engine.getVideoDeviceManager().setDevice(deviceId);
+  }
+
+  bool _canChangeCamera(RtcEngine engine, int generation) {
+    return _isCurrentCameraCall(engine, generation) &&
+        state?.video == true &&
+        state?.shareScreen == false;
+  }
+
+  bool _isCurrentCameraCall(RtcEngine engine, int generation) {
+    return !_disposed &&
+        identical(engine, _engine) &&
+        generation == _callGeneration &&
+        state != null;
   }
 
   Future<void> startShareScreen() async {

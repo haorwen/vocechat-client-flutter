@@ -1095,6 +1095,20 @@ class AppL10nKo extends AppL10n {
   String get voiceCameraOff => 'Turn off camera';
 
   @override
+  String get voiceSwitchCamera => 'Switch camera';
+
+  @override
+  String get voiceSelectCamera => 'Select camera';
+
+  @override
+  String get voiceNoCameras => 'No cameras available';
+
+  @override
+  String voiceCameraFallback(int index) {
+    return 'Camera $index';
+  }
+
+  @override
   String get voiceShareScreen => 'Share screen';
 
   @override

@@ -465,6 +465,13 @@
   "voiceUndeafen": "Undeafen",
   "voiceCameraOn": "Turn on camera",
   "voiceCameraOff": "Turn off camera",
+  "voiceSwitchCamera": "Switch camera",
+  "voiceSelectCamera": "Select camera",
+  "voiceNoCameras": "No cameras available",
+  "voiceCameraFallback": "Camera {index}",
+  "@voiceCameraFallback": {
+    "placeholders": {"index": {"type": "int"}}
+  },
   "voiceShareScreen": "Share screen",
   "voiceFullscreen": "Fullscreen",
   "voiceLeave": "Leave call",

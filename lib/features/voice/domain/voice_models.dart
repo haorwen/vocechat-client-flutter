@@ -24,6 +24,22 @@ enum VoiceConnectionState {
   failed,
 }
 
+/// A camera exposed by the desktop RTC device manager.
+class VoiceCameraDevice {
+  const VoiceCameraDevice({required this.id, required this.name});
+
+  final String id;
+  final String name;
+}
+
+/// Available cameras and the device currently used by the active call.
+class VoiceCameraDevices {
+  const VoiceCameraDevices({required this.devices, this.selectedDeviceId});
+
+  final List<VoiceCameraDevice> devices;
+  final String? selectedDeviceId;
+}
+
 /// Per-call state for the call the current device is in (or joining).
 /// [context] identifies the DM peer or channel via the same `MessageTarget`
 /// shape used for chat targets — a voice call is scoped to exactly one DM
