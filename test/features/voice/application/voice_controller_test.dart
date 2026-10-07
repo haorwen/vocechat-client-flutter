@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart';
 
 import 'package:vocechat_client/features/messages/domain/message_models.dart';
 import 'package:vocechat_client/features/voice/application/avo_interaction_controller.dart';
@@ -15,7 +16,7 @@ import 'package:vocechat_client/shared/models/avo_interaction.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  // Exercise RTC independently of the mobile-only native PiP extension.
+  // RTC tests use desktop unless a case explicitly exercises mobile PiP.
   setUp(() => debugDefaultTargetPlatformOverride = TargetPlatform.windows);
   tearDown(() => debugDefaultTargetPlatformOverride = null);
 
@@ -80,6 +81,223 @@ void main() {
     client.engine.confirmJoin();
     expect(client.info?.joining, isFalse);
   });
+
+  test('video reception is ready before joining without camera capture',
+      () async {
+    final client = _CallClient(7);
+    addTearDown(client.dispose);
+    client.engine.videoSetupWait = Completer<void>();
+    final join = client.controller.join(const MessageTarget.user(uid: 42));
+
+    await Future<void>.delayed(Duration.zero);
+    expect(client.engine.enableVideoCalls, 1);
+    expect(client.engine.joinCalls, 0);
+
+    client.engine.videoSetupWait!.complete();
+    await join;
+    expect(client.engine.localVideoEnabled, isFalse);
+    expect(client.engine.options.publishCameraTrack, isFalse);
+    expect(client.engine.options.autoSubscribeVideo, isTrue);
+    expect(client.engine.mediaSetup,
+        ['enable-video', 'local-video:false', 'join']);
+  });
+
+  test('iOS remote video prepares native PiP and stops on return', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    final client = _CallClient(7);
+    addTearDown(client.dispose);
+    await client.controller.join(const MessageTarget.user(uid: 42));
+    client.engine.confirmJoin();
+    client.engine.remoteJoined(42);
+    await Future<void>.delayed(Duration.zero);
+    expect(client.engine.pip.configurations, isEmpty);
+
+    client.engine.remoteVideoDecoding(42);
+    await Future<void>.delayed(Duration.zero);
+    final pip = client.engine.pip;
+    expect(pip.observer, isNotNull);
+    expect(pip.configurations, hasLength(1));
+    final configuration = pip.configurations.single;
+    expect(configuration.autoEnterEnabled, isTrue);
+    expect(configuration.sourceContentView, 0);
+    expect(configuration.contentView, 0);
+    expect(configuration.controlStyle, 2);
+    expect(configuration.videoStreams, hasLength(1));
+    final stream = configuration.videoStreams!.single;
+    expect(stream.connection.channelId, 'vocechat:dm:42');
+    expect(stream.connection.localUid, 7);
+    expect(stream.canvas.uid, 42);
+    expect(stream.canvas.sourceType, VideoSourceType.videoSourceRemote);
+
+    client.controller.didChangeAppLifecycleState(AppLifecycleState.inactive);
+    await Future<void>.delayed(Duration.zero);
+    pip.reportState(AgoraPipState.pipStateStarted);
+    client.controller.didChangeAppLifecycleState(AppLifecycleState.hidden);
+    client.controller.didChangeAppLifecycleState(AppLifecycleState.paused);
+    await Future<void>.delayed(Duration.zero);
+    expect(pip.startCalls, 0);
+    expect(pip.configurations, hasLength(1));
+
+    client.controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await Future<void>.delayed(Duration.zero);
+    expect(pip.stopCalls, 1);
+    expect(pip.activated, isFalse);
+  });
+
+  test('closing or leaving a call releases local camera capture', () async {
+    final client = _CallClient(7);
+    addTearDown(client.dispose);
+    await client.controller.join(const MessageTarget.user(uid: 42));
+    client.engine.confirmJoin();
+    client.engine.remoteJoined(42);
+    client.engine.remoteVideoDecoding(42);
+
+    await client.controller.openCamera();
+    expect(client.engine.localVideoEnabled, isTrue);
+    await client.controller.closeCamera();
+    expect(client.engine.localVideoEnabled, isFalse);
+    expect(client.info?.video, isFalse);
+    expect(client.controller.members.value.byId[42]?.video, isTrue);
+    expect(client.info?.connectionState, VoiceConnectionState.connected);
+
+    await client.controller.openCamera();
+    expect(client.engine.localVideoEnabled, isTrue);
+    await client.controller.leave();
+    expect(client.engine.localVideoEnabled, isFalse);
+    expect(client.info, isNull);
+    await client.controller.join(const MessageTarget.user(uid: 55));
+    expect(client.engine.localVideoEnabled, isFalse);
+    expect(client.engine.options.publishCameraTrack, isFalse);
+    expect(client.engine.enableVideoCalls, 1);
+  });
+
+  for (final peerLeaves in [false, true]) {
+    test('iOS disposes PiP when ${peerLeaves ? 'peer leaves' : 'camera stops'}',
+        () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final client = _CallClient(7);
+      addTearDown(client.dispose);
+      await client.controller.join(const MessageTarget.user(uid: 42));
+      client.engine.confirmJoin();
+      client.engine.remoteJoined(42);
+      client.engine.remoteVideoDecoding(42);
+      await Future<void>.delayed(Duration.zero);
+      expect(client.engine.pip.configurations, hasLength(1));
+
+      if (peerLeaves) {
+        client.engine.handler.onUserOffline!(client.engine.connection, 42,
+            UserOfflineReasonType.userOfflineQuit);
+      } else {
+        client.engine.handler.onUserMuteVideo!(
+            client.engine.connection, 42, true);
+      }
+      await Future<void>.delayed(Duration.zero);
+      expect(client.engine.pip.pipDisposeCalls, 1);
+      client.controller.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      await Future<void>.delayed(Duration.zero);
+      expect(client.engine.pip.startCalls, 0);
+      expect(client.engine.pip.configurations, hasLength(1));
+    });
+  }
+
+  test('iOS manual PiP starts only when leaving the foreground', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    final client = _CallClient(7);
+    addTearDown(client.dispose);
+    final pip = client.engine.pip..autoEnterSupported = false;
+    await client.controller.join(const MessageTarget.user(uid: 42));
+    client.engine.confirmJoin();
+    client.engine.remoteJoined(42);
+    client.engine.remoteVideoDecoding(42);
+    await Future<void>.delayed(Duration.zero);
+    expect(pip.configurations.single.autoEnterEnabled, isFalse);
+    expect(pip.startCalls, 0);
+
+    client.controller.didChangeAppLifecycleState(AppLifecycleState.inactive);
+    await Future<void>.delayed(Duration.zero);
+    expect(pip.startCalls, 1);
+
+    // If the native window closes while backgrounded, hidden/paused and the
+    // inactive transition on the way back must not reopen it.
+    pip.reportState(AgoraPipState.pipStateStopped);
+    client.controller.didChangeAppLifecycleState(AppLifecycleState.hidden);
+    await Future<void>.delayed(Duration.zero);
+    client.controller.didChangeAppLifecycleState(AppLifecycleState.paused);
+    await Future<void>.delayed(Duration.zero);
+    client.controller.didChangeAppLifecycleState(AppLifecycleState.hidden);
+    client.controller.didChangeAppLifecycleState(AppLifecycleState.inactive);
+    await Future<void>.delayed(Duration.zero);
+    expect(pip.startCalls, 1);
+    expect(pip.configurations, hasLength(1));
+
+    client.controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await Future<void>.delayed(Duration.zero);
+    expect(pip.stopCalls, 1);
+    client.controller.didChangeAppLifecycleState(AppLifecycleState.inactive);
+    await Future<void>.delayed(Duration.zero);
+    expect(pip.startCalls, 2);
+  });
+
+  test('failed iOS PiP setup cannot start an unconfigured window', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    final client = _CallClient(7);
+    addTearDown(client.dispose);
+    final pip = client.engine.pip
+      ..autoEnterSupported = false
+      ..setupSucceeds = false;
+    await client.controller.join(const MessageTarget.user(uid: 42));
+    client.engine.confirmJoin();
+    client.engine.remoteJoined(42);
+    client.engine.remoteVideoDecoding(42);
+    await Future<void>.delayed(Duration.zero);
+    client.controller.didChangeAppLifecycleState(AppLifecycleState.inactive);
+    await Future<void>.delayed(Duration.zero);
+    expect(pip.startCalls, 0);
+    expect(client.info?.connectionState, VoiceConnectionState.connected);
+  });
+
+  for (final waitingForSetup in [true, false]) {
+    test(
+        'iOS late ${waitingForSetup ? 'setup' : 'activation query'} does not reopen PiP while returning',
+        () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final client = _CallClient(7);
+      addTearDown(client.dispose);
+      final pip = client.engine.pip..autoEnterSupported = false;
+      if (waitingForSetup) {
+        pip.setupWait = Completer<void>();
+      } else {
+        pip.activatedWait = Completer<bool>();
+      }
+      await client.controller.join(const MessageTarget.user(uid: 42));
+      client.engine.confirmJoin();
+      client.engine.remoteJoined(42);
+      client.engine.remoteVideoDecoding(42);
+      await Future<void>.delayed(Duration.zero);
+
+      client.controller.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      await Future<void>.delayed(Duration.zero);
+      client.controller.didChangeAppLifecycleState(AppLifecycleState.hidden);
+      client.controller.didChangeAppLifecycleState(AppLifecycleState.paused);
+      client.controller.didChangeAppLifecycleState(AppLifecycleState.hidden);
+      client.controller.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      if (waitingForSetup) {
+        pip.setupWait!.complete();
+      } else {
+        pip.activatedWait!.complete(false);
+      }
+      await Future<void>.delayed(Duration.zero);
+      expect(pip.startCalls, 0);
+
+      // A fresh departure after the app has resumed is still eligible.
+      client.controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await Future<void>.delayed(Duration.zero);
+      client.controller.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      await Future<void>.delayed(Duration.zero);
+      expect(pip.startCalls, 1);
+      expect(pip.configurations, hasLength(1));
+    });
+  }
 
   test('native join failure is not overwritten by request completion',
       () async {
@@ -254,6 +472,34 @@ void main() {
     await newJoin;
     expect(oldClient.engine.releaseCalls, 2);
     expect(newClient.engine.initializeCalls, 1);
+  });
+
+  test('recovery waits for late video setup before replacing the engine',
+      () async {
+    final oldClient =
+        _CallClient(7, cleanupTimeout: const Duration(milliseconds: 10));
+    oldClient.engine.videoSetupWait = Completer<void>();
+    final oldJoin =
+        oldClient.controller.join(const MessageTarget.user(uid: 42));
+    await Future<void>.delayed(Duration.zero);
+    expect(oldClient.engine.enableVideoCalls, 1);
+    expect(oldClient.engine.joinCalls, 0);
+    oldClient.dispose();
+    await oldClient.engine.released.future.timeout(const Duration(seconds: 1));
+
+    final newClient = _CallClient(7);
+    addTearDown(newClient.dispose);
+    final newJoin =
+        newClient.controller.join(const MessageTarget.user(uid: 42));
+    await Future<void>.delayed(Duration.zero);
+    expect(newClient.engine.initializeCalls, 0);
+    oldClient.engine.videoSetupWait!.complete();
+    await oldJoin;
+    await newJoin;
+    expect(oldClient.engine.releaseCalls, 2);
+    expect(oldClient.engine.joinCalls, 0);
+    expect(newClient.engine.enableVideoCalls, 1);
+    expect(newClient.engine.localVideoEnabled, isFalse);
   });
 
   test('overlapping joins share full setup and never use an unready engine',
@@ -678,6 +924,9 @@ class _FakeRtcEngine implements RtcEngine {
   int leaveCalls = 0;
   int releaseCalls = 0;
   int joinCalls = 0;
+  int enableVideoCalls = 0;
+  bool? localVideoEnabled;
+  final mediaSetup = <String>[];
   int switchCameraCalls = 0;
   int startPreviewCalls = 0;
   int videoDeviceManagerCalls = 0;
@@ -687,6 +936,7 @@ class _FakeRtcEngine implements RtcEngine {
   Completer<void>? leaveWait;
   Completer<void>? releaseWait;
   Completer<void>? initializeWait;
+  Completer<void>? videoSetupWait;
   Completer<void>? volumeSetupWait;
   Completer<void>? startPreviewWait;
   Completer<void>? muteLocalVideoWait;
@@ -698,6 +948,13 @@ class _FakeRtcEngine implements RtcEngine {
   Future<void> initialize(RtcEngineContext context) async {
     initializeCalls++;
     await initializeWait?.future;
+  }
+
+  @override
+  Future<void> enableVideo() async {
+    enableVideoCalls++;
+    mediaSetup.add('enable-video');
+    await videoSetupWait?.future;
   }
 
   @override
@@ -727,6 +984,7 @@ class _FakeRtcEngine implements RtcEngine {
     required ChannelMediaOptions options,
   }) async {
     joinCalls++;
+    mediaSetup.add('join');
     connection = RtcConnection(channelId: channelId, localUid: uid);
     joinToken = token;
     this.options = options;
@@ -740,6 +998,16 @@ class _FakeRtcEngine implements RtcEngine {
   }
 
   void confirmJoin() => handler.onJoinChannelSuccess!(connection, 0);
+
+  void remoteJoined(int uid) => handler.onUserJoined!(connection, uid, 0);
+
+  void remoteVideoDecoding(int uid) => handler.onRemoteVideoStateChanged!(
+        connection,
+        uid,
+        RemoteVideoState.remoteVideoStateDecoding,
+        RemoteVideoStateReason.remoteVideoStateReasonInternal,
+        0,
+      );
 
   @override
   Future<void> leaveChannel({LeaveChannelOptions? options}) async {
@@ -760,7 +1028,10 @@ class _FakeRtcEngine implements RtcEngine {
   }
 
   @override
-  Future<void> enableLocalVideo(bool enabled) async {}
+  Future<void> enableLocalVideo(bool enabled) async {
+    localVideoEnabled = enabled;
+    mediaSetup.add('local-video:$enabled');
+  }
 
   @override
   Future<void> muteLocalVideoStream(bool mute) async {
@@ -870,12 +1141,78 @@ class _FakeVideoDeviceManager implements VideoDeviceManager {
 
 class _FakePipController implements AgoraPipController {
   bool failDispose = false;
+  bool supported = true;
+  bool autoEnterSupported = true;
+  bool setupSucceeds = true;
+  bool startSucceeds = true;
+  bool activated = false;
+  int startCalls = 0;
+  int stopCalls = 0;
+  int pipDisposeCalls = 0;
+  AgoraPipStateChangedObserver? observer;
+  final configurations = <AgoraPipOptions>[];
+  Completer<void>? setupWait;
+  Completer<bool>? activatedWait;
   Completer<void>? disposeWait;
+
+  @override
+  Future<void> registerPipStateChangedObserver(
+      AgoraPipStateChangedObserver observer) async {
+    this.observer = observer;
+  }
+
+  @override
+  Future<void> unregisterPipStateChangedObserver() async {
+    observer = null;
+  }
+
+  @override
+  Future<bool> pipIsSupported() async => supported;
+
+  @override
+  Future<bool> pipIsAutoEnterSupported() async => autoEnterSupported;
+
+  @override
+  Future<bool> isPipActivated() async =>
+      activatedWait != null ? await activatedWait!.future : activated;
+
+  @override
+  Future<bool> pipSetup(AgoraPipOptions options) async {
+    configurations.add(options);
+    await setupWait?.future;
+    return setupSucceeds;
+  }
+
+  @override
+  Future<bool> pipStart() async {
+    startCalls++;
+    if (startSucceeds) reportState(AgoraPipState.pipStateStarted);
+    return startSucceeds;
+  }
+
+  @override
+  Future<void> pipStop() async {
+    stopCalls++;
+    reportState(AgoraPipState.pipStateStopped);
+  }
+
+  @override
+  Future<void> pipDispose() async {
+    pipDisposeCalls++;
+    activated = false;
+  }
+
+  void reportState(AgoraPipState state, [String? error]) {
+    activated = state == AgoraPipState.pipStateStarted;
+    observer?.onPipStateChanged(state, error);
+  }
 
   @override
   Future<void> dispose() async {
     if (failDispose) throw StateError('Native PiP disposal failed');
     await disposeWait?.future;
+    await pipDispose();
+    await unregisterPipStateChangedObserver();
   }
 
   @override

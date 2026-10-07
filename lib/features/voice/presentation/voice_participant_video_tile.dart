@@ -76,7 +76,13 @@ class VoiceParticipantVideoTile extends ConsumerWidget {
                     )
                   : VideoViewController.remote(
                       rtcEngine: engine,
-                      canvas: VideoCanvas(uid: uid),
+                      // Keep Agora's native iOS PiP view attached when the
+                      // regular tile is rebuilt or moved into fullscreen.
+                      // The default Replace mode clears every existing view.
+                      canvas: VideoCanvas(
+                        uid: uid,
+                        setupMode: VideoViewSetupMode.videoViewSetupAdd,
+                      ),
                       connection: RtcConnection(channelId: channelName),
                     ),
             )

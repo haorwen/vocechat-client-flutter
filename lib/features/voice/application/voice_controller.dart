@@ -78,6 +78,7 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
   int? _desiredPipRemoteUid;
   int? _configuredPipRemoteUid;
   bool _pipAutoEnterEnabled = false;
+  bool _iosPipEntryRequested = false;
   AppLifecycleState _appLifecycleState = AppLifecycleState.resumed;
   Future<void> _pipOperations = Future<void>.value();
 
@@ -214,6 +215,18 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     });
   }
 
+  Future<void> _initializeEngineMedia(RtcEngine engine, String appId) async {
+    await engine.initialize(RtcEngineContext(appId: appId));
+    if (_disposed) throw StateError('Voice controller has been disposed');
+    // Agora disables the entire video module by default. Receiving remote
+    // video (including the native iOS PiP stream) needs it enabled even in
+    // an audio-first call. Keep local capture off until openCamera().
+    await engine.enableVideo();
+    if (_disposed) throw StateError('Voice controller has been disposed');
+    await engine.enableLocalVideo(false);
+    if (_disposed) throw StateError('Voice controller has been disposed');
+  }
+
   Future<RtcEngine> _createEngine(String appId) async {
     if (_disposed) throw StateError('Voice controller has been disposed');
     final existing = _engine;
@@ -226,7 +239,9 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     // the platform's initialize response has arrived.
     _engine = engine;
     try {
-      final initializing = engine.initialize(RtcEngineContext(appId: appId));
+      // Track video setup with initialization so a recovered scope cannot
+      // create a new native singleton while late media calls are in flight.
+      final initializing = _initializeEngineMedia(engine, appId);
       _engineInitialization = initializing;
       await initializing;
       _engineInitialization = null;
@@ -235,6 +250,21 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
           (defaultTargetPlatform == TargetPlatform.android ||
               defaultTargetPlatform == TargetPlatform.iOS)) {
         _pipController = ref.read(agoraPipControllerFactoryProvider)(engine);
+        await _pipController!.registerPipStateChangedObserver(
+          AgoraPipStateChangedObserver(onPipStateChanged: (pipState, error) {
+            if (_disposed) return;
+            if (pipState == AgoraPipState.pipStateFailed) {
+              AppLog.e(
+                  LogTag.voice,
+                  () =>
+                      'picture-in-picture failed: ${error ?? "unknown error"}');
+            } else {
+              AppLog.d(
+                  LogTag.voice, () => 'picture-in-picture state=$pipState');
+            }
+          }),
+        );
+        if (_disposed) throw StateError('Voice controller has been disposed');
       }
       await engine.enableAudioVolumeIndication(
         interval: 150,
@@ -514,7 +544,13 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
             ],
             controlStyle: 2,
           );
-    if (!await pipController.pipSetup(options) || _disposed) return;
+    final configured = await pipController.pipSetup(options);
+    if (_disposed) return;
+    if (!configured) {
+      AppLog.e(LogTag.voice,
+          () => 'picture-in-picture setup rejected for remote uid=$remoteUid');
+      return;
+    }
 
     _configuredPipRemoteUid = remoteUid;
     if (_desiredPipRemoteUid != remoteUid) {
@@ -531,7 +567,9 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     if (pipController == null ||
         remoteUid == null ||
         _configuredPipRemoteUid != remoteUid ||
-        _appLifecycleState == AppLifecycleState.resumed) {
+        _appLifecycleState == AppLifecycleState.resumed ||
+        (defaultTargetPlatform == TargetPlatform.iOS &&
+            !_iosPipEntryRequested)) {
       return;
     }
 
@@ -548,14 +586,31 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
 
     if (!_pipAutoEnterEnabled && !await pipController.isPipActivated()) {
       if (_disposed) return;
-      await pipController.pipStart();
+      if (_desiredPipRemoteUid != remoteUid ||
+          _appLifecycleState == AppLifecycleState.resumed ||
+          (defaultTargetPlatform == TargetPlatform.iOS &&
+              !_iosPipEntryRequested)) {
+        return;
+      }
+      if (!await pipController.pipStart()) {
+        AppLog.e(
+            LogTag.voice,
+            () =>
+                'picture-in-picture start rejected for remote uid=$remoteUid');
+      }
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (_disposed) return;
+    final previousState = _appLifecycleState;
     _appLifecycleState = state;
+    // Keep the direction of this transition across asynchronous PiP calls.
+    // An old setup/activation response can arrive after paused -> inactive
+    // while the app is returning, when starting a new window is unwanted.
+    _iosPipEntryRequested = state == AppLifecycleState.inactive &&
+        previousState == AppLifecycleState.resumed;
     switch (state) {
       case AppLifecycleState.resumed:
         pictureInPictureRemoteUid.value = null;
@@ -564,9 +619,18 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
           _queuePipOperation(() => _pipController!.pipStop());
         }
       case AppLifecycleState.inactive:
+        // iOS also sends inactive on the way back from the background. Only
+        // the outgoing transition is a manual PiP entry opportunity; after
+        // hidden/paused it is too late to start the native window reliably.
+        if (_desiredPipRemoteUid != null &&
+            (defaultTargetPlatform != TargetPlatform.iOS ||
+                previousState == AppLifecycleState.resumed)) {
+          _queuePipOperation(_applyPictureInPictureConfiguration);
+        }
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
-        if (_desiredPipRemoteUid != null) {
+        if (defaultTargetPlatform != TargetPlatform.iOS &&
+            _desiredPipRemoteUid != null) {
           _queuePipOperation(_applyPictureInPictureConfiguration);
         }
       case AppLifecycleState.detached:
@@ -700,6 +764,8 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
       await engine.leaveChannel();
       if (_disposed) return;
       await engine.stopPreview();
+      if (_disposed) return;
+      await engine.enableLocalVideo(false);
     }
   }
 
@@ -778,6 +844,8 @@ class VoiceController extends _$VoiceController with WidgetsBindingObserver {
     );
     if (!_isCurrentCameraCall(engine, generation)) return;
     await engine.stopPreview();
+    if (!_isCurrentCameraCall(engine, generation)) return;
+    await engine.enableLocalVideo(false);
     if (!_isCurrentCameraCall(engine, generation)) return;
     state = state!.copyWith(video: false);
   }
