@@ -35,6 +35,7 @@ import '../../../shared/widgets/voce_dialog.dart';
 import '../../profile/presentation/user_profile_card.dart';
 import '../../voice/presentation/voice_entry_button.dart';
 import '../application/chat_controller.dart';
+import '../application/chat_layout_provider.dart';
 import '../application/chat_tools_provider.dart';
 import '../application/read_index_provider.dart';
 import '../data/message_api.dart';
@@ -1025,7 +1026,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                         if (showSep)
                                           _DateSeparator(
                                               createdAt: msg.createdAt),
-                                        _MessageRow(
+                                        MessageRow(
                                           message: msg,
                                           currentUid: currentUid,
                                           status: statuses[msg.mid],
@@ -1602,13 +1603,14 @@ class _DateSeparator extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// _MessageRow — Figma "Main / Comment". 40px avatar, cyan name + gray time
+// MessageRow — Figma "Main / Comment". 40px avatar, cyan name + gray time
 // header, body text in #374151. Hovering reveals a reply-actions cluster on
 // the right of the row (Emoji / Reply / Bookmark / More).
 // ---------------------------------------------------------------------------
 
-class _MessageRow extends ConsumerStatefulWidget {
-  const _MessageRow({
+class MessageRow extends ConsumerStatefulWidget {
+  const MessageRow({
+    super.key,
     required this.message,
     required this.currentUid,
     required this.userDir,
@@ -1656,10 +1658,10 @@ class _MessageRow extends ConsumerStatefulWidget {
   final VoidCallback? onEnterSelect;
 
   @override
-  ConsumerState<_MessageRow> createState() => _MessageRowState();
+  ConsumerState<MessageRow> createState() => _MessageRowState();
 }
 
-class _MessageRowState extends ConsumerState<_MessageRow> {
+class _MessageRowState extends ConsumerState<MessageRow> {
   bool _hovered = false;
   final GlobalKey _toolbarKey = GlobalKey();
 
@@ -1674,6 +1676,13 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
     final msg = widget.message;
+    final layout = ref.watch(chatLayoutProvider);
+    final rightAligned = layout == ChatLayoutMode.selfRight &&
+        msg.fromUid == widget.currentUid &&
+        widget.currentUid > 0;
+    final rowDirection = rightAligned ? TextDirection.rtl : TextDirection.ltr;
+    final contentAlignment =
+        rightAligned ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final sender = widget.userDir[msg.fromUid];
     final senderName = sender?.name ?? l.chatUserFallback(msg.fromUid);
     final senderAvatarUrl = sender != null
@@ -1763,7 +1772,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
       final originalAuthor =
           original != null ? widget.userDir[original.fromUid] : null;
       content = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: contentAlignment,
         children: [
           // Quoted original — mirrors the web client's <Reply>: a w-fit
           // gray-100 rounded box with the original author's avatar, name in
@@ -1792,7 +1801,9 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
               : GestureDetector(
                   onTap: () => widget.onJumpToMid?.call(detail.mid),
                   child: Align(
-                    alignment: Alignment.centerLeft,
+                    alignment: rightAligned
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
@@ -1904,8 +1915,13 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         children: [
           if (pinned)
             Padding(
-              padding: const EdgeInsets.only(left: 56, bottom: 4),
+              padding: EdgeInsets.only(
+                left: rightAligned ? 0 : 56,
+                right: rightAligned ? 56 : 0,
+                bottom: 4,
+              ),
               child: Row(
+                textDirection: rowDirection,
                 children: [
                   Icon(Icons.push_pin, size: 12, color: AppTokens.gray400),
                   const SizedBox(width: 4),
@@ -1921,6 +1937,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
               ),
             ),
           Row(
+            textDirection: rowDirection,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (selecting) ...[
@@ -1928,7 +1945,11 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                 // mode; the checkbox is display-only so taps don't race.
                 AbsorbPointer(
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 8, right: 4),
+                    padding: EdgeInsets.only(
+                      top: 8,
+                      left: rightAligned ? 4 : 0,
+                      right: rightAligned ? 0 : 4,
+                    ),
                     child: Checkbox(
                       value: widget.selected,
                       onChanged: selectable ? (_) {} : null,
@@ -1947,9 +1968,10 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: contentAlignment,
                   children: [
                     Row(
+                      textDirection: rowDirection,
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Flexible(
@@ -2045,13 +2067,14 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
           mainRow,
           if (_hovered)
             Positioned(
-              // Anchor toolbar to the top-right of the message row so it
+              // Anchor toolbar opposite the avatar, inside the row so it
               // stays inside the MouseRegion's hit-test bounds. Floating
               // it above the row (negative top) makes the cursor exit
               // the MouseRegion when it moves up, which causes the
               // toolbar to jump to the previous message.
               top: 0,
-              right: 10,
+              left: rightAligned ? 10 : null,
+              right: rightAligned ? null : 10,
               child: _ReplyActionsBar(
                 key: _toolbarKey,
                 onEmojiTap:

@@ -18,6 +18,7 @@ import '../domain/message_models.dart';
 import '../../voice/application/incoming_call_provider.dart';
 import 'burn_after_read_provider.dart';
 import 'chat_controller.dart';
+import 'chat_layout_provider.dart';
 import 'reactions_provider.dart';
 import 'read_index_provider.dart';
 
@@ -98,6 +99,7 @@ class MessageDispatcher extends _$MessageDispatcher {
           return;
         }
         if (event is ChatEventServerConfigChanged) {
+          ref.read(chatLayoutProvider.notifier).applyConfig(event.data);
           final flag = event.data['show_user_online_status'];
           if (flag is bool) {
             ref.read(showOnlineStatusProvider.notifier).set(flag);
