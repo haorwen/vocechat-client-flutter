@@ -234,6 +234,7 @@
   "chatMessagePlaceholderUser": "{name}님에게 메시지 보내기",
   "chatPinned": "고정됨",
   "chatUnsupported": "[지원하지 않는 메시지]",
+  "chatOpenLinkFailed": "링크를 열 수 없습니다. 다시 시도하거나 브라우저에 링크를 복사하세요.",
   "chatMarkdown": "마크다운",
   "chatAttach": "첨부",
   "chatVoiceMessage": "음성 메시지",

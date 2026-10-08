@@ -234,6 +234,7 @@
   "chatMessagePlaceholderUser": "Message à {name}",
   "chatPinned": "épinglé",
   "chatUnsupported": "[message non pris en charge]",
+  "chatOpenLinkFailed": "Impossible d’ouvrir le lien. Réessayez ou copiez-le dans votre navigateur.",
   "chatMarkdown": "Markdown",
   "chatAttach": "Joindre",
   "chatVoiceMessage": "Message vocal",

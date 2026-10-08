@@ -1674,6 +1674,23 @@ class _MessageRowState extends ConsumerState<MessageRow> {
     return p != null && (p['pinned'] == true || p['is_pinned'] == true);
   }
 
+  Widget _buildTextContent(String text, String contentType) {
+    final style = TextStyle(
+      fontSize: 14,
+      color: AppTokens.gray700,
+      height: 20 / 14,
+    );
+    if (contentType == 'text/markdown') {
+      return MarkdownBody(
+        onTapLink: (text, href, title) =>
+            openMessageLink(href, context: context),
+        data: safeText(text),
+        styleSheet: MarkdownStyleSheet(p: style, a: messageLinkTextStyle),
+      );
+    }
+    return MentionText(text: text, userDir: widget.userDir, style: style);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
@@ -1698,7 +1715,8 @@ class _MessageRowState extends ConsumerState<MessageRow> {
 
     final detail = msg.detail;
     final displayContent = msg.displayContent;
-    final displayContentType = msg.displayContentType;
+    final displayContentType =
+        msg.displayContentType.split(';').first.trim().toLowerCase();
     // Burn-after-read: server stamps `expires_in` (seconds) onto normal/reply
     // messages based on the sender's own auto-delete setting for this
     // target. ChatController removes rows at their absolute expiry.
@@ -1739,28 +1757,8 @@ class _MessageRowState extends ConsumerState<MessageRow> {
           filePath: displayContent,
           cacheMedia: expiresIn == null,
         );
-      } else if (displayContentType == 'text/markdown') {
-        content = MarkdownBody(
-          onTapLink: (text, href, title) => openMessageLink(href),
-          data: safeText(displayContent),
-          styleSheet: MarkdownStyleSheet(
-            p: TextStyle(
-              fontSize: 14,
-              color: AppTokens.gray700,
-              height: 20 / 14,
-            ),
-          ),
-        );
       } else {
-        content = MentionText(
-          text: displayContent,
-          userDir: widget.userDir,
-          style: TextStyle(
-            fontSize: 14,
-            color: AppTokens.gray700,
-            height: 20 / 14,
-          ),
-        );
+        content = _buildTextContent(displayContent, displayContentType);
       }
     } else if (detail is ReplyMessageDetail) {
       // Try to resolve the original message from the current chat list so we
@@ -1868,15 +1866,7 @@ class _MessageRowState extends ConsumerState<MessageRow> {
               cacheMedia: expiresIn == null,
             )
           else
-            MentionText(
-              text: displayContent,
-              userDir: widget.userDir,
-              style: TextStyle(
-                fontSize: 14,
-                color: AppTokens.gray700,
-                height: 20 / 14,
-              ),
-            ),
+            _buildTextContent(displayContent, displayContentType),
         ],
       );
     } else {

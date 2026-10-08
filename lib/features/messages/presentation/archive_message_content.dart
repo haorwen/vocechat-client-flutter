@@ -438,11 +438,14 @@ class _ArchiveDetailBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = message.content;
 
-    if (c.contentType == 'text/markdown') {
+    final contentType = c.contentType.split(';').first.trim().toLowerCase();
+    if (contentType == 'text/markdown') {
       return MarkdownBody(
-        onTapLink: (text, href, title) => openMessageLink(href),
+        onTapLink: (text, href, title) =>
+            openMessageLink(href, context: context),
         data: safeText(c.content ?? ''),
         styleSheet: MarkdownStyleSheet(
+          a: messageLinkTextStyle,
           p: TextStyle(
             fontSize: 14,
             color: AppTokens.textBody,
@@ -452,7 +455,7 @@ class _ArchiveDetailBody extends ConsumerWidget {
       );
     }
 
-    if (c.contentType == 'vocechat/file') {
+    if (contentType == 'vocechat/file') {
       return _ArchiveAttachment(
         message: message,
         filePath: filePath,

@@ -1547,6 +1547,12 @@ abstract class AppL10n {
   /// **'[unsupported message]'**
   String get chatUnsupported;
 
+  /// No description provided for @chatOpenLinkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the link. Try again or copy it into your browser.'**
+  String get chatOpenLinkFailed;
+
   /// No description provided for @chatMarkdown.
   ///
   /// In en, this message translates to:

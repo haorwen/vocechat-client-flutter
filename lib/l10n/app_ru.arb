@@ -233,6 +233,7 @@
   "chatMessagePlaceholderUser": "Сообщение {name}",
   "chatPinned": "закреплено",
   "chatUnsupported": "[неподдерживаемое сообщение]",
+  "chatOpenLinkFailed": "Не удалось открыть ссылку. Повторите попытку или скопируйте её в браузер.",
   "chatMarkdown": "Markdown",
   "chatAttach": "Прикрепить",
   "chatVoiceMessage": "Голосовое сообщение",

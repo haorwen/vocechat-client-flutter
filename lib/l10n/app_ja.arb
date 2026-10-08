@@ -234,6 +234,7 @@
   "chatMessagePlaceholderUser": "{name} にメッセージを送信",
   "chatPinned": "ピン留め済み",
   "chatUnsupported": "[サポートされていないメッセージ]",
+  "chatOpenLinkFailed": "リンクを開けませんでした。再試行するか、リンクをブラウザにコピーしてください。",
   "chatMarkdown": "Markdown",
   "chatAttach": "添付",
   "chatVoiceMessage": "音声メッセージ",

@@ -75,17 +75,23 @@ class MainActivity : AgoraPIPFlutterActivity() {
 
     private var updater: AndroidUpdateInstaller? = null
     private var secureStorageCommit: SecureStorageCommit? = null
+    private var externalLinks: ExternalLinkLauncher? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         if (BuildConfig.DIRECT_DISTRIBUTION_FEATURES) {
             updater = AndroidUpdateInstaller(this, flutterEngine.dartExecutor.binaryMessenger)
         } else {
+            // Play owns its engine here. Standalone registers the same bridge
+            // in AppFlutterEngine.Resources for the retained engine's lifetime.
+            externalLinks = ExternalLinkLauncher(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
             secureStorageCommit = SecureStorageCommit(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
         }
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        externalLinks?.dispose()
+        externalLinks = null
         secureStorageCommit?.dispose()
         secureStorageCommit = null
         updater?.dispose()

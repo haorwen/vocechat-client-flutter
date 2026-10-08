@@ -761,6 +761,9 @@ class AppL10nRu extends AppL10n {
   String get chatUnsupported => '[неподдерживаемое сообщение]';
 
   @override
+  String get chatOpenLinkFailed => 'Не удалось открыть ссылку. Повторите попытку или скопируйте её в браузер.';
+
+  @override
   String get chatMarkdown => 'Markdown';
 
   @override

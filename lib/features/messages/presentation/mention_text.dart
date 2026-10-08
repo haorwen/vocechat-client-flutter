@@ -42,10 +42,10 @@ class MentionText extends StatefulWidget {
 }
 
 class _MentionTextState extends State<MentionText> {
-  final _recognizers = <TapGestureRecognizer>[];
+  final _recognizers = <String, TapGestureRecognizer>{};
 
   void _disposeRecognizers() {
-    for (final recognizer in _recognizers) {
+    for (final recognizer in _recognizers.values) {
       recognizer.dispose();
     }
     _recognizers.clear();
@@ -57,7 +57,22 @@ class _MentionTextState extends State<MentionText> {
     super.dispose();
   }
 
-  List<InlineSpan> _plainSpans(String text) {
+  TextSpan _linkSpan(String label, String href, Set<String> activeLinks) {
+    activeLinks.add(href);
+    final recognizer = _recognizers.putIfAbsent(
+      href,
+      () => TapGestureRecognizer()
+        ..onTap = () => openMessageLink(href, context: context),
+    );
+    return TextSpan(
+      text: safeText(label),
+      style: messageLinkTextStyle,
+      mouseCursor: SystemMouseCursors.click,
+      recognizer: recognizer,
+    );
+  }
+
+  List<InlineSpan> _plainSpans(String text, Set<String> activeLinks) {
     final spans = <InlineSpan>[];
     var cursor = 0;
     for (final match in messageLinkPattern.allMatches(text)) {
@@ -68,18 +83,7 @@ class _MentionTextState extends State<MentionText> {
         spans
             .add(TextSpan(text: safeText(text.substring(cursor, match.start))));
       }
-      final recognizer = TapGestureRecognizer()
-        ..onTap = () => openMessageLink(href);
-      _recognizers.add(recognizer);
-      spans.add(TextSpan(
-        text: safeText(label),
-        style: TextStyle(
-          color: AppTokens.primary500,
-          decoration: TextDecoration.underline,
-        ),
-        mouseCursor: SystemMouseCursors.click,
-        recognizer: recognizer,
-      ));
+      spans.add(_linkSpan(label, href, activeLinks));
       cursor = match.start + label.length;
     }
     if (cursor < text.length) {
@@ -90,7 +94,7 @@ class _MentionTextState extends State<MentionText> {
 
   @override
   Widget build(BuildContext context) {
-    _disposeRecognizers();
+    final activeLinks = <String>{};
     final text = widget.text;
     final style = widget.style;
     final userDir = widget.userDir;
@@ -104,7 +108,7 @@ class _MentionTextState extends State<MentionText> {
     var cursor = 0;
     for (final m in matches) {
       if (m.start > cursor) {
-        spans.addAll(_plainSpans(text.substring(cursor, m.start)));
+        spans.addAll(_plainSpans(text.substring(cursor, m.start), activeLinks));
       }
       final name = userDir[m.uid]?.name;
       spans.add(TextSpan(
@@ -114,8 +118,16 @@ class _MentionTextState extends State<MentionText> {
       cursor = m.end;
     }
     if (cursor < text.length) {
-      spans.addAll(_plainSpans(text.substring(cursor)));
+      spans.addAll(_plainSpans(text.substring(cursor), activeLinks));
     }
+
+    // Reuse handlers for links that are still present: rebuilding between
+    // pointer down and up must not cancel an in-progress tap.
+    _recognizers.removeWhere((href, recognizer) {
+      if (activeLinks.contains(href)) return false;
+      recognizer.dispose();
+      return true;
+    });
 
     if (widget.selectable) {
       return SelectableText.rich(TextSpan(style: style, children: spans));

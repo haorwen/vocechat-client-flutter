@@ -761,6 +761,9 @@ class AppL10nPt extends AppL10n {
   String get chatUnsupported => '[mensagem não suportada]';
 
   @override
+  String get chatOpenLinkFailed => 'Não foi possível abrir o link. Tente novamente ou copie-o para o navegador.';
+
+  @override
   String get chatMarkdown => 'Markdown';
 
   @override

@@ -761,6 +761,9 @@ class AppL10nKo extends AppL10n {
   String get chatUnsupported => '[지원하지 않는 메시지]';
 
   @override
+  String get chatOpenLinkFailed => '링크를 열 수 없습니다. 다시 시도하거나 브라우저에 링크를 복사하세요.';
+
+  @override
   String get chatMarkdown => '마크다운';
 
   @override

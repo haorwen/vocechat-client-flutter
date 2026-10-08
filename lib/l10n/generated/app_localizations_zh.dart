@@ -761,6 +761,9 @@ class AppL10nZh extends AppL10n {
   String get chatUnsupported => '[不支持的消息]';
 
   @override
+  String get chatOpenLinkFailed => '无法打开链接，请重试或复制链接到浏览器。';
+
+  @override
   String get chatMarkdown => 'Markdown';
 
   @override

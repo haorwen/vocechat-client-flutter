@@ -13,6 +13,11 @@ internal object AppFlutterEngine {
         // Explicitly create an externally owned engine. The default constructor
         // registers plugins; FlutterActivity starts Dart on its first onStart.
         val engine = FlutterEngine(context.applicationContext, shellArgs)
+        // This bridge uses application context and follows the shared engine,
+        // so replacing or destroying an Activity cannot remove its handler.
+        val externalLinks = ExternalLinkLauncher(
+            context.applicationContext, engine.dartExecutor.binaryMessenger,
+        )
         val secureStorage = SecureStorageCommit(
             context.applicationContext, engine.dartExecutor.binaryMessenger,
         )
@@ -23,6 +28,7 @@ internal object AppFlutterEngine {
         fun dispose() {
             Log.i(TAG, "destroy engine=${System.identityHashCode(engine)}")
             notifications.dispose()
+            externalLinks.dispose()
             secureStorage.dispose()
             engine.destroy()
         }

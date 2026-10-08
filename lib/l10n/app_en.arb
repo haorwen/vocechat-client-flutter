@@ -321,6 +321,7 @@
   },
   "chatPinned": "pinned",
   "chatUnsupported": "[unsupported message]",
+  "chatOpenLinkFailed": "Could not open the link. Try again or copy it into your browser.",
   "chatMarkdown": "Markdown",
   "chatAttach": "Attach",
   "chatVoiceMessage": "Voice Message",

@@ -268,6 +268,7 @@
   "chatMessagePlaceholderUser": "发送给 {name}",
   "chatPinned": "已置顶",
   "chatUnsupported": "[不支持的消息]",
+  "chatOpenLinkFailed": "无法打开链接，请重试或复制链接到浏览器。",
   "chatMarkdown": "Markdown",
   "chatAttach": "附件",
   "chatVoiceMessage": "语音消息",
