@@ -112,6 +112,12 @@ class MessageDispatcher extends _$MessageDispatcher {
               .applySnapshot(event.users));
           return;
         }
+        if (event is ChatEventGroupChanged) {
+          unawaited(ref
+              .read(groupDirectoryProvider.notifier)
+              .applyGroupUpdate(event.data));
+          return;
+        }
         if (event is ChatEventUserSettings) {
           _applyPinnedChatsSnapshot(event.data);
           _applyReadIndexSnapshot(event.data);
@@ -152,6 +158,14 @@ class MessageDispatcher extends _$MessageDispatcher {
         }
         if (event is ChatEventUnknown) {
           switch (event.type) {
+            case 'pinned_message_updated':
+              final data = _decode(event.raw);
+              if (data != null) {
+                unawaited(ref
+                    .read(groupDirectoryProvider.notifier)
+                    .applyPinUpdate(data));
+              }
+              break;
             case 'users_log':
               final logs = _decode(event.raw)?['logs'];
               if (logs is List) {

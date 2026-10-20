@@ -810,6 +810,9 @@ class AppL10nZh extends AppL10n {
   String get chatDropOverlayHint => '拖放文件到此处以发送';
 
   @override
+  String get chatMessageUnavailable => '该消息已不存在或暂时无法加载。';
+
+  @override
   String get chatEmoji => '表情';
 
   @override

@@ -1637,6 +1637,12 @@ abstract class AppL10n {
   /// **'Drop files here to send them'**
   String get chatDropOverlayHint;
 
+  /// No description provided for @chatMessageUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This message is no longer available or could not be loaded.'**
+  String get chatMessageUnavailable;
+
   /// No description provided for @chatEmoji.
   ///
   /// In en, this message translates to:

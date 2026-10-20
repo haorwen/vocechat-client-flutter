@@ -94,6 +94,7 @@ class GroupSummary {
     required this.name,
     this.avatarUpdatedAt,
     this.owner = 0,
+    this.description = '',
     this.isPublic = false,
     this.members = const [],
     this.pinnedMessages = const [],
@@ -103,6 +104,7 @@ class GroupSummary {
   final String name;
   final int? avatarUpdatedAt;
   final int owner;
+  final String description;
   final bool isPublic;
   final List<int> members;
   final List<PinnedMessageSummary> pinnedMessages;
@@ -116,6 +118,7 @@ class GroupSummary {
         name: name,
         avatarUpdatedAt: avatarUpdatedAt,
         owner: owner,
+        description: description,
         isPublic: isPublic,
         members: members ?? this.members,
         pinnedMessages: pinnedMessages ?? this.pinnedMessages,
@@ -126,6 +129,7 @@ class GroupSummary {
         name: j['name'] as String? ?? 'Group',
         avatarUpdatedAt: (j['avatar_updated_at'] as num?)?.toInt(),
         owner: (j['owner'] as num?)?.toInt() ?? 0,
+        description: j['description'] as String? ?? '',
         isPublic: j['is_public'] as bool? ?? false,
         members: (j['members'] as List<dynamic>?)
                 ?.map((e) => (e as num).toInt())
@@ -143,6 +147,7 @@ class GroupSummary {
         'name': name,
         if (avatarUpdatedAt != null) 'avatar_updated_at': avatarUpdatedAt,
         'owner': owner,
+        'description': description,
         'is_public': isPublic,
         'members': members,
         'pinned_messages':
@@ -277,6 +282,8 @@ class UserDirectory extends _$UserDirectory {
 
 @Riverpod(keepAlive: true)
 class GroupDirectory extends _$GroupDirectory {
+  int _revision = 0;
+
   @override
   Future<Map<int, GroupSummary>> build() async {
     final cache = await ref.watch(messageCacheProvider.future);
@@ -295,8 +302,10 @@ class GroupDirectory extends _$GroupDirectory {
 
   Future<Map<int, GroupSummary>> _fetch(MessageCache cache) async {
     final dio = ref.read(dioProvider);
+    final revision = _revision;
     try {
       final resp = await dio.get('/api/group');
+      if (revision != _revision) return state.valueOrNull ?? const {};
       final list = (resp.data as List<dynamic>).cast<Map<String, dynamic>>();
       final map = {
         for (final g in list)
@@ -320,11 +329,55 @@ class GroupDirectory extends _$GroupDirectory {
     await _refresh(cache);
   }
 
+  Future<void> applyGroupUpdate(Map<String, dynamic> data) async {
+    await future;
+    final gid = (data['gid'] as num?)?.toInt();
+    final current = state.valueOrNull;
+    final group = current?[gid];
+    if (current == null || group == null) return;
+    _revision++;
+    state = AsyncData({
+      ...current,
+      group.gid: GroupSummary.fromJson({
+        ...group.toJson(),
+        for (final entry in data.entries)
+          if (entry.value != null) entry.key: entry.value,
+      }),
+    });
+    await _persistGroups();
+  }
+
+  Future<void> applyPinUpdate(Map<String, dynamic> data) async {
+    await future;
+    final gid = (data['gid'] as num?)?.toInt();
+    final mid = (data['mid'] as num?)?.toInt();
+    final group = state.valueOrNull?[gid];
+    if (group == null || mid == null) return;
+    final pins = group.pinnedMessages.where((p) => p.mid != mid).toList();
+    final message = data['msg'];
+    if (message is Map) {
+      pins.add(
+          PinnedMessageSummary.fromJson(Map<String, dynamic>.from(message)));
+    }
+    applyPinned(group.gid, pins);
+    await _persistGroups();
+  }
+
+  Future<void> _persistGroups() async {
+    final cache = await ref.read(messageCacheProvider.future);
+    final groups = state.valueOrNull;
+    if (groups != null) {
+      await cache
+          .writeGroupDirectory(groups.values.map((g) => g.toJson()).toList());
+    }
+  }
+
   void applyPinned(int gid, List<PinnedMessageSummary> pinned) {
     final current = state.valueOrNull;
     if (current == null) return;
     final group = current[gid];
     if (group == null) return;
+    _revision++;
     state = AsyncData({
       ...current,
       gid: group.copyWith(pinnedMessages: pinned),

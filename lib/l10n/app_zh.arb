@@ -283,6 +283,7 @@
   "chatAttachSend": "发送（{count}）",
   "chatDropOverlayTitle": "发送到 {name}",
   "chatDropOverlayHint": "拖放文件到此处以发送",
+  "chatMessageUnavailable": "该消息已不存在或暂时无法加载。",
   "chatEmoji": "表情",
   "chatUserFallback": "用户 {uid}",
   "chatGroupFallback": "群组 {gid}",

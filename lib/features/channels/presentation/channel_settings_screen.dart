@@ -57,7 +57,7 @@ class _ChannelSettingsScreenState extends ConsumerState<ChannelSettingsScreen> {
     if (_initializedForGid == group.gid) return;
     _initializedForGid = group.gid;
     _nameCtrl.text = group.name;
-    // description isn't in GroupSummary; kept as a local-only editable field.
+    _descCtrl.text = group.description;
   }
 
   String _friendlyError(Object e) {
@@ -352,7 +352,8 @@ class _ChannelSettingsScreenState extends ConsumerState<ChannelSettingsScreen> {
                 TextField(
                   controller: _descCtrl,
                   enabled: canManage,
-                  maxLines: 3,
+                  minLines: 3,
+                  maxLines: null,
                   onChanged: (_) => setState(() => _dirty = true),
                   decoration:
                       InputDecoration(labelText: l.channelDescriptionLabel),

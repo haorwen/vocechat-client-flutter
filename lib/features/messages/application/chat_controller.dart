@@ -30,7 +30,7 @@ part 'chat_controller.g.dart';
 class ChatController extends _$ChatController {
   static const _initialLimit = 50;
   Timer? _expiryTimer;
-  bool _loadingMore = false;
+  Future<void>? _loadingMoreTask;
   bool _hasMore = true;
   int? _historyBeforeMid;
   int _generation = 0;
@@ -407,7 +407,7 @@ class ChatController extends _$ChatController {
     final generation = ++_generation;
     _cache = null;
     _messages = null;
-    _loadingMore = false;
+    _loadingMoreTask = null;
     _hasMore = true;
     _historyBeforeMid = null;
     // The cache dependency changes when switching accounts. Previous rows
@@ -1114,10 +1114,42 @@ class ChatController extends _$ChatController {
     }
   }
 
-  /// Load older messages (pull-up pagination).
-  Future<void> loadMore() async {
+  /// Fetch contiguous history so locating an old pin leaves no gaps in chat.
+  Future<bool> ensureMessageLoaded(int mid,
+      {bool Function()? shouldContinue}) async {
     final generation = _generation;
-    if (_loadingMore || !_hasMore) return;
+    while (generation == _generation && (shouldContinue?.call() ?? true)) {
+      final rows = state.valueOrNull ?? const <ChatMessage>[];
+      if (rows.any((m) => m.mid == mid)) return true;
+      final oldest = rows.where((m) => m.mid > 0).fold<int?>(
+          null, (value, m) => value == null || m.mid < value ? m.mid : value);
+      if (mid <= 0 || oldest == null || oldest < mid || !_hasMore) return false;
+      final before = _historyBeforeMid;
+      await loadMore();
+      if (generation != _generation || before == _historyBeforeMid) {
+        // Empty pages, failures and non-advancing cursors must not spin.
+        return false;
+      }
+    }
+    return false;
+  }
+
+  /// Coalesce scrolling and pin-location requests for the same history page.
+  Future<void> loadMore() {
+    final active = _loadingMoreTask;
+    if (active != null) return active;
+    final generation = _generation;
+    final task = _loadOlderMessages();
+    _loadingMoreTask = task.whenComplete(() {
+      if (generation == _generation) _loadingMoreTask = null;
+    });
+    return _loadingMoreTask!;
+  }
+
+  /// Load older messages (pull-up pagination).
+  Future<void> _loadOlderMessages() async {
+    final generation = _generation;
+    if (!_hasMore) return;
     final current = _messages ?? [];
     if (current.isEmpty) return;
 
@@ -1128,7 +1160,6 @@ class ChatController extends _$ChatController {
         _historyBeforeMid != null && _historyBeforeMid! < oldestMid
             ? _historyBeforeMid!
             : oldestMid;
-    _loadingMore = true;
     try {
       // A failed request must remain retryable; only a successful empty page
       // means we have reached the start of the conversation.
@@ -1165,8 +1196,6 @@ class ChatController extends _$ChatController {
       }
     } catch (_) {
       // awaits live server; falls back gracefully
-    } finally {
-      if (generation == _generation) _loadingMore = false;
     }
   }
 }

@@ -810,6 +810,9 @@ class AppL10nPt extends AppL10n {
   String get chatDropOverlayHint => 'Solte os arquivos aqui para enviá-los';
 
   @override
+  String get chatMessageUnavailable => 'Esta mensagem não está mais disponível ou não pôde ser carregada.';
+
+  @override
   String get chatEmoji => 'Emoji';
 
   @override

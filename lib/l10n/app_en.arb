@@ -342,6 +342,7 @@
     "placeholders": {"name": {"type": "String"}}
   },
   "chatDropOverlayHint": "Drop files here to send them",
+  "chatMessageUnavailable": "This message is no longer available or could not be loaded.",
   "chatEmoji": "Emoji",
   "chatUserFallback": "User {uid}",
   "@chatUserFallback": {

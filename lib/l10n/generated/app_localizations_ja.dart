@@ -810,6 +810,9 @@ class AppL10nJa extends AppL10n {
   String get chatDropOverlayHint => 'ここにファイルをドロップして送信';
 
   @override
+  String get chatMessageUnavailable => 'このメッセージは削除されたか、読み込めませんでした。';
+
+  @override
   String get chatEmoji => '絵文字';
 
   @override

@@ -32,6 +32,7 @@ Future<void> showChatToolOverlay(
   required ChatTool tool,
   required int targetId,
   required bool isChannel,
+  ValueChanged<int>? onLocate,
 }) {
   final l = AppL10n.of(context);
   final String title = switch (tool) {
@@ -42,7 +43,7 @@ Future<void> showChatToolOverlay(
   };
 
   final Widget body = switch (tool) {
-    ChatTool.pin => _PinListPanel(gid: targetId),
+    ChatTool.pin => _PinListPanel(gid: targetId, onLocate: onLocate),
     ChatTool.saved => _FavListPanel(targetId: targetId, isChannel: isChannel),
     ChatTool.members => _MembersListPanel(gid: targetId),
     ChatTool.autoDelete =>
@@ -196,8 +197,9 @@ class _ToolHeader extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _PinListPanel extends ConsumerWidget {
-  const _PinListPanel({required this.gid});
+  const _PinListPanel({required this.gid, this.onLocate});
   final int gid;
+  final ValueChanged<int>? onLocate;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -229,6 +231,12 @@ class _PinListPanel extends ConsumerWidget {
         final p = pins[i];
         final user = userDir[p.createdBy];
         return _MessageListTile(
+          onTap: onLocate == null
+              ? null
+              : () {
+                  Navigator.of(ctx).pop();
+                  onLocate!(p.mid);
+                },
           name: user?.name ?? l.chatUserFallback(p.createdBy),
           avatarUrl: _userAvatarUrl(ref, p.createdBy, user?.avatarUpdatedAt),
           createdAt: p.createdAt,
@@ -802,6 +810,7 @@ class _MessageListTile extends StatelessWidget {
     required this.content,
     required this.contentType,
     this.trailing,
+    this.onTap,
   });
 
   final String name;
@@ -810,6 +819,7 @@ class _MessageListTile extends StatelessWidget {
   final String content;
   final String contentType;
   final Widget? trailing;
+  final VoidCallback? onTap;
 
   String _previewContent(AppL10n l) {
     if (contentType.startsWith('text/')) return content;
@@ -836,57 +846,60 @@ class _MessageListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          VoceAvatar(name: name, imageUrl: avatarUrl, size: 36),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        safeText(name),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppTokens.textHeading,
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            VoceAvatar(name: name, imageUrl: avatarUrl, size: 36),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          safeText(name),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppTokens.textHeading,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _formatTime(),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppTokens.gray400,
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatTime(),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTokens.gray400,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  safeText(_previewContent(AppL10n.of(context))),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppTokens.gray600,
-                    height: 1.4,
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    safeText(_previewContent(AppL10n.of(context))),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppTokens.gray600,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          if (trailing != null) trailing!,
-        ],
+            if (trailing != null) trailing!,
+          ],
+        ),
       ),
     );
   }

@@ -43,6 +43,9 @@ import '../domain/message_models.dart';
 import '../domain/message_status.dart';
 import 'archive_message_content.dart';
 import 'chat_tool_panels.dart';
+import 'chat_header_details.dart';
+import 'composer_emoji_picker.dart';
+import 'pinned_message_bar.dart';
 import 'file_display_utils.dart';
 import 'message_links.dart';
 import 'file_message_content.dart';
@@ -62,6 +65,9 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _textCtrl = TextEditingController();
+  final _composerFocusNode = FocusNode();
+  bool _pickingEmoji = false;
+  int? _locatingMid;
   final _editCtrl = TextEditingController();
   final _searchAnchorKey = GlobalKey();
   final _sendBoxKey = GlobalKey();
@@ -143,6 +149,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       setState(() {
         _target = _parseTarget(widget.id);
         _selectedMids = null;
+        _locatingMid = null;
+        _highlightMid = null;
       });
       // New conversation: reset the read-report guard so its first visible
       // message gets marked read.
@@ -152,6 +160,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    _composerFocusNode.dispose();
     _textCtrl.dispose();
     _editCtrl.dispose();
     _highlightTimer?.cancel();
@@ -849,28 +858,70 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
+  Future<void> _pickEmoji() async {
+    if (_pickingEmoji) return;
+    _pickingEmoji = true;
+    final target = _target;
+    final selection = _textCtrl.selection;
+    _closeMentionOverlay();
+    _composerFocusNode.unfocus();
+    try {
+      final emoji = await showComposerEmojiPicker(context);
+      if (!mounted || target != _target || emoji == null) return;
+      final text = _textCtrl.text;
+      final start = selection.isValid
+          ? selection.start.clamp(0, text.length)
+          : text.length;
+      final end = selection.isValid
+          ? selection.end.clamp(start, text.length)
+          : text.length;
+      _textCtrl.value = TextEditingValue(
+        text: text.replaceRange(start, end, emoji),
+        selection: TextSelection.collapsed(offset: start + emoji.length),
+      );
+      _composerFocusNode.requestFocus();
+    } finally {
+      _pickingEmoji = false;
+    }
+  }
+
   Future<void> _scrollToMid(int mid) async {
-    final messages =
-        ref.read(chatControllerProvider(_target)).valueOrNull ?? const [];
-    final index = messages.indexWhere((m) => m.mid == mid);
-    if (index < 0) return;
-    if (_itemScrollController.isAttached) {
+    if (_locatingMid != null) return;
+    final target = _target;
+    setState(() => _locatingMid = mid);
+    try {
+      final found = await ref
+          .read(chatControllerProvider(target).notifier)
+          .ensureMessageLoaded(mid,
+              shouldContinue: () => mounted && _target == target);
+      if (!mounted || _target != target) return;
+      if (!found) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(AppL10n.of(context).chatMessageUnavailable)));
+        return;
+      }
+      // Newly loaded rows must be laid out before the item controller sees them.
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted || _target != target) return;
+      final messages =
+          ref.read(chatControllerProvider(target)).valueOrNull ?? const [];
+      final index = messages.indexWhere((m) => m.mid == mid);
+      if (index < 0 || !_itemScrollController.isAttached) return;
       await _itemScrollController.scrollTo(
         index: index,
         duration: const Duration(milliseconds: 320),
         curve: Curves.easeOut,
-        // 0.0 puts the item flush with the leading edge — for a reverse list
-        // that's the bottom; 0.3 nudges it a third of the way up.
         alignment: 0.3,
       );
+      if (!mounted || _target != target) return;
+      setState(() => _highlightMid = mid);
+      _highlightTimer?.cancel();
+      _highlightTimer = Timer(const Duration(milliseconds: 1600), () {
+        if (mounted) setState(() => _highlightMid = null);
+      });
+    } finally {
+      if (mounted && _target == target) setState(() => _locatingMid = null);
     }
-    if (!mounted) return;
-    setState(() => _highlightMid = mid);
-    _highlightTimer?.cancel();
-    _highlightTimer = Timer(const Duration(milliseconds: 1600), () {
-      if (!mounted) return;
-      setState(() => _highlightMid = null);
-    });
   }
 
   void _showToolPanel(ChatTool tool) {
@@ -887,6 +938,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       tool: tool,
       targetId: id,
       isChannel: isChannel,
+      onLocate: _scrollToMid,
     );
   }
 
@@ -934,14 +986,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       group: (t) {
         final g = groupDir[t.gid];
         final name = g?.name ?? l.chatGroupFallback(t.gid);
+        final description = g?.description.trim();
         return (
           name,
-          l.chatGroupIntro,
+          description?.isNotEmpty == true ? description : null,
           g != null ? _groupAvatarUrl(t.gid, g.avatarUpdatedAt) : null,
           true,
         );
       },
     );
+
+    final group = _target.maybeMap(
+      group: (t) => groupDir[t.gid],
+      orElse: () => null,
+    );
+    final pins = [...?group?.pinnedMessages]..sort((a, b) {
+        final byTime = b.createdAt.compareTo(a.createdAt);
+        return byTime != 0 ? byTime : b.mid.compareTo(a.mid);
+      });
 
     final statuses =
         ref.watch(chatControllerProvider(_target).notifier).statuses;
@@ -979,6 +1041,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             showMoreMenu: !isWide,
                             searchAnchorKey: _searchAnchorKey,
                             onSearch: _openSearchOverlay,
+                            onShowIntroduction: isChannel
+                                ? () => showGroupIntroduction(context,
+                                    name: title,
+                                    description: group?.description ?? '')
+                                : null,
                             onPin: isChannel
                                 ? () => _showToolPanel(ChatTool.pin)
                                 : null,
@@ -989,6 +1056,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             onAutoDelete: () =>
                                 _showToolPanel(ChatTool.autoDelete),
                           ),
+                          if (pins.isNotEmpty)
+                            PinnedMessageBar(
+                              key: ValueKey(widget.id),
+                              messages: [
+                                for (final pin in pins)
+                                  (
+                                    mid: pin.mid,
+                                    text: _pinPreview(pin, l, userDir)
+                                  ),
+                              ],
+                              locating: _locatingMid != null,
+                              onLocate: _scrollToMid,
+                              onShowAll: () => _showToolPanel(ChatTool.pin),
+                            ),
                           Expanded(
                             child: messagesAsync.when(
                               loading: () => Center(
@@ -1080,6 +1161,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           else
                             _SendBox(
                               controller: _textCtrl,
+                              focusNode: _composerFocusNode,
+                              onEmojiTap: _pickEmoji,
                               canSend: _canSend,
                               onSend: _sendMessage,
                               onAttach: _pickingFile
@@ -1135,6 +1218,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
     );
   }
+}
+
+String _pinPreview(
+    PinnedMessageSummary pin, AppL10n l, Map<int, UserSummary> users) {
+  if (pin.contentType.startsWith('text/')) {
+    return pin.content.replaceAllMapped(RegExp(r'@(\d+)'), (match) {
+      final uid = int.tryParse(match[1]!);
+      return '@${users[uid]?.name ?? match[1]}';
+    }).replaceAll(RegExp(r'\s+'), ' ');
+  }
+  if (pin.contentType.startsWith('image/')) return l.previewImage;
+  if (pin.contentType == 'vocechat/audio') return l.previewVoice;
+  if (pin.contentType == 'vocechat/archive') return l.previewArchive;
+  return l.previewFile;
 }
 
 // ---------------------------------------------------------------------------
@@ -1247,8 +1344,7 @@ class _DashedRectPainter extends CustomPainter {
 }
 
 // ---------------------------------------------------------------------------
-// _ChatHeader — channel/dm header (Figma "Main / Header"). 52px tall, white
-// background, bottom border #EAECF0, Inter Bold 16 title + Inter 16 subtitle.
+// _ChatHeader — content-sized title and introduction with compact actions.
 // ---------------------------------------------------------------------------
 
 class _ChatHeader extends StatelessWidget {
@@ -1269,6 +1365,7 @@ class _ChatHeader extends StatelessWidget {
     this.onSaved,
     this.onMembers,
     this.onAutoDelete,
+    this.onShowIntroduction,
   });
 
   final String title;
@@ -1289,19 +1386,20 @@ class _ChatHeader extends StatelessWidget {
   final VoidCallback? onSaved;
   final VoidCallback? onMembers;
   final VoidCallback? onAutoDelete;
+  final VoidCallback? onShowIntroduction;
 
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
     return Container(
-      height: 52,
+      constraints: const BoxConstraints(minHeight: 64),
       decoration: BoxDecoration(
         color: AppTokens.surface,
         border: Border(
           bottom: BorderSide(color: AppTokens.gray200, width: 1),
         ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
         children: [
           if (canPop)
@@ -1347,37 +1445,11 @@ class _ChatHeader extends StatelessWidget {
               ),
             ),
           Expanded(
-            child: Row(
-              children: [
-                Flexible(
-                  child: Text(
-                    safeText(title),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppTokens.textHeading,
-                      height: 24 / 16,
-                    ),
-                  ),
-                ),
-                if (subtitle != null && subtitle!.isNotEmpty) ...[
-                  const SizedBox(width: 16),
-                  Flexible(
-                    child: Text(
-                      safeText(subtitle!),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppTokens.gray500,
-                        height: 24 / 16,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+            child: ChatHeaderDetails(
+              title: title,
+              subtitle: subtitle,
+              isChannel: isChannel,
+              onTap: onShowIntroduction,
             ),
           ),
           VoiceEntryButton(target: target),
@@ -2566,6 +2638,8 @@ class _SelectionBar extends StatelessWidget {
 class _SendBox extends StatelessWidget {
   const _SendBox({
     required this.controller,
+    required this.focusNode,
+    required this.onEmojiTap,
     required this.canSend,
     required this.onSend,
     required this.placeholder,
@@ -2587,6 +2661,8 @@ class _SendBox extends StatelessWidget {
   });
 
   final TextEditingController controller;
+  final FocusNode focusNode;
+  final VoidCallback onEmojiTap;
   final bool canSend;
   final VoidCallback onSend;
   final String placeholder;
@@ -2707,7 +2783,7 @@ class _SendBox extends StatelessWidget {
                 _SendIcon(
                   icon: Icons.emoji_emotions_outlined,
                   tooltip: l.chatEmoji,
-                  onTap: () {},
+                  onTap: onEmojiTap,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -2734,6 +2810,7 @@ class _SendBox extends StatelessWidget {
                         key: textFieldKey,
                         child: TextField(
                           controller: controller,
+                          focusNode: focusNode,
                           minLines: 1,
                           maxLines: null,
                           keyboardType: TextInputType.multiline,

@@ -810,6 +810,9 @@ class AppL10nKo extends AppL10n {
   String get chatDropOverlayHint => '파일을 여기에 놓아 전송하세요';
 
   @override
+  String get chatMessageUnavailable => '이 메시지는 더 이상 사용할 수 없거나 불러올 수 없습니다.';
+
+  @override
   String get chatEmoji => '이모지';
 
   @override

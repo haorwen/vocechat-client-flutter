@@ -245,6 +245,7 @@
   "chatRecordingPermissionDenied": "Permiso denegado: habilita el acceso al micrófono o la cámara en la configuración del sistema",
   "chatDropOverlayTitle": "Enviar a {name}",
   "chatDropOverlayHint": "Suelta los archivos aquí para enviarlos",
+  "chatMessageUnavailable": "Este mensaje ya no está disponible o no se pudo cargar.",
   "chatEmoji": "Emoji",
   "chatUserFallback": "Usuario {uid}",
   "chatGroupFallback": "Grupo {gid}",

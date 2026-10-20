@@ -149,11 +149,72 @@ void main() {
     final container = await setup(_Cache([_message(20)]), api);
     final controller = container.read(_provider.notifier);
     final loading = controller.loadMore();
-    await controller.loadMore();
+    final coalesced = controller.loadMore();
     expect(api.requests.length, 2);
     api.requests.last.result.complete([]);
     await loading;
+    await coalesced;
     await controller.loadMore();
+    expect(api.requests.length, 2);
+  });
+
+  test('locating an old pin loads contiguous pages and retains live updates',
+      () async {
+    final api = _Api();
+    final container = await setup(_Cache([_message(30)]), api);
+    final controller = container.read(_provider.notifier);
+    final locating = controller.ensureMessageLoaded(10);
+    expect(api.requests.last.before, 30);
+    controller.applyIncomingMessage(_message(31, content: 'live'));
+    await _flush();
+    api.requests.last.result.complete([_message(25), _message(20)]);
+    await _flush();
+    expect(api.requests.last.before, 20);
+    api.requests.last.result.complete([_message(15), _message(10)]);
+    expect(await locating, isTrue);
+    expect(container.read(_provider).requireValue.map((m) => m.mid),
+        [31, 30, 25, 20, 15, 10]);
+    final requests = api.requests.length;
+    expect(await controller.ensureMessageLoaded(10), isTrue);
+    expect(api.requests.length, requests);
+  });
+
+  test('pin location waits for an existing scroll request', () async {
+    final api = _Api();
+    final container = await setup(_Cache([_message(30)]), api);
+    final controller = container.read(_provider.notifier);
+    final scrolling = controller.loadMore();
+    final locating = controller.ensureMessageLoaded(10);
+    expect(api.requests.length, 2);
+    api.requests.last.result.complete([_message(10)]);
+    await scrolling;
+    expect(await locating, isTrue);
+  });
+
+  test('missing pins and failed history do not loop and remain retryable',
+      () async {
+    final api = _Api();
+    final container = await setup(_Cache([_message(30)]), api);
+    final controller = container.read(_provider.notifier);
+    var locating = controller.ensureMessageLoaded(10);
+    api.requests.last.result.completeError(StateError('offline'));
+    expect(await locating, isFalse);
+    locating = controller.ensureMessageLoaded(10);
+    api.requests.last.result.complete([_message(9)]);
+    expect(await locating, isFalse);
+    expect(api.requests.length, 3);
+  });
+
+  test('pin location can stop between pages when the chat changes', () async {
+    final api = _Api();
+    final container = await setup(_Cache([_message(30)]), api);
+    final controller = container.read(_provider.notifier);
+    var active = true;
+    final locating =
+        controller.ensureMessageLoaded(10, shouldContinue: () => active);
+    active = false;
+    api.requests.last.result.complete([_message(20)]);
+    expect(await locating, isFalse);
     expect(api.requests.length, 2);
   });
 
@@ -305,11 +366,12 @@ void main() {
     await _flush();
     expect(container.read(_provider).requireValue.map((m) => m.mid), [200]);
     expect(cache.rows.map((m) => m.mid), [200]);
-    await controller.loadMore();
+    final coalesced = controller.loadMore();
     expect(api.requests.length, 4,
         reason: 'old request cannot release new lock');
     newPage.complete([]);
     await newLoading;
+    await coalesced;
   });
 
   test('HTTP acknowledgement publishes the sent status with the confirmed row',

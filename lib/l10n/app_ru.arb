@@ -244,6 +244,7 @@
   "chatRecordingPermissionDenied": "Доступ запрещён — включите доступ к микрофону/камере в настройках системы",
   "chatDropOverlayTitle": "Отправить {name}",
   "chatDropOverlayHint": "Перетащите файлы сюда, чтобы отправить их",
+  "chatMessageUnavailable": "Это сообщение больше недоступно или его не удалось загрузить.",
   "chatEmoji": "Эмодзи",
   "chatUserFallback": "Пользователь {uid}",
   "chatGroupFallback": "Группа {gid}",

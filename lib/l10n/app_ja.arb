@@ -245,6 +245,7 @@
   "chatRecordingPermissionDenied": "権限が拒否されました — システム設定でマイク／カメラのアクセスを許可してください",
   "chatDropOverlayTitle": "{name} に送信",
   "chatDropOverlayHint": "ここにファイルをドロップして送信",
+  "chatMessageUnavailable": "このメッセージは削除されたか、読み込めませんでした。",
   "chatEmoji": "絵文字",
   "chatUserFallback": "ユーザー {uid}",
   "chatGroupFallback": "グループ {gid}",

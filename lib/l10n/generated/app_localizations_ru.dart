@@ -810,6 +810,9 @@ class AppL10nRu extends AppL10n {
   String get chatDropOverlayHint => 'Перетащите файлы сюда, чтобы отправить их';
 
   @override
+  String get chatMessageUnavailable => 'Это сообщение больше недоступно или его не удалось загрузить.';
+
+  @override
   String get chatEmoji => 'Эмодзи';
 
   @override
