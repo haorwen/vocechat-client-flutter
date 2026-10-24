@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/sse_client.dart';
+import '../../../core/privacy/email_privacy_provider.dart';
 import '../../../core/utils/app_log.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../channels/application/conversation_providers.dart';
@@ -12,6 +13,7 @@ import '../../channels/application/muted_chats_provider.dart';
 import '../../channels/application/pinned_chats_provider.dart';
 import '../../channels/domain/pin_chat_models.dart';
 import '../../contacts/application/presence_provider.dart';
+import '../../contacts/application/contacts_provider.dart';
 import '../../contacts/application/user_directory_provider.dart';
 import '../data/message_cache.dart';
 import '../domain/message_models.dart';
@@ -38,10 +40,16 @@ part 'message_dispatcher.g.dart';
 /// screen being mounted.
 @Riverpod(keepAlive: true)
 class MessageDispatcher extends _$MessageDispatcher {
+  bool _initialConfig = true;
+
   @override
   void build() {
     ref.listen(sseEventsProvider, (_, next) {
       next.whenData((event) {
+        if (event is ChatEventConnectionOpened) {
+          _initialConfig = true;
+          return;
+        }
         if (event is ChatEventChat) {
           final msg = event.message;
           deliverBackgroundNotification(ref, msg);
@@ -99,6 +107,14 @@ class MessageDispatcher extends _$MessageDispatcher {
           return;
         }
         if (event is ChatEventServerConfigChanged) {
+          final changed = ref.read(emailPrivacyProvider.notifier).applyConfig(
+                event.data,
+                initial: _initialConfig,
+              );
+          _initialConfig = false;
+          if (changed && ref.exists(authControllerProvider)) {
+            unawaited(ref.read(authControllerProvider.notifier).refreshUser());
+          }
           ref.read(chatLayoutProvider.notifier).applyConfig(event.data);
           final flag = event.data['show_user_online_status'];
           if (flag is bool) {
@@ -107,6 +123,7 @@ class MessageDispatcher extends _$MessageDispatcher {
           return;
         }
         if (event is ChatEventUsersSnapshot) {
+          _applyUsers(event.users);
           unawaited(ref
               .read(userDirectoryProvider.notifier)
               .applySnapshot(event.users));
@@ -142,6 +159,7 @@ class MessageDispatcher extends _$MessageDispatcher {
                 event.type == 'avo_changed')) {
           final decoded = _decode(event.raw);
           if (decoded != null) {
+            _applyUsers([decoded], partial: true);
             unawaited(ref
                 .read(userDirectoryProvider.notifier)
                 .applyUserUpdate(decoded));
@@ -169,6 +187,12 @@ class MessageDispatcher extends _$MessageDispatcher {
             case 'users_log':
               final logs = _decode(event.raw)?['logs'];
               if (logs is List) {
+                _applyUsers(
+                    logs
+                        .whereType<Map>()
+                        .map((m) => Map<String, dynamic>.from(m))
+                        .toList(),
+                    partial: true);
                 unawaited(ref.read(userDirectoryProvider.notifier).applyLogs(
                       logs
                           .whereType<Map>()
@@ -201,6 +225,18 @@ class MessageDispatcher extends _$MessageDispatcher {
         }
       });
     });
+  }
+
+  void _applyUsers(List<Map<String, dynamic>> users, {bool partial = false}) {
+    if (ref.exists(authControllerProvider)) {
+      ref
+          .read(authControllerProvider.notifier)
+          .applyUsers(users, partial: partial);
+    }
+    // Update only known contacts; a snapshot also contains group members.
+    if (ref.exists(contactsProvider)) {
+      ref.read(contactsProvider.notifier).applyUsers(users, partial: partial);
+    }
   }
 
   /// Initial `user_settings` snapshot: replace the pinned-chats list with

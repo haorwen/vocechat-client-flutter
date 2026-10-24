@@ -237,6 +237,9 @@ class ChatMessage with _$ChatMessage {
 sealed class ChatEvent with _$ChatEvent {
   const factory ChatEvent.ready() = ChatEventReady;
 
+  /// Local transport boundary, emitted before frames on every reconnect.
+  const factory ChatEvent.connectionOpened() = ChatEventConnectionOpened;
+
   const factory ChatEvent.heartbeat({String? time}) = ChatEventHeartbeat;
 
   const factory ChatEvent.chat({required ChatMessage message}) = ChatEventChat;

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/dio_client.dart';
+import '../../../core/privacy/email_privacy_provider.dart';
 import '../../../core/notifications/fcm_service.dart';
 import '../../../core/storage/account_store.dart';
 import '../../../core/storage/media_cache.dart';
@@ -66,9 +69,37 @@ class AuthController extends _$AuthController {
   /// "Cannot use ref functions after the dependency of a provider changed"
   /// assertion.
   bool _suppressStoreReact = false;
+  Object _profileRequest = Object();
+  Object _authOperation = Object();
+  Object _lifetime = Object();
 
   @override
   Future<AuthState> build() async {
+    final lifetime = _lifetime = Object();
+    ref.onDispose(() {
+      if (_lifetime == lifetime) _lifetime = Object();
+    });
+    ref.listen(emailPrivacyProvider, (_, policy) {
+      final current = state.valueOrNull;
+      if (policy.redact && current is AuthStateAuthenticated) {
+        final redacted = AsyncData<AuthState>(AuthState.authenticated(
+          user: current.user.copyWith(email: null),
+        ));
+        state = state.isLoading
+            ? const AsyncLoading<AuthState>()
+                .copyWithPrevious(redacted, isRefresh: false)
+            : redacted;
+      }
+      final id = policy.accountId;
+      if (id != null) {
+        unawaited(ref
+            .read(accountStoreProvider.notifier)
+            .setDisplayEmailHidden(id, policy.redact)
+            .catchError((Object e) {
+          AppLog.w(LogTag.auth, () => 'email cache purge failed: $e');
+        }));
+      }
+    });
     bootLog('5 AuthController.build: enter');
     // Listen — instead of watch — so updates to accountStore (e.g. login
     // creating/selecting a new account, or the user switching accounts)
@@ -146,9 +177,15 @@ class AuthController extends _$AuthController {
           .selectServer(account.serverId);
     }
 
+    final scope = ref.read(emailPrivacyProvider);
+    final lifetime = _lifetime;
+    bool stale() =>
+        lifetime != _lifetime ||
+        ref.read(emailPrivacyProvider).session != scope.session;
     final tokenStore = ref.read(secureTokenStoreProvider(account.accountId));
     try {
       final tokens = await tokenStore.readTokens();
+      if (stale()) return const AuthState.unauthenticated();
       AppLog.d(
         LogTag.auth,
         () =>
@@ -168,16 +205,30 @@ class AuthController extends _$AuthController {
         DateTime.now().add(const Duration(seconds: 60)),
       )) {
         await _refreshTokens(api, tokenStore, tokens.refreshToken);
+        if (stale()) return const AuthState.unauthenticated();
       }
 
       // Dio already refreshes on 401 and retries this request once. Starting
       // another refresh here can reuse the old, already-rotated refresh token.
-      final user = await api.me();
+      final policy = ref.read(emailPrivacyProvider);
+      final responseUser = await api.me();
+      if (stale()) return const AuthState.unauthenticated();
+      if (ref.read(emailPrivacyProvider).revision != policy.revision) {
+        return state.valueOrNull ?? _savedAuth(account);
+      }
+      ref.read(emailPrivacyProvider.notifier).verifyRole(responseUser.isAdmin);
+      final verified = ref.read(emailPrivacyProvider);
+      final user = _protectUser(responseUser);
       AppLog.d(LogTag.auth, () => '🟦 bootstrap: me() ok uid=${user.uid}');
       await _syncAccountProfile(account, user);
+      if (stale()) return const AuthState.unauthenticated();
+      if (ref.read(emailPrivacyProvider).revision != verified.revision) {
+        return state.valueOrNull ?? _savedAuth(_currentAccount() ?? account);
+      }
       ref.read(authRestoreFailureProvider.notifier).state = null;
       return AuthState.authenticated(user: user);
     } on DioException catch (e) {
+      if (stale()) return const AuthState.unauthenticated();
       if (e.response?.statusCode == 401) {
         await tokenStore.clear();
         ref.read(authRestoreFailureProvider.notifier).state =
@@ -187,6 +238,7 @@ class AuthController extends _$AuthController {
       AppLog.w(LogTag.auth,
           () => '🟦 bootstrap: server unavailable; keeping saved session: $e');
     } catch (e) {
+      if (stale()) return const AuthState.unauthenticated();
       // An unexpected response or local profile-write failure is not proof
       // that the credentials are invalid either. Keep them for recovery.
       AppLog.w(LogTag.auth,
@@ -196,35 +248,45 @@ class AuthController extends _$AuthController {
     // Local access to the existing account/cache remains available offline.
     // Network requests still require the stored tokens, and the SSE reconnect
     // path renews expired tokens when connectivity returns.
-    return AuthState.authenticated(
-      user: VoceUser(
-        uid: account.uid,
-        name: account.name,
-        email: account.email,
-        isAdmin: account.isAdmin,
-        avatarUpdatedAt: account.avatarUpdatedAt,
-      ),
-    );
+    return _savedAuth(account);
   }
+
+  VoceUser _protectUser(VoceUser user) =>
+      ref.read(emailPrivacyProvider).redact ? user.copyWith(email: null) : user;
+
+  AuthState _savedAuth(AccountConfig account) => AuthState.authenticated(
+        user: _protectUser(VoceUser(
+          uid: account.uid,
+          name: account.name,
+          email: account.email,
+          isAdmin: account.isAdmin,
+          avatarUpdatedAt: account.avatarUpdatedAt,
+        )),
+      );
 
   /// Keep the saved [AccountConfig]'s display fields (name/email/avatar) in
   /// sync with the latest `/api/user/me`, so the account-switcher list
   /// doesn't show stale info after a profile edit.
   Future<void> _syncAccountProfile(AccountConfig account, VoceUser user) async {
-    if (account.name == user.name &&
-        account.email == user.email &&
-        account.isAdmin == user.isAdmin &&
-        account.avatarUpdatedAt == user.avatarUpdatedAt) {
-      return;
-    }
-    await ref.read(accountStoreProvider.notifier).upsertAccount(
-          account.copyWith(
-            name: user.name,
-            email: user.email,
-            isAdmin: user.isAdmin,
-            avatarUpdatedAt: user.avatarUpdatedAt,
-          ),
+    final policy = ref.read(emailPrivacyProvider);
+    final lifetime = _lifetime;
+    await ref.read(accountStoreProvider.notifier).updateAccount(
+      account.accountId,
+      (saved) {
+        if (lifetime != _lifetime ||
+            ref.read(emailPrivacyProvider).revision != policy.revision ||
+            policy.accountId != account.accountId) {
+          return saved;
+        }
+        final protected = _protectUser(user);
+        return saved.copyWith(
+          name: protected.name,
+          email: protected.email,
+          isAdmin: protected.isAdmin,
+          avatarUpdatedAt: protected.avatarUpdatedAt,
         );
+      },
+    );
   }
 
   /// Exchange refresh token for a new access token; persist on success.
@@ -598,6 +660,8 @@ class AuthController extends _$AuthController {
   /// appears in the account switcher for a quick re-login — mirroring how a
   /// signed-out browser tab still remembers "who" was signed in.
   Future<void> logout() async {
+    _authOperation = Object();
+    _profileRequest = Object();
     ref.read(authRestoreFailureProvider.notifier).state = null;
     try {
       await ref.read(authApiProvider).logout();
@@ -624,6 +688,8 @@ class AuthController extends _$AuthController {
   /// and the saved account entry are removed only after the server confirms
   /// deletion, so a failed request leaves the current session recoverable.
   Future<void> deleteCurrentAccount() async {
+    _authOperation = Object();
+    _profileRequest = Object();
     final account = _currentAccount();
     if (account == null) return;
 
@@ -676,6 +742,8 @@ class AuthController extends _$AuthController {
     if (target == null) return;
     if (accountState?.currentAccountId == accountId) return;
 
+    final operation = _authOperation = Object();
+    _profileRequest = Object();
     final previous = state;
     final previousServerId =
         ref.read(serverStoreProvider).valueOrNull?.currentServerId;
@@ -699,7 +767,8 @@ class AuthController extends _$AuthController {
           .read(serverStoreProvider.notifier)
           .selectServer(target.serverId);
       await ref.read(accountStoreProvider.notifier).selectAccount(accountId);
-      state = AsyncData(await _bootstrap());
+      final restored = await _bootstrap();
+      if (operation == _authOperation) state = AsyncData(restored);
     } catch (error, stackTrace) {
       // Store failures can happen before or after the selected account moves.
       // Preserve the old session only while both pointers still refer to it;
@@ -811,12 +880,16 @@ class AuthController extends _$AuthController {
 
   /// Re-validate tokens and refresh user state.
   Future<void> bootstrap() async {
+    final operation = _authOperation = Object();
+    final lifetime = _lifetime;
+    _profileRequest = Object();
     // See login() — preserve hasValue so a re-validation triggered while
     // already authenticated/unauthenticated doesn't look like the app's
     // initial auth bootstrap to the router's redirect logic.
     // isRefresh: false — see login() for why the default true is wrong here.
     state = AsyncLoading<AuthState>().copyWithPrevious(state, isRefresh: false);
-    state = await AsyncValue.guard(_bootstrap);
+    final restored = await AsyncValue.guard(_bootstrap);
+    if (operation == _authOperation && lifetime == _lifetime) state = restored;
   }
 
   /// Re-fetch `/api/user/me` and update [state] in place, without the token
@@ -826,17 +899,52 @@ class AuthController extends _$AuthController {
   /// flash or redundant refresh-token exchange. No-op if not authenticated.
   Future<void> refreshUser() async {
     final current = state.valueOrNull;
-    if (current is! AuthStateAuthenticated) return;
+    final account = _currentAccount();
+    if (state.isLoading ||
+        current is! AuthStateAuthenticated ||
+        account == null ||
+        current.user.uid != account.uid) return;
+    final policy = ref.read(emailPrivacyProvider);
+    final lifetime = _lifetime;
+    final request = _profileRequest = Object();
     try {
-      final user = await ref.read(authApiProvider).me();
-      final account = _currentAccount();
-      if (account != null) {
-        await _syncAccountProfile(account, user);
-      }
+      final responseUser = await ref.read(authApiProvider).me();
+      if (lifetime != _lifetime || request != _profileRequest) return;
+      if (ref.read(emailPrivacyProvider).revision != policy.revision) return;
+      ref.read(emailPrivacyProvider.notifier).verifyRole(responseUser.isAdmin);
+      final verified = ref.read(emailPrivacyProvider);
+      final user = _protectUser(responseUser);
+      await _syncAccountProfile(account, user);
+      if (lifetime != _lifetime || request != _profileRequest) return;
+      if (ref.read(emailPrivacyProvider).revision != verified.revision) return;
       state = AsyncData(AuthState.authenticated(user: user));
     } catch (e) {
       AppLog.w(LogTag.auth, () => '🟦 refreshUser: me() failed: $e');
-      // Best-effort — keep the previous state on failure.
     }
+  }
+
+  /// Full snapshots can explicitly clear email; logs use null for unchanged.
+  void applyUsers(List<Map<String, dynamic>> users, {bool partial = false}) {
+    final current = state.valueOrNull;
+    final account = _currentAccount();
+    if (state.isLoading ||
+        current is! AuthStateAuthenticated ||
+        account == null ||
+        current.user.uid != account.uid) return;
+    final update = users.where((u) => u['uid'] == current.user.uid).lastOrNull;
+    if (update == null) return;
+    _profileRequest = Object();
+    if (update['is_admin'] case final bool isAdmin) {
+      ref.read(emailPrivacyProvider.notifier).verifyRole(isAdmin);
+    }
+    final user = _protectUser(VoceUser.fromJson({
+      ...current.user.toJson(),
+      for (final entry in update.entries)
+        if (!partial || entry.value != null) entry.key: entry.value,
+    }));
+    state = AsyncData(AuthState.authenticated(user: user));
+    unawaited(_syncAccountProfile(account, user).catchError((Object e) {
+      AppLog.w(LogTag.auth, () => 'profile cache update failed: $e');
+    }));
   }
 }

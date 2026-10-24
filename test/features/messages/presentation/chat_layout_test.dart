@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vocechat_client/core/network/sse_client.dart';
 import 'package:vocechat_client/core/storage/server_store.dart';
 import 'package:vocechat_client/features/contacts/application/presence_provider.dart';
@@ -65,6 +66,7 @@ void main() {
   late StreamController<ChatEvent> events;
 
   setUp(() async {
+    SharedPreferences.setMockInitialValues({});
     events = StreamController<ChatEvent>();
     container = ProviderContainer(overrides: [
       serverStoreProvider.overrideWith(_Servers.new),

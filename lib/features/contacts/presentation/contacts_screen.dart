@@ -72,13 +72,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                               c.email.toLowerCase().contains(q))
                           .toList();
 
-                  // Heuristic: if email contains "bot" treat as bot section.
-                  // Otherwise, contacts. Mirrors Figma's BOT / CONTACT split.
-                  final bots = filtered
-                      .where((c) =>
-                          c.email.toLowerCase().contains('bot') ||
-                          c.name.toLowerCase().contains('bot'))
-                      .toList();
+                  final bots = filtered.where((c) => c.bot).toList();
                   final contacts =
                       filtered.where((c) => !bots.contains(c)).toList();
 
@@ -436,7 +430,9 @@ class _ContactProfile extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '@${safeText(contact.email).split('@').first}',
+              safeText(contact.email).trim().isEmpty
+                  ? '#${contact.uid}'
+                  : '@${safeText(contact.email).split('@').first}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(

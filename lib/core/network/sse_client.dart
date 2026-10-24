@@ -127,8 +127,7 @@ class VoceSseClient {
     // _generation, so any callback below that fires after a teardown sees a
     // mismatch and bails — no stale reconnect chains.
     final myGen = _generation;
-    bool isStale() =>
-        _disposed || controller.isClosed || myGen != _generation;
+    bool isStale() => _disposed || controller.isClosed || myGen != _generation;
 
     // Renew the access token before every (re)connect so reconnects after
     // expiry don't loop with a stale key. A null return means "keep current".
@@ -181,55 +180,65 @@ class VoceSseClient {
     // watchdog but doesn't catch app-layer hangs — both work together.
     socket.pingInterval = const Duration(seconds: 30);
     _socket = socket;
+    controller.add(const ChatEvent.connectionOpened());
 
     bool firstFrame = true;
+    Future<void> frames = Future.value();
     _armWatchdog(controller);
     _sub = socket.listen(
-      (frame) async {
+      (frame) {
         if (isStale()) return;
         // Any frame at all means the link is alive. Reset the watchdog.
         _armWatchdog(controller);
-        if (firstFrame) {
-          firstFrame = false;
-          currentDelay = const Duration(seconds: 1);
-        }
-        final raw = frame is String
-            ? frame
-            : (frame is List<int> ? utf8.decode(frame) : frame.toString());
-        final trimmed = raw.trim();
-        if (trimmed.isEmpty) return;
-
-        final eventType = _peekTypeField(trimmed) ?? '';
-
-        ChatEvent chatEvent;
-        if (eventType == 'ready' ||
-            eventType == 'heartbeat' ||
-            eventType == 'kick') {
-          chatEvent = parseSseEvent(eventType, trimmed);
-        } else {
-          try {
-            if (trimmed.length <= 16384 && preferInlineParsing?.call() == true) {
-              chatEvent = parseSseEvent(eventType, trimmed);
-            } else {
-              chatEvent = await compute(
-                _parseSseEventInIsolate,
-                [eventType, trimmed],
-                debugLabel: 'parseSseEvent',
-              );
-            }
-          } catch (_) {
-            chatEvent = ChatEvent.unknown(type: eventType, raw: trimmed);
-          }
+        // Decode frames in wire order. Independent compute() calls can finish
+        // out of order and apply a snapshot before its privacy configuration.
+        frames = frames.then((_) async {
           if (isStale()) return;
-        }
-
-        if (chatEvent is ChatEventChat) {
-          final mid = chatEvent.message.mid;
-          if (mid > 0 && (_highWaterMid == null || mid > _highWaterMid!)) {
-            _highWaterMid = mid;
+          if (firstFrame) {
+            firstFrame = false;
+            currentDelay = const Duration(seconds: 1);
           }
-        }
-        controller.add(chatEvent);
+          final raw = frame is String
+              ? frame
+              : (frame is List<int> ? utf8.decode(frame) : frame.toString());
+          final trimmed = raw.trim();
+          if (trimmed.isEmpty) return;
+
+          final eventType = _peekTypeField(trimmed) ?? '';
+
+          ChatEvent chatEvent;
+          if (eventType == 'ready' ||
+              eventType == 'heartbeat' ||
+              eventType == 'kick') {
+            chatEvent = parseSseEvent(eventType, trimmed);
+          } else {
+            try {
+              if (trimmed.length <= 16384 &&
+                  preferInlineParsing?.call() == true) {
+                chatEvent = parseSseEvent(eventType, trimmed);
+              } else {
+                chatEvent = await compute(
+                  _parseSseEventInIsolate,
+                  [eventType, trimmed],
+                  debugLabel: 'parseSseEvent',
+                );
+              }
+            } catch (_) {
+              chatEvent = ChatEvent.unknown(type: eventType, raw: trimmed);
+            }
+            if (isStale()) return;
+          }
+
+          if (chatEvent is ChatEventChat) {
+            final mid = chatEvent.message.mid;
+            if (mid > 0 && (_highWaterMid == null || mid > _highWaterMid!)) {
+              _highWaterMid = mid;
+            }
+          }
+          controller.add(chatEvent);
+        }).catchError((Object e) {
+          AppLog.w(LogTag.sse, () => 'SSE frame failed: $e');
+        });
       },
       onError: (e) {
         AppLog.w(LogTag.sse, () => '⚠️ SSE socket error: $e');
@@ -248,8 +257,10 @@ class VoceSseClient {
   void _armWatchdog(StreamController<ChatEvent> controller) {
     _watchdog?.cancel();
     _watchdog = Timer(_kSseWatchdog, () {
-      AppLog.w(LogTag.sse,
-          () => '⏱️ SSE watchdog fired — no events for ${_kSseWatchdog.inSeconds}s, reconnecting');
+      AppLog.w(
+          LogTag.sse,
+          () =>
+              '⏱️ SSE watchdog fired — no events for ${_kSseWatchdog.inSeconds}s, reconnecting');
       _cleanup();
       // Reset backoff: this is a heartbeat-miss, not a hard error.
       _connect(controller, const Duration(seconds: 1));
@@ -314,24 +325,24 @@ class SseConnectionStatus extends _$SseConnectionStatus {
 
 @Riverpod(keepAlive: true)
 Stream<ChatEvent> sseEvents(Ref ref) async* {
-  // Only stream when authenticated. Watching authController makes the
-  // provider rebuild on login/logout.
-  final authState = await ref.watch(authControllerProvider.future);
-  if (authState is! AuthStateAuthenticated) return;
-
-  // Watching accountStore makes the provider rebuild on account switch (same
-  // or different server); watching serverStore makes it rebuild on server
-  // switch too, since that's what resolves currentServer's baseUrl.
-  final accountState = await ref.watch(accountStoreProvider.future);
-  final accountId = accountState.currentAccountId;
-  if (accountId == null) return;
-  final serverState = await ref.watch(serverStoreProvider.future);
-  final account =
-      accountState.accounts.where((a) => a.accountId == accountId).firstOrNull;
-  if (account == null) return;
-  final currentServer =
-      serverState.servers.where((s) => s.id == account.serverId).firstOrNull;
-  if (currentServer == null) return;
+  // Profile/privacy updates must not reopen the connection: its initial
+  // configuration refreshes profiles, which would otherwise reconnect forever.
+  final uid = ref.watch(authControllerProvider.select((value) {
+    final auth = value.valueOrNull;
+    return auth is AuthStateAuthenticated ? auth.user.uid : null;
+  }));
+  if (uid == null) return;
+  final accountId = ref.watch(accountStoreProvider.select(
+    (value) => value.valueOrNull?.currentAccountId,
+  ));
+  final baseUrl = ref.watch(serverStoreProvider.select((value) {
+    final servers = value.valueOrNull;
+    return servers?.servers
+        .where((s) => s.id == servers.currentServerId)
+        .firstOrNull
+        ?.baseUrl;
+  }));
+  if (accountId == null || baseUrl == null) return;
 
   // Token. We READ rather than WATCH here because the token store doesn't
   // expose a stream; instead we manually invalidate this provider when a
@@ -351,14 +362,16 @@ Stream<ChatEvent> sseEvents(Ref ref) async* {
     final store = ref.read(secureTokenStoreProvider(accountId));
     final current = await store.readTokens();
     if (current == null) return null;
-    final aboutToExpire =
-        current.expiresAt.isBefore(DateTime.now().add(const Duration(seconds: 30)));
+    final aboutToExpire = current.expiresAt
+        .isBefore(DateTime.now().add(const Duration(seconds: 30)));
     if (aboutToExpire) {
-      AppLog.w(LogTag.sse, () => '🔑 SSE: token within 30s of expiry, renewing before connect');
+      AppLog.w(LogTag.sse,
+          () => '🔑 SSE: token within 30s of expiry, renewing before connect');
       final renewed =
           await ref.read(authControllerProvider.notifier).renewIfPossible();
       if (!renewed) {
-        AppLog.w(LogTag.sse, () => '🔑 SSE: token renew failed, proceeding with current key');
+        AppLog.w(LogTag.sse,
+            () => '🔑 SSE: token renew failed, proceeding with current key');
         return null;
       }
       final fresh = await store.readTokens();
@@ -368,7 +381,7 @@ Stream<ChatEvent> sseEvents(Ref ref) async* {
   }
 
   final client = VoceSseClient(
-    baseUrl: currentServer.baseUrl,
+    baseUrl: baseUrl,
     apiKey: tokens.accessToken,
     initialAfterMid: cursor,
     refreshToken: tokenRefreshCallback,

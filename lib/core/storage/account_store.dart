@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -70,68 +71,95 @@ class AccountStore extends _$AccountStore {
 
   static String makeId(String serverId, int uid) => '$serverId::$uid';
 
-  /// Insert a new account or update an existing one (matched by [accountId]).
-  Future<void> upsertAccount(AccountConfig account) async {
-    final current = await future;
-    final idx =
-        current.accounts.indexWhere((a) => a.accountId == account.accountId);
-    final updated = [...current.accounts];
-    if (idx >= 0) {
-      updated[idx] = account;
-    } else {
-      updated.add(account);
+  Future<void> _writes = Future.value();
+  final _hiddenEmails = <String>{};
+
+  AccountState _protectEmails(AccountState value) => value.copyWith(accounts: [
+        for (final account in value.accounts)
+          _hiddenEmails.contains(account.accountId)
+              ? account.copyWith(email: null)
+              : account,
+      ]);
+
+  /// Redact memory synchronously; every queued write also observes this
+  /// constraint. Login credentials live in SecureTokenStore and are untouched.
+  Future<void> setDisplayEmailHidden(String accountId, bool hidden) {
+    if (!hidden) {
+      _hiddenEmails.remove(accountId);
+      return Future.value();
     }
-    await _persist(updated, current.currentAccountId);
-    state = AsyncData(current.copyWith(accounts: updated));
+    _hiddenEmails.add(accountId);
+    final current = state.valueOrNull;
+    if (current != null) state = AsyncData(_protectEmails(current));
+    return _update((current) => current);
   }
 
-  Future<void> removeAccount(String accountId) async {
-    final current = await future;
-    final updated =
-        current.accounts.where((a) => a.accountId != accountId).toList();
-    final newCurrentId =
-        current.currentAccountId == accountId ? null : current.currentAccountId;
-    await _persist(updated, newCurrentId);
-    state = AsyncData(
-        current.copyWith(accounts: updated, currentAccountId: newCurrentId));
+  // Serialize read/modify/write operations: a profile refresh must not restore
+  // an older accounts list after a privacy purge or account selection.
+  Future<void> _update(AccountState Function(AccountState) change) {
+    final result = _writes.then((_) async {
+      await future;
+      final next = _protectEmails(change(state.requireValue));
+      await _persist(next.accounts, next.currentAccountId);
+      state = AsyncData(_protectEmails(next));
+    });
+    _writes = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    return result;
   }
 
-  Future<void> selectAccount(String accountId) async {
-    final current = await future;
-    await _persist(current.accounts, accountId);
-    state = AsyncData(current.copyWith(currentAccountId: accountId));
-  }
+  /// Insert a new account or update an existing one (matched by accountId).
+  Future<void> upsertAccount(AccountConfig account) => _update((current) {
+        final updated = [...current.accounts];
+        final idx = updated.indexWhere((a) => a.accountId == account.accountId);
+        if (idx >= 0) {
+          updated[idx] = account;
+        } else {
+          updated.add(account);
+        }
+        return current.copyWith(accounts: updated);
+      });
 
-  /// Unset the current account pointer without removing its saved entry —
-  /// used by logout(), which keeps the account in the switcher list for a
-  /// quick re-login.
-  Future<void> clearCurrentAccount() async {
-    final current = await future;
-    await _persist(current.accounts, null);
-    state = AsyncData(current.copyWith(currentAccountId: null));
-  }
+  /// Evaluate the guard/transform at commit time, after earlier disk writes.
+  /// This cannot recreate an account removed while a request was in flight.
+  Future<void> updateAccount(
+    String accountId,
+    AccountConfig Function(AccountConfig) update,
+  ) =>
+      _update((current) => current.copyWith(accounts: [
+            for (final account in current.accounts)
+              account.accountId == accountId ? update(account) : account,
+          ]));
 
-  /// Remove every saved account belonging to [serverId]. The server may have
-  /// been replaced at the same URL, so retaining these accounts would leave
-  /// tokens and account-scoped message databases pointing at the old server.
+  Future<void> removeAccount(String accountId) =>
+      _update((current) => current.copyWith(
+            accounts: current.accounts
+                .where((a) => a.accountId != accountId)
+                .toList(),
+            currentAccountId: current.currentAccountId == accountId
+                ? null
+                : current.currentAccountId,
+          ));
+
+  Future<void> selectAccount(String accountId) =>
+      _update((current) => current.copyWith(currentAccountId: accountId));
+
+  /// Keep the saved display profile for the account switcher on logout.
+  Future<void> clearCurrentAccount() =>
+      _update((current) => current.copyWith(currentAccountId: null));
+
   Future<List<AccountConfig>> removeAccountsForServer(String serverId) async {
-    final current = await future;
-    final removed = current.accounts
-        .where((account) => account.serverId == serverId)
-        .toList();
-    if (removed.isEmpty) return const [];
-
-    final removedIds = removed.map((account) => account.accountId).toSet();
-    final updated = current.accounts
-        .where((account) => !removedIds.contains(account.accountId))
-        .toList();
-    final newCurrentId = removedIds.contains(current.currentAccountId)
-        ? null
-        : current.currentAccountId;
-    await _persist(updated, newCurrentId);
-    state = AsyncData(
-      current.copyWith(accounts: updated, currentAccountId: newCurrentId),
-    );
+    var removed = <AccountConfig>[];
+    await _update((current) {
+      removed = current.accounts.where((a) => a.serverId == serverId).toList();
+      final ids = removed.map((a) => a.accountId).toSet();
+      return current.copyWith(
+        accounts:
+            current.accounts.where((a) => a.serverId != serverId).toList(),
+        currentAccountId: ids.contains(current.currentAccountId)
+            ? null
+            : current.currentAccountId,
+      );
+    });
     return removed;
   }
 

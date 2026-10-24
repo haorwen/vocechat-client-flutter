@@ -1536,6 +1536,7 @@ mixin _$ChatEvent {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() ready,
+    required TResult Function() connectionOpened,
     required TResult Function(String? time) heartbeat,
     required TResult Function(ChatMessage message) chat,
     required TResult Function(String? reason) kick,
@@ -1554,6 +1555,7 @@ mixin _$ChatEvent {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? ready,
+    TResult? Function()? connectionOpened,
     TResult? Function(String? time)? heartbeat,
     TResult? Function(ChatMessage message)? chat,
     TResult? Function(String? reason)? kick,
@@ -1572,6 +1574,7 @@ mixin _$ChatEvent {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? ready,
+    TResult Function()? connectionOpened,
     TResult Function(String? time)? heartbeat,
     TResult Function(ChatMessage message)? chat,
     TResult Function(String? reason)? kick,
@@ -1591,6 +1594,7 @@ mixin _$ChatEvent {
   @optionalTypeArgs
   TResult map<TResult extends Object?>({
     required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventConnectionOpened value) connectionOpened,
     required TResult Function(ChatEventHeartbeat value) heartbeat,
     required TResult Function(ChatEventChat value) chat,
     required TResult Function(ChatEventKick value) kick,
@@ -1610,6 +1614,7 @@ mixin _$ChatEvent {
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>({
     TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult? Function(ChatEventHeartbeat value)? heartbeat,
     TResult? Function(ChatEventChat value)? chat,
     TResult? Function(ChatEventKick value)? kick,
@@ -1627,6 +1632,7 @@ mixin _$ChatEvent {
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>({
     TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult Function(ChatEventHeartbeat value)? heartbeat,
     TResult Function(ChatEventChat value)? chat,
     TResult Function(ChatEventKick value)? kick,
@@ -1706,6 +1712,7 @@ class _$ChatEventReadyImpl implements ChatEventReady {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() ready,
+    required TResult Function() connectionOpened,
     required TResult Function(String? time) heartbeat,
     required TResult Function(ChatMessage message) chat,
     required TResult Function(String? reason) kick,
@@ -1727,6 +1734,7 @@ class _$ChatEventReadyImpl implements ChatEventReady {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? ready,
+    TResult? Function()? connectionOpened,
     TResult? Function(String? time)? heartbeat,
     TResult? Function(ChatMessage message)? chat,
     TResult? Function(String? reason)? kick,
@@ -1748,6 +1756,7 @@ class _$ChatEventReadyImpl implements ChatEventReady {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? ready,
+    TResult Function()? connectionOpened,
     TResult Function(String? time)? heartbeat,
     TResult Function(ChatMessage message)? chat,
     TResult Function(String? reason)? kick,
@@ -1773,6 +1782,7 @@ class _$ChatEventReadyImpl implements ChatEventReady {
   @optionalTypeArgs
   TResult map<TResult extends Object?>({
     required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventConnectionOpened value) connectionOpened,
     required TResult Function(ChatEventHeartbeat value) heartbeat,
     required TResult Function(ChatEventChat value) chat,
     required TResult Function(ChatEventKick value) kick,
@@ -1795,6 +1805,7 @@ class _$ChatEventReadyImpl implements ChatEventReady {
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>({
     TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult? Function(ChatEventHeartbeat value)? heartbeat,
     TResult? Function(ChatEventChat value)? chat,
     TResult? Function(ChatEventKick value)? kick,
@@ -1815,6 +1826,7 @@ class _$ChatEventReadyImpl implements ChatEventReady {
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>({
     TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult Function(ChatEventHeartbeat value)? heartbeat,
     TResult Function(ChatEventChat value)? chat,
     TResult Function(ChatEventKick value)? kick,
@@ -1838,6 +1850,191 @@ class _$ChatEventReadyImpl implements ChatEventReady {
 
 abstract class ChatEventReady implements ChatEvent {
   const factory ChatEventReady() = _$ChatEventReadyImpl;
+}
+
+/// @nodoc
+abstract class _$$ChatEventConnectionOpenedImplCopyWith<$Res> {
+  factory _$$ChatEventConnectionOpenedImplCopyWith(
+          _$ChatEventConnectionOpenedImpl value,
+          $Res Function(_$ChatEventConnectionOpenedImpl) then) =
+      __$$ChatEventConnectionOpenedImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$ChatEventConnectionOpenedImplCopyWithImpl<$Res>
+    extends _$ChatEventCopyWithImpl<$Res, _$ChatEventConnectionOpenedImpl>
+    implements _$$ChatEventConnectionOpenedImplCopyWith<$Res> {
+  __$$ChatEventConnectionOpenedImplCopyWithImpl(
+      _$ChatEventConnectionOpenedImpl _value,
+      $Res Function(_$ChatEventConnectionOpenedImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of ChatEvent
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$ChatEventConnectionOpenedImpl implements ChatEventConnectionOpened {
+  const _$ChatEventConnectionOpenedImpl();
+
+  @override
+  String toString() {
+    return 'ChatEvent.connectionOpened()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ChatEventConnectionOpenedImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() ready,
+    required TResult Function() connectionOpened,
+    required TResult Function(String? time) heartbeat,
+    required TResult Function(ChatMessage message) chat,
+    required TResult Function(String? reason) kick,
+    required TResult Function(List<Map<String, dynamic>> users, int version)
+        usersSnapshot,
+    required TResult Function(Map<String, dynamic> data) groupChanged,
+    required TResult Function(int gid, List<int> uid) userJoinedGroup,
+    required TResult Function(int gid, List<int> uid) userLeavedGroup,
+    required TResult Function(Map<String, dynamic> data) serverConfigChanged,
+    required TResult Function(Map<String, dynamic> data) userSettings,
+    required TResult Function(Map<String, dynamic> data) userSettingsChanged,
+    required TResult Function(int target, int uid) userCalling,
+    required TResult Function(String type, String raw) unknown,
+  }) {
+    return connectionOpened();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? ready,
+    TResult? Function()? connectionOpened,
+    TResult? Function(String? time)? heartbeat,
+    TResult? Function(ChatMessage message)? chat,
+    TResult? Function(String? reason)? kick,
+    TResult? Function(List<Map<String, dynamic>> users, int version)?
+        usersSnapshot,
+    TResult? Function(Map<String, dynamic> data)? groupChanged,
+    TResult? Function(int gid, List<int> uid)? userJoinedGroup,
+    TResult? Function(int gid, List<int> uid)? userLeavedGroup,
+    TResult? Function(Map<String, dynamic> data)? serverConfigChanged,
+    TResult? Function(Map<String, dynamic> data)? userSettings,
+    TResult? Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult? Function(int target, int uid)? userCalling,
+    TResult? Function(String type, String raw)? unknown,
+  }) {
+    return connectionOpened?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? ready,
+    TResult Function()? connectionOpened,
+    TResult Function(String? time)? heartbeat,
+    TResult Function(ChatMessage message)? chat,
+    TResult Function(String? reason)? kick,
+    TResult Function(List<Map<String, dynamic>> users, int version)?
+        usersSnapshot,
+    TResult Function(Map<String, dynamic> data)? groupChanged,
+    TResult Function(int gid, List<int> uid)? userJoinedGroup,
+    TResult Function(int gid, List<int> uid)? userLeavedGroup,
+    TResult Function(Map<String, dynamic> data)? serverConfigChanged,
+    TResult Function(Map<String, dynamic> data)? userSettings,
+    TResult Function(Map<String, dynamic> data)? userSettingsChanged,
+    TResult Function(int target, int uid)? userCalling,
+    TResult Function(String type, String raw)? unknown,
+    required TResult orElse(),
+  }) {
+    if (connectionOpened != null) {
+      return connectionOpened();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventConnectionOpened value) connectionOpened,
+    required TResult Function(ChatEventHeartbeat value) heartbeat,
+    required TResult Function(ChatEventChat value) chat,
+    required TResult Function(ChatEventKick value) kick,
+    required TResult Function(ChatEventUsersSnapshot value) usersSnapshot,
+    required TResult Function(ChatEventGroupChanged value) groupChanged,
+    required TResult Function(ChatEventUserJoinedGroup value) userJoinedGroup,
+    required TResult Function(ChatEventUserLeavedGroup value) userLeavedGroup,
+    required TResult Function(ChatEventServerConfigChanged value)
+        serverConfigChanged,
+    required TResult Function(ChatEventUserSettings value) userSettings,
+    required TResult Function(ChatEventUserSettingsChanged value)
+        userSettingsChanged,
+    required TResult Function(ChatEventUserCalling value) userCalling,
+    required TResult Function(ChatEventUnknown value) unknown,
+  }) {
+    return connectionOpened(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventConnectionOpened value)? connectionOpened,
+    TResult? Function(ChatEventHeartbeat value)? heartbeat,
+    TResult? Function(ChatEventChat value)? chat,
+    TResult? Function(ChatEventKick value)? kick,
+    TResult? Function(ChatEventUsersSnapshot value)? usersSnapshot,
+    TResult? Function(ChatEventGroupChanged value)? groupChanged,
+    TResult? Function(ChatEventUserJoinedGroup value)? userJoinedGroup,
+    TResult? Function(ChatEventUserLeavedGroup value)? userLeavedGroup,
+    TResult? Function(ChatEventServerConfigChanged value)? serverConfigChanged,
+    TResult? Function(ChatEventUserSettings value)? userSettings,
+    TResult? Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult? Function(ChatEventUserCalling value)? userCalling,
+    TResult? Function(ChatEventUnknown value)? unknown,
+  }) {
+    return connectionOpened?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventConnectionOpened value)? connectionOpened,
+    TResult Function(ChatEventHeartbeat value)? heartbeat,
+    TResult Function(ChatEventChat value)? chat,
+    TResult Function(ChatEventKick value)? kick,
+    TResult Function(ChatEventUsersSnapshot value)? usersSnapshot,
+    TResult Function(ChatEventGroupChanged value)? groupChanged,
+    TResult Function(ChatEventUserJoinedGroup value)? userJoinedGroup,
+    TResult Function(ChatEventUserLeavedGroup value)? userLeavedGroup,
+    TResult Function(ChatEventServerConfigChanged value)? serverConfigChanged,
+    TResult Function(ChatEventUserSettings value)? userSettings,
+    TResult Function(ChatEventUserSettingsChanged value)? userSettingsChanged,
+    TResult Function(ChatEventUserCalling value)? userCalling,
+    TResult Function(ChatEventUnknown value)? unknown,
+    required TResult orElse(),
+  }) {
+    if (connectionOpened != null) {
+      return connectionOpened(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class ChatEventConnectionOpened implements ChatEvent {
+  const factory ChatEventConnectionOpened() = _$ChatEventConnectionOpenedImpl;
 }
 
 /// @nodoc
@@ -1910,6 +2107,7 @@ class _$ChatEventHeartbeatImpl implements ChatEventHeartbeat {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() ready,
+    required TResult Function() connectionOpened,
     required TResult Function(String? time) heartbeat,
     required TResult Function(ChatMessage message) chat,
     required TResult Function(String? reason) kick,
@@ -1931,6 +2129,7 @@ class _$ChatEventHeartbeatImpl implements ChatEventHeartbeat {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? ready,
+    TResult? Function()? connectionOpened,
     TResult? Function(String? time)? heartbeat,
     TResult? Function(ChatMessage message)? chat,
     TResult? Function(String? reason)? kick,
@@ -1952,6 +2151,7 @@ class _$ChatEventHeartbeatImpl implements ChatEventHeartbeat {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? ready,
+    TResult Function()? connectionOpened,
     TResult Function(String? time)? heartbeat,
     TResult Function(ChatMessage message)? chat,
     TResult Function(String? reason)? kick,
@@ -1977,6 +2177,7 @@ class _$ChatEventHeartbeatImpl implements ChatEventHeartbeat {
   @optionalTypeArgs
   TResult map<TResult extends Object?>({
     required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventConnectionOpened value) connectionOpened,
     required TResult Function(ChatEventHeartbeat value) heartbeat,
     required TResult Function(ChatEventChat value) chat,
     required TResult Function(ChatEventKick value) kick,
@@ -1999,6 +2200,7 @@ class _$ChatEventHeartbeatImpl implements ChatEventHeartbeat {
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>({
     TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult? Function(ChatEventHeartbeat value)? heartbeat,
     TResult? Function(ChatEventChat value)? chat,
     TResult? Function(ChatEventKick value)? kick,
@@ -2019,6 +2221,7 @@ class _$ChatEventHeartbeatImpl implements ChatEventHeartbeat {
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>({
     TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult Function(ChatEventHeartbeat value)? heartbeat,
     TResult Function(ChatEventChat value)? chat,
     TResult Function(ChatEventKick value)? kick,
@@ -2134,6 +2337,7 @@ class _$ChatEventChatImpl implements ChatEventChat {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() ready,
+    required TResult Function() connectionOpened,
     required TResult Function(String? time) heartbeat,
     required TResult Function(ChatMessage message) chat,
     required TResult Function(String? reason) kick,
@@ -2155,6 +2359,7 @@ class _$ChatEventChatImpl implements ChatEventChat {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? ready,
+    TResult? Function()? connectionOpened,
     TResult? Function(String? time)? heartbeat,
     TResult? Function(ChatMessage message)? chat,
     TResult? Function(String? reason)? kick,
@@ -2176,6 +2381,7 @@ class _$ChatEventChatImpl implements ChatEventChat {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? ready,
+    TResult Function()? connectionOpened,
     TResult Function(String? time)? heartbeat,
     TResult Function(ChatMessage message)? chat,
     TResult Function(String? reason)? kick,
@@ -2201,6 +2407,7 @@ class _$ChatEventChatImpl implements ChatEventChat {
   @optionalTypeArgs
   TResult map<TResult extends Object?>({
     required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventConnectionOpened value) connectionOpened,
     required TResult Function(ChatEventHeartbeat value) heartbeat,
     required TResult Function(ChatEventChat value) chat,
     required TResult Function(ChatEventKick value) kick,
@@ -2223,6 +2430,7 @@ class _$ChatEventChatImpl implements ChatEventChat {
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>({
     TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult? Function(ChatEventHeartbeat value)? heartbeat,
     TResult? Function(ChatEventChat value)? chat,
     TResult? Function(ChatEventKick value)? kick,
@@ -2243,6 +2451,7 @@ class _$ChatEventChatImpl implements ChatEventChat {
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>({
     TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult Function(ChatEventHeartbeat value)? heartbeat,
     TResult Function(ChatEventChat value)? chat,
     TResult Function(ChatEventKick value)? kick,
@@ -2346,6 +2555,7 @@ class _$ChatEventKickImpl implements ChatEventKick {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() ready,
+    required TResult Function() connectionOpened,
     required TResult Function(String? time) heartbeat,
     required TResult Function(ChatMessage message) chat,
     required TResult Function(String? reason) kick,
@@ -2367,6 +2577,7 @@ class _$ChatEventKickImpl implements ChatEventKick {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? ready,
+    TResult? Function()? connectionOpened,
     TResult? Function(String? time)? heartbeat,
     TResult? Function(ChatMessage message)? chat,
     TResult? Function(String? reason)? kick,
@@ -2388,6 +2599,7 @@ class _$ChatEventKickImpl implements ChatEventKick {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? ready,
+    TResult Function()? connectionOpened,
     TResult Function(String? time)? heartbeat,
     TResult Function(ChatMessage message)? chat,
     TResult Function(String? reason)? kick,
@@ -2413,6 +2625,7 @@ class _$ChatEventKickImpl implements ChatEventKick {
   @optionalTypeArgs
   TResult map<TResult extends Object?>({
     required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventConnectionOpened value) connectionOpened,
     required TResult Function(ChatEventHeartbeat value) heartbeat,
     required TResult Function(ChatEventChat value) chat,
     required TResult Function(ChatEventKick value) kick,
@@ -2435,6 +2648,7 @@ class _$ChatEventKickImpl implements ChatEventKick {
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>({
     TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult? Function(ChatEventHeartbeat value)? heartbeat,
     TResult? Function(ChatEventChat value)? chat,
     TResult? Function(ChatEventKick value)? kick,
@@ -2455,6 +2669,7 @@ class _$ChatEventKickImpl implements ChatEventKick {
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>({
     TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult Function(ChatEventHeartbeat value)? heartbeat,
     TResult Function(ChatEventChat value)? chat,
     TResult Function(ChatEventKick value)? kick,
@@ -2577,6 +2792,7 @@ class _$ChatEventUsersSnapshotImpl implements ChatEventUsersSnapshot {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() ready,
+    required TResult Function() connectionOpened,
     required TResult Function(String? time) heartbeat,
     required TResult Function(ChatMessage message) chat,
     required TResult Function(String? reason) kick,
@@ -2598,6 +2814,7 @@ class _$ChatEventUsersSnapshotImpl implements ChatEventUsersSnapshot {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? ready,
+    TResult? Function()? connectionOpened,
     TResult? Function(String? time)? heartbeat,
     TResult? Function(ChatMessage message)? chat,
     TResult? Function(String? reason)? kick,
@@ -2619,6 +2836,7 @@ class _$ChatEventUsersSnapshotImpl implements ChatEventUsersSnapshot {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? ready,
+    TResult Function()? connectionOpened,
     TResult Function(String? time)? heartbeat,
     TResult Function(ChatMessage message)? chat,
     TResult Function(String? reason)? kick,
@@ -2644,6 +2862,7 @@ class _$ChatEventUsersSnapshotImpl implements ChatEventUsersSnapshot {
   @optionalTypeArgs
   TResult map<TResult extends Object?>({
     required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventConnectionOpened value) connectionOpened,
     required TResult Function(ChatEventHeartbeat value) heartbeat,
     required TResult Function(ChatEventChat value) chat,
     required TResult Function(ChatEventKick value) kick,
@@ -2666,6 +2885,7 @@ class _$ChatEventUsersSnapshotImpl implements ChatEventUsersSnapshot {
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>({
     TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult? Function(ChatEventHeartbeat value)? heartbeat,
     TResult? Function(ChatEventChat value)? chat,
     TResult? Function(ChatEventKick value)? kick,
@@ -2686,6 +2906,7 @@ class _$ChatEventUsersSnapshotImpl implements ChatEventUsersSnapshot {
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>({
     TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult Function(ChatEventHeartbeat value)? heartbeat,
     TResult Function(ChatEventChat value)? chat,
     TResult Function(ChatEventKick value)? kick,
@@ -2800,6 +3021,7 @@ class _$ChatEventGroupChangedImpl implements ChatEventGroupChanged {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() ready,
+    required TResult Function() connectionOpened,
     required TResult Function(String? time) heartbeat,
     required TResult Function(ChatMessage message) chat,
     required TResult Function(String? reason) kick,
@@ -2821,6 +3043,7 @@ class _$ChatEventGroupChangedImpl implements ChatEventGroupChanged {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? ready,
+    TResult? Function()? connectionOpened,
     TResult? Function(String? time)? heartbeat,
     TResult? Function(ChatMessage message)? chat,
     TResult? Function(String? reason)? kick,
@@ -2842,6 +3065,7 @@ class _$ChatEventGroupChangedImpl implements ChatEventGroupChanged {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? ready,
+    TResult Function()? connectionOpened,
     TResult Function(String? time)? heartbeat,
     TResult Function(ChatMessage message)? chat,
     TResult Function(String? reason)? kick,
@@ -2867,6 +3091,7 @@ class _$ChatEventGroupChangedImpl implements ChatEventGroupChanged {
   @optionalTypeArgs
   TResult map<TResult extends Object?>({
     required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventConnectionOpened value) connectionOpened,
     required TResult Function(ChatEventHeartbeat value) heartbeat,
     required TResult Function(ChatEventChat value) chat,
     required TResult Function(ChatEventKick value) kick,
@@ -2889,6 +3114,7 @@ class _$ChatEventGroupChangedImpl implements ChatEventGroupChanged {
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>({
     TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult? Function(ChatEventHeartbeat value)? heartbeat,
     TResult? Function(ChatEventChat value)? chat,
     TResult? Function(ChatEventKick value)? kick,
@@ -2909,6 +3135,7 @@ class _$ChatEventGroupChangedImpl implements ChatEventGroupChanged {
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>({
     TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult Function(ChatEventHeartbeat value)? heartbeat,
     TResult Function(ChatEventChat value)? chat,
     TResult Function(ChatEventKick value)? kick,
@@ -3031,6 +3258,7 @@ class _$ChatEventUserJoinedGroupImpl implements ChatEventUserJoinedGroup {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() ready,
+    required TResult Function() connectionOpened,
     required TResult Function(String? time) heartbeat,
     required TResult Function(ChatMessage message) chat,
     required TResult Function(String? reason) kick,
@@ -3052,6 +3280,7 @@ class _$ChatEventUserJoinedGroupImpl implements ChatEventUserJoinedGroup {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? ready,
+    TResult? Function()? connectionOpened,
     TResult? Function(String? time)? heartbeat,
     TResult? Function(ChatMessage message)? chat,
     TResult? Function(String? reason)? kick,
@@ -3073,6 +3302,7 @@ class _$ChatEventUserJoinedGroupImpl implements ChatEventUserJoinedGroup {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? ready,
+    TResult Function()? connectionOpened,
     TResult Function(String? time)? heartbeat,
     TResult Function(ChatMessage message)? chat,
     TResult Function(String? reason)? kick,
@@ -3098,6 +3328,7 @@ class _$ChatEventUserJoinedGroupImpl implements ChatEventUserJoinedGroup {
   @optionalTypeArgs
   TResult map<TResult extends Object?>({
     required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventConnectionOpened value) connectionOpened,
     required TResult Function(ChatEventHeartbeat value) heartbeat,
     required TResult Function(ChatEventChat value) chat,
     required TResult Function(ChatEventKick value) kick,
@@ -3120,6 +3351,7 @@ class _$ChatEventUserJoinedGroupImpl implements ChatEventUserJoinedGroup {
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>({
     TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult? Function(ChatEventHeartbeat value)? heartbeat,
     TResult? Function(ChatEventChat value)? chat,
     TResult? Function(ChatEventKick value)? kick,
@@ -3140,6 +3372,7 @@ class _$ChatEventUserJoinedGroupImpl implements ChatEventUserJoinedGroup {
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>({
     TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult Function(ChatEventHeartbeat value)? heartbeat,
     TResult Function(ChatEventChat value)? chat,
     TResult Function(ChatEventKick value)? kick,
@@ -3264,6 +3497,7 @@ class _$ChatEventUserLeavedGroupImpl implements ChatEventUserLeavedGroup {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() ready,
+    required TResult Function() connectionOpened,
     required TResult Function(String? time) heartbeat,
     required TResult Function(ChatMessage message) chat,
     required TResult Function(String? reason) kick,
@@ -3285,6 +3519,7 @@ class _$ChatEventUserLeavedGroupImpl implements ChatEventUserLeavedGroup {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? ready,
+    TResult? Function()? connectionOpened,
     TResult? Function(String? time)? heartbeat,
     TResult? Function(ChatMessage message)? chat,
     TResult? Function(String? reason)? kick,
@@ -3306,6 +3541,7 @@ class _$ChatEventUserLeavedGroupImpl implements ChatEventUserLeavedGroup {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? ready,
+    TResult Function()? connectionOpened,
     TResult Function(String? time)? heartbeat,
     TResult Function(ChatMessage message)? chat,
     TResult Function(String? reason)? kick,
@@ -3331,6 +3567,7 @@ class _$ChatEventUserLeavedGroupImpl implements ChatEventUserLeavedGroup {
   @optionalTypeArgs
   TResult map<TResult extends Object?>({
     required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventConnectionOpened value) connectionOpened,
     required TResult Function(ChatEventHeartbeat value) heartbeat,
     required TResult Function(ChatEventChat value) chat,
     required TResult Function(ChatEventKick value) kick,
@@ -3353,6 +3590,7 @@ class _$ChatEventUserLeavedGroupImpl implements ChatEventUserLeavedGroup {
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>({
     TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult? Function(ChatEventHeartbeat value)? heartbeat,
     TResult? Function(ChatEventChat value)? chat,
     TResult? Function(ChatEventKick value)? kick,
@@ -3373,6 +3611,7 @@ class _$ChatEventUserLeavedGroupImpl implements ChatEventUserLeavedGroup {
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>({
     TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult Function(ChatEventHeartbeat value)? heartbeat,
     TResult Function(ChatEventChat value)? chat,
     TResult Function(ChatEventKick value)? kick,
@@ -3491,6 +3730,7 @@ class _$ChatEventServerConfigChangedImpl
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() ready,
+    required TResult Function() connectionOpened,
     required TResult Function(String? time) heartbeat,
     required TResult Function(ChatMessage message) chat,
     required TResult Function(String? reason) kick,
@@ -3512,6 +3752,7 @@ class _$ChatEventServerConfigChangedImpl
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? ready,
+    TResult? Function()? connectionOpened,
     TResult? Function(String? time)? heartbeat,
     TResult? Function(ChatMessage message)? chat,
     TResult? Function(String? reason)? kick,
@@ -3533,6 +3774,7 @@ class _$ChatEventServerConfigChangedImpl
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? ready,
+    TResult Function()? connectionOpened,
     TResult Function(String? time)? heartbeat,
     TResult Function(ChatMessage message)? chat,
     TResult Function(String? reason)? kick,
@@ -3558,6 +3800,7 @@ class _$ChatEventServerConfigChangedImpl
   @optionalTypeArgs
   TResult map<TResult extends Object?>({
     required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventConnectionOpened value) connectionOpened,
     required TResult Function(ChatEventHeartbeat value) heartbeat,
     required TResult Function(ChatEventChat value) chat,
     required TResult Function(ChatEventKick value) kick,
@@ -3580,6 +3823,7 @@ class _$ChatEventServerConfigChangedImpl
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>({
     TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult? Function(ChatEventHeartbeat value)? heartbeat,
     TResult? Function(ChatEventChat value)? chat,
     TResult? Function(ChatEventKick value)? kick,
@@ -3600,6 +3844,7 @@ class _$ChatEventServerConfigChangedImpl
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>({
     TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult Function(ChatEventHeartbeat value)? heartbeat,
     TResult Function(ChatEventChat value)? chat,
     TResult Function(ChatEventKick value)? kick,
@@ -3714,6 +3959,7 @@ class _$ChatEventUserSettingsImpl implements ChatEventUserSettings {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() ready,
+    required TResult Function() connectionOpened,
     required TResult Function(String? time) heartbeat,
     required TResult Function(ChatMessage message) chat,
     required TResult Function(String? reason) kick,
@@ -3735,6 +3981,7 @@ class _$ChatEventUserSettingsImpl implements ChatEventUserSettings {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? ready,
+    TResult? Function()? connectionOpened,
     TResult? Function(String? time)? heartbeat,
     TResult? Function(ChatMessage message)? chat,
     TResult? Function(String? reason)? kick,
@@ -3756,6 +4003,7 @@ class _$ChatEventUserSettingsImpl implements ChatEventUserSettings {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? ready,
+    TResult Function()? connectionOpened,
     TResult Function(String? time)? heartbeat,
     TResult Function(ChatMessage message)? chat,
     TResult Function(String? reason)? kick,
@@ -3781,6 +4029,7 @@ class _$ChatEventUserSettingsImpl implements ChatEventUserSettings {
   @optionalTypeArgs
   TResult map<TResult extends Object?>({
     required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventConnectionOpened value) connectionOpened,
     required TResult Function(ChatEventHeartbeat value) heartbeat,
     required TResult Function(ChatEventChat value) chat,
     required TResult Function(ChatEventKick value) kick,
@@ -3803,6 +4052,7 @@ class _$ChatEventUserSettingsImpl implements ChatEventUserSettings {
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>({
     TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult? Function(ChatEventHeartbeat value)? heartbeat,
     TResult? Function(ChatEventChat value)? chat,
     TResult? Function(ChatEventKick value)? kick,
@@ -3823,6 +4073,7 @@ class _$ChatEventUserSettingsImpl implements ChatEventUserSettings {
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>({
     TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult Function(ChatEventHeartbeat value)? heartbeat,
     TResult Function(ChatEventChat value)? chat,
     TResult Function(ChatEventKick value)? kick,
@@ -3939,6 +4190,7 @@ class _$ChatEventUserSettingsChangedImpl
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() ready,
+    required TResult Function() connectionOpened,
     required TResult Function(String? time) heartbeat,
     required TResult Function(ChatMessage message) chat,
     required TResult Function(String? reason) kick,
@@ -3960,6 +4212,7 @@ class _$ChatEventUserSettingsChangedImpl
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? ready,
+    TResult? Function()? connectionOpened,
     TResult? Function(String? time)? heartbeat,
     TResult? Function(ChatMessage message)? chat,
     TResult? Function(String? reason)? kick,
@@ -3981,6 +4234,7 @@ class _$ChatEventUserSettingsChangedImpl
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? ready,
+    TResult Function()? connectionOpened,
     TResult Function(String? time)? heartbeat,
     TResult Function(ChatMessage message)? chat,
     TResult Function(String? reason)? kick,
@@ -4006,6 +4260,7 @@ class _$ChatEventUserSettingsChangedImpl
   @optionalTypeArgs
   TResult map<TResult extends Object?>({
     required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventConnectionOpened value) connectionOpened,
     required TResult Function(ChatEventHeartbeat value) heartbeat,
     required TResult Function(ChatEventChat value) chat,
     required TResult Function(ChatEventKick value) kick,
@@ -4028,6 +4283,7 @@ class _$ChatEventUserSettingsChangedImpl
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>({
     TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult? Function(ChatEventHeartbeat value)? heartbeat,
     TResult? Function(ChatEventChat value)? chat,
     TResult? Function(ChatEventKick value)? kick,
@@ -4048,6 +4304,7 @@ class _$ChatEventUserSettingsChangedImpl
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>({
     TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult Function(ChatEventHeartbeat value)? heartbeat,
     TResult Function(ChatEventChat value)? chat,
     TResult Function(ChatEventKick value)? kick,
@@ -4163,6 +4420,7 @@ class _$ChatEventUserCallingImpl implements ChatEventUserCalling {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() ready,
+    required TResult Function() connectionOpened,
     required TResult Function(String? time) heartbeat,
     required TResult Function(ChatMessage message) chat,
     required TResult Function(String? reason) kick,
@@ -4184,6 +4442,7 @@ class _$ChatEventUserCallingImpl implements ChatEventUserCalling {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? ready,
+    TResult? Function()? connectionOpened,
     TResult? Function(String? time)? heartbeat,
     TResult? Function(ChatMessage message)? chat,
     TResult? Function(String? reason)? kick,
@@ -4205,6 +4464,7 @@ class _$ChatEventUserCallingImpl implements ChatEventUserCalling {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? ready,
+    TResult Function()? connectionOpened,
     TResult Function(String? time)? heartbeat,
     TResult Function(ChatMessage message)? chat,
     TResult Function(String? reason)? kick,
@@ -4230,6 +4490,7 @@ class _$ChatEventUserCallingImpl implements ChatEventUserCalling {
   @optionalTypeArgs
   TResult map<TResult extends Object?>({
     required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventConnectionOpened value) connectionOpened,
     required TResult Function(ChatEventHeartbeat value) heartbeat,
     required TResult Function(ChatEventChat value) chat,
     required TResult Function(ChatEventKick value) kick,
@@ -4252,6 +4513,7 @@ class _$ChatEventUserCallingImpl implements ChatEventUserCalling {
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>({
     TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult? Function(ChatEventHeartbeat value)? heartbeat,
     TResult? Function(ChatEventChat value)? chat,
     TResult? Function(ChatEventKick value)? kick,
@@ -4272,6 +4534,7 @@ class _$ChatEventUserCallingImpl implements ChatEventUserCalling {
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>({
     TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult Function(ChatEventHeartbeat value)? heartbeat,
     TResult Function(ChatEventChat value)? chat,
     TResult Function(ChatEventKick value)? kick,
@@ -4386,6 +4649,7 @@ class _$ChatEventUnknownImpl implements ChatEventUnknown {
   @optionalTypeArgs
   TResult when<TResult extends Object?>({
     required TResult Function() ready,
+    required TResult Function() connectionOpened,
     required TResult Function(String? time) heartbeat,
     required TResult Function(ChatMessage message) chat,
     required TResult Function(String? reason) kick,
@@ -4407,6 +4671,7 @@ class _$ChatEventUnknownImpl implements ChatEventUnknown {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
     TResult? Function()? ready,
+    TResult? Function()? connectionOpened,
     TResult? Function(String? time)? heartbeat,
     TResult? Function(ChatMessage message)? chat,
     TResult? Function(String? reason)? kick,
@@ -4428,6 +4693,7 @@ class _$ChatEventUnknownImpl implements ChatEventUnknown {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
     TResult Function()? ready,
+    TResult Function()? connectionOpened,
     TResult Function(String? time)? heartbeat,
     TResult Function(ChatMessage message)? chat,
     TResult Function(String? reason)? kick,
@@ -4453,6 +4719,7 @@ class _$ChatEventUnknownImpl implements ChatEventUnknown {
   @optionalTypeArgs
   TResult map<TResult extends Object?>({
     required TResult Function(ChatEventReady value) ready,
+    required TResult Function(ChatEventConnectionOpened value) connectionOpened,
     required TResult Function(ChatEventHeartbeat value) heartbeat,
     required TResult Function(ChatEventChat value) chat,
     required TResult Function(ChatEventKick value) kick,
@@ -4475,6 +4742,7 @@ class _$ChatEventUnknownImpl implements ChatEventUnknown {
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>({
     TResult? Function(ChatEventReady value)? ready,
+    TResult? Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult? Function(ChatEventHeartbeat value)? heartbeat,
     TResult? Function(ChatEventChat value)? chat,
     TResult? Function(ChatEventKick value)? kick,
@@ -4495,6 +4763,7 @@ class _$ChatEventUnknownImpl implements ChatEventUnknown {
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>({
     TResult Function(ChatEventReady value)? ready,
+    TResult Function(ChatEventConnectionOpened value)? connectionOpened,
     TResult Function(ChatEventHeartbeat value)? heartbeat,
     TResult Function(ChatEventChat value)? chat,
     TResult Function(ChatEventKick value)? kick,
