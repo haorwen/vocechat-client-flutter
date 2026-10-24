@@ -7,6 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:vocechat_client/core/storage/server_store.dart';
+import 'package:vocechat_client/core/theme/app_text_scale.dart';
 import 'package:vocechat_client/features/auth/application/auth_controller.dart';
 import 'package:vocechat_client/features/auth/domain/auth_models.dart';
 import 'package:vocechat_client/features/settings/application/app_info_provider.dart';
@@ -21,6 +22,44 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   for (final width in [390.0, 1000.0]) {
+    testWidgets('font size can be adjusted from Appearance at width $width',
+        (tester) async {
+      tester.view.physicalSize = Size(width, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(_RegularAuthController.new),
+          serverStoreProvider.overrideWith(_TestServerStore.new),
+        ],
+        child: _localizedApp(),
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Appearance'));
+      await tester.pumpAndSettle();
+      final slider = find.byKey(const Key('font-size-slider'));
+      await tester.ensureVisible(slider);
+      await tester.drag(slider, const Offset(500, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('130%'), findsOneWidget);
+      expect((await SharedPreferences.getInstance()).getInt('app.fontSize.step'), 6);
+      expect(tester.takeException(), isNull);
+
+      if (width < 700) {
+        await tester.tap(find.byIcon(Icons.arrow_back));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Appearance'));
+      } else {
+        await tester.tap(find.text('My Account'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Appearance'));
+      }
+      await tester.pumpAndSettle();
+      expect(find.text('130%'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('AVO opens only from its own menu at width $width',
         (tester) async {
       tester.view.physicalSize = Size(width, 900);
@@ -180,6 +219,7 @@ Widget _localizedApp() {
     locale: const Locale('en'),
     localizationsDelegates: AppL10n.localizationsDelegates,
     supportedLocales: AppL10n.supportedLocales,
+    builder: (context, child) => AppTextScale(child: child!),
     home: const Scaffold(body: SettingsScreen()),
   );
 }

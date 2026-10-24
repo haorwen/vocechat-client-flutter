@@ -370,6 +370,31 @@ class AppL10nRu extends AppL10n {
   String get appearanceDark => 'Тёмная';
 
   @override
+  String get appearanceFontSize => 'Размер текста';
+
+  @override
+  String get appearanceFontSizeDescription => 'Перемещайте ползунок, чтобы изменить размер текста в приложении. Изменения сохраняются автоматически.';
+
+  @override
+  String get appearanceFontSizePreview => 'Выберите удобный размер текста для чтения и общения.';
+
+  @override
+  String appearanceFontSizeDefault(int percent) {
+    return '$percent% (По умолчанию)';
+  }
+
+  @override
+  String appearanceFontSizeValue(int percent) {
+    return '$percent%';
+  }
+
+  @override
+  String get appearanceFontSizeReset => 'Сбросить';
+
+  @override
+  String get appearanceFontSizeSaveFailed => 'Не удалось сохранить размер текста. Попробуйте ещё раз.';
+
+  @override
   String get appearanceLanguage => 'ЯЗЫК';
 
   @override

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vocechat_client/core/network/sse_client.dart';
@@ -92,6 +93,7 @@ void main() {
       {MessageDetail? detail,
       MessageSendStatus? status,
       bool selecting = false,
+      double textScale = 1,
       VoidCallback? onToggleSelect}) async {
     await tester.pumpWidget(UncontrolledProviderScope(
       container: container,
@@ -99,6 +101,12 @@ void main() {
         locale: const Locale('en'),
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(textScale),
+          ),
+          child: child!,
+        ),
         home: Scaffold(
           body: Column(children: [
             for (final uid in [7, 8])
@@ -166,6 +174,66 @@ void main() {
       expectPlacement(tester, 8, right: false);
       expect(tester.takeException(), isNull);
     });
+  }
+
+  const longText = '这个要做大群吗，不要聊太多，后面进来的都可以看到历史记录😀'
+      '这个要做大群吗，不要聊太多，后面进来的都可以看到历史记录😀';
+  final longMessages = {
+    'plain text': const MessageDetail.normal(
+        contentType: 'text/plain', content: longText),
+    'Markdown': const MessageDetail.normal(
+        contentType: 'text/markdown', content: longText),
+    'reply': const MessageDetail.reply(
+        mid: 8, contentType: 'text/plain', content: longText),
+  };
+
+  for (final width in [320.0, 400.0, 768.0]) {
+    for (final textScale in [1.0, 1.3]) {
+      for (final entry in longMessages.entries) {
+        testWidgets(
+            '${entry.key} wraps before opposite avatars at $width / $textScale',
+            (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(width, 1200);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.view.resetPhysicalSize);
+          await container.read(chatControllerProvider(_group).future);
+          await pumpRows(tester, _group,
+              detail: entry.value, textScale: textScale);
+          await config(tester, {'chat_layout_mode': 'SelfRight'});
+
+          final leftAvatar =
+              tester.getRect(within(8, find.byType(VoceAvatar)).first);
+          final rightAvatar =
+              tester.getRect(within(7, find.byType(VoceAvatar)).first);
+          Finder body(int uid) => within(
+              uid,
+              find.byWidgetPredicate((widget) =>
+                  widget is RichText && widget.text.toPlainText() == longText));
+
+          for (final uid in [7, 8]) {
+            final rect = tester.getRect(body(uid));
+            expect(rect.left, closeTo(leftAvatar.right + 16, 0.01));
+            expect(rect.right, closeTo(rightAvatar.left - 16, 0.01));
+            final paragraph = tester.renderObject<RenderParagraph>(body(uid));
+            final lines = paragraph.getBoxesForSelection(const TextSelection(
+                baseOffset: 0, extentOffset: longText.length));
+            expect(lines.last.top, greaterThan(lines.first.top));
+          }
+          expect(tester.takeException(), isNull);
+
+          // Disabling the split layout restores the full content width.
+          await config(tester, {'chat_layout_mode': 'Left'});
+          for (final uid in [7, 8]) {
+            final rect = tester.getRect(body(uid));
+            final row = tester.getRect(find.byKey(ValueKey(uid)));
+            expect(rect.left, closeTo(leftAvatar.right + 16, 0.01));
+            expect(rect.right, closeTo(row.right - 8, 0.01));
+          }
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
   }
 
   testWidgets('config received before opening a chat is retained',

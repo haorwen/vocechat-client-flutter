@@ -370,6 +370,31 @@ class AppL10nKo extends AppL10n {
   String get appearanceDark => '다크';
 
   @override
+  String get appearanceFontSize => '글자 크기';
+
+  @override
+  String get appearanceFontSizeDescription => '슬라이더로 앱 전체의 글자 크기를 조절하세요. 변경 사항은 자동으로 저장됩니다.';
+
+  @override
+  String get appearanceFontSizePreview => '읽기와 채팅에 편안한 글자 크기를 선택하세요.';
+
+  @override
+  String appearanceFontSizeDefault(int percent) {
+    return '$percent% (기본값)';
+  }
+
+  @override
+  String appearanceFontSizeValue(int percent) {
+    return '$percent%';
+  }
+
+  @override
+  String get appearanceFontSizeReset => '기본값으로 재설정';
+
+  @override
+  String get appearanceFontSizeSaveFailed => '글자 크기를 저장하지 못했습니다. 다시 시도해 주세요.';
+
+  @override
   String get appearanceLanguage => '언어';
 
   @override

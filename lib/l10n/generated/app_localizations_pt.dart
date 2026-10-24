@@ -370,6 +370,31 @@ class AppL10nPt extends AppL10n {
   String get appearanceDark => 'Escuro';
 
   @override
+  String get appearanceFontSize => 'Tamanho do texto';
+
+  @override
+  String get appearanceFontSizeDescription => 'Deslize para ajustar o tamanho do texto em todo o app. As alterações são salvas automaticamente.';
+
+  @override
+  String get appearanceFontSizePreview => 'Escolha um tamanho confortável para ler e conversar.';
+
+  @override
+  String appearanceFontSizeDefault(int percent) {
+    return '$percent% (Padrão)';
+  }
+
+  @override
+  String appearanceFontSizeValue(int percent) {
+    return '$percent%';
+  }
+
+  @override
+  String get appearanceFontSizeReset => 'Restaurar padrão';
+
+  @override
+  String get appearanceFontSizeSaveFailed => 'Não foi possível salvar o tamanho do texto. Tente novamente.';
+
+  @override
   String get appearanceLanguage => 'IDIOMA';
 
   @override

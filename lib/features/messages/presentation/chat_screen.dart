@@ -2104,6 +2104,9 @@ class _MessageRowState extends ConsumerState<MessageRow> {
                   ],
                 ),
               ),
+              // In the split layout, wrap content before the opposite
+              // avatar column as well (40px avatar + 16px gap).
+              if (layout == ChatLayoutMode.selfRight) const SizedBox(width: 56),
             ],
           ),
         ],

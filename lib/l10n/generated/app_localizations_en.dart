@@ -370,6 +370,31 @@ class AppL10nEn extends AppL10n {
   String get appearanceDark => 'Dark';
 
   @override
+  String get appearanceFontSize => 'Font size';
+
+  @override
+  String get appearanceFontSizeDescription => 'Drag the slider to adjust text size throughout the app. Changes are saved automatically.';
+
+  @override
+  String get appearanceFontSizePreview => 'Find a comfortable size for reading and chatting.';
+
+  @override
+  String appearanceFontSizeDefault(int percent) {
+    return '$percent% (Default)';
+  }
+
+  @override
+  String appearanceFontSizeValue(int percent) {
+    return '$percent%';
+  }
+
+  @override
+  String get appearanceFontSizeReset => 'Reset to default';
+
+  @override
+  String get appearanceFontSizeSaveFailed => 'Couldn\'t save font size. Please try again.';
+
+  @override
   String get appearanceLanguage => 'LANGUAGE';
 
   @override

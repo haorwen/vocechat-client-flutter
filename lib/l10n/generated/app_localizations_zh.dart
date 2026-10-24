@@ -370,6 +370,31 @@ class AppL10nZh extends AppL10n {
   String get appearanceDark => '深色';
 
   @override
+  String get appearanceFontSize => '字体大小';
+
+  @override
+  String get appearanceFontSizeDescription => '滑动调节应用内的字体大小，设置会自动保存。';
+
+  @override
+  String get appearanceFontSizePreview => '选择舒适的字号，让阅读和聊天更轻松。';
+
+  @override
+  String appearanceFontSizeDefault(int percent) {
+    return '$percent%（默认）';
+  }
+
+  @override
+  String appearanceFontSizeValue(int percent) {
+    return '$percent%';
+  }
+
+  @override
+  String get appearanceFontSizeReset => '恢复默认';
+
+  @override
+  String get appearanceFontSizeSaveFailed => '字体大小保存失败，请重试。';
+
+  @override
   String get appearanceLanguage => '语言';
 
   @override

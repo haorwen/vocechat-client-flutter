@@ -10,6 +10,7 @@ import 'package:vocechat_client/core/notifications/fcm_service.dart';
 import 'package:vocechat_client/core/router/app_router.dart';
 import 'package:vocechat_client/core/router/deep_link_listener.dart';
 import 'package:vocechat_client/core/theme/app_theme.dart';
+import 'package:vocechat_client/core/theme/app_text_scale.dart';
 import 'package:vocechat_client/core/theme/theme_provider.dart';
 import 'package:vocechat_client/features/app_update/presentation/app_update_gate.dart';
 import 'package:vocechat_client/features/voice/presentation/voice_picture_in_picture_overlay.dart';
@@ -75,25 +76,27 @@ class VoceChatApp extends ConsumerWidget {
         // Key the subtree by brightness so every descendant rebuilds (and
         // re-reads AppTokens.*) the instant the resolved theme flips —
         // otherwise widgets that don't watch themeMode keep cached colors.
-        return GestureDetector(
-          // Tapping blank space anywhere dismisses the keyboard — mirrors
-          // native mobile behavior. deferToChild would only fire when a
-          // descendant already claims the hit, so opaque is required to
-          // catch taps on plain, non-interactive areas.
-          behavior: HitTestBehavior.opaque,
-          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-          child: AppUpdateGate(
-            child: VoicePictureInPictureOverlay(
-              child: KeyedSubtree(
-                key: ValueKey(brightness),
-                child: TickerMode(
-                  enabled: !ref.watch(androidBackgroundedProvider) ||
-                      ref.watch(
-                          voiceControllerProvider.select((s) => s != null)),
-                  child: child ??
-                      AppRecoveryPage(
-                        onRetry: () => ref.invalidate(goRouterProvider),
-                      ),
+        return AppTextScale(
+          child: GestureDetector(
+            // Tapping blank space anywhere dismisses the keyboard — mirrors
+            // native mobile behavior. deferToChild would only fire when a
+            // descendant already claims the hit, so opaque is required to
+            // catch taps on plain, non-interactive areas.
+            behavior: HitTestBehavior.opaque,
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            child: AppUpdateGate(
+              child: VoicePictureInPictureOverlay(
+                child: KeyedSubtree(
+                  key: ValueKey(brightness),
+                  child: TickerMode(
+                    enabled: !ref.watch(androidBackgroundedProvider) ||
+                        ref.watch(
+                            voiceControllerProvider.select((s) => s != null)),
+                    child: child ??
+                        AppRecoveryPage(
+                          onRetry: () => ref.invalidate(goRouterProvider),
+                        ),
+                  ),
                 ),
               ),
             ),

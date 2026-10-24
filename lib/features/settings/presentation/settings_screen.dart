@@ -25,6 +25,7 @@ import '../application/app_info_provider.dart';
 import '../application/server_version_provider.dart';
 import '../data/user_api.dart';
 import 'avo_settings_screen.dart';
+import 'font_size_settings_card.dart';
 
 void _showFeatureUnavailable(BuildContext context) {
   ScaffoldMessenger.of(context).showSnackBar(
@@ -1136,7 +1137,7 @@ class _CardDivider extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// _AppearancePane — theme selector + language selector.
+// _AppearancePane — theme, font size and language selectors.
 // ---------------------------------------------------------------------------
 
 class _AppearancePane extends StatelessWidget {
@@ -1195,6 +1196,8 @@ class _AppearancePane extends StatelessWidget {
             ],
           ),
         ),
+        const SizedBox(height: 16),
+        const FontSizeSettingsCard(),
         const SizedBox(height: 16),
         _Card(
           child: Column(

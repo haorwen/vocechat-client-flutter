@@ -809,6 +809,48 @@ abstract class AppL10n {
   /// **'Dark'**
   String get appearanceDark;
 
+  /// No description provided for @appearanceFontSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Font size'**
+  String get appearanceFontSize;
+
+  /// No description provided for @appearanceFontSizeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag the slider to adjust text size throughout the app. Changes are saved automatically.'**
+  String get appearanceFontSizeDescription;
+
+  /// No description provided for @appearanceFontSizePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a comfortable size for reading and chatting.'**
+  String get appearanceFontSizePreview;
+
+  /// No description provided for @appearanceFontSizeDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% (Default)'**
+  String appearanceFontSizeDefault(int percent);
+
+  /// No description provided for @appearanceFontSizeValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}%'**
+  String appearanceFontSizeValue(int percent);
+
+  /// No description provided for @appearanceFontSizeReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default'**
+  String get appearanceFontSizeReset;
+
+  /// No description provided for @appearanceFontSizeSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save font size. Please try again.'**
+  String get appearanceFontSizeSaveFailed;
+
   /// No description provided for @appearanceLanguage.
   ///
   /// In en, this message translates to:
