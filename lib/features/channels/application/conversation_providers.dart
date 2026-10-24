@@ -219,6 +219,10 @@ class Conversations extends _$Conversations {
   /// and makes the refreshing flag flap; instead everyone shares one run.
   Future<void>? _refreshInFlight;
 
+  // A roster request started before channel creation must not remove the new
+  // local entry when its older snapshot arrives.
+  int _rosterRevision = 0;
+
   /// Conversation keys that arrived via SSE but were NOT present in the
   /// roster even after a refresh. Without this set, every further message
   /// from such a conversation retriggers a full refresh — an endless
@@ -295,6 +299,23 @@ class Conversations extends _$Conversations {
     await _refreshFromNetwork(cache);
   }
 
+  /// Publish a successfully created channel immediately, including empty
+  /// channels, without waiting for an existing roster/history refresh.
+  Future<void> addCreatedChannel(
+      {required int gid, required String name}) async {
+    await future;
+    final current = state.requireValue;
+    final key = GroupConversationKey(gid);
+    _rosterRevision++;
+    if (current.any((item) => item.key == key)) return;
+    final next = _sorted([
+      ...current,
+      ConversationItem(key: key, name: name, isChannel: true),
+    ]);
+    state = AsyncData(next);
+    if (_cache != null) _persist(_cache!, next);
+  }
+
   /// Remove a conversation from the local list (hide session / leave channel).
   /// Does NOT call any server API — the caller is responsible for that.
   void hideConversation(ConversationKey key) {
@@ -332,7 +353,9 @@ class Conversations extends _$Conversations {
   Future<void> _doRefreshFromNetwork(MessageCache cache) async {
     _setRefreshing(true);
     try {
+      final revision = _rosterRevision;
       final base = await _fetchBaseRoster();
+      if (revision != _rosterRevision) return;
       if (base.isEmpty) return;
       // Merge roster with current state, preserving existing previews while
       // network catches up. This gives the UI a fresh name/membership list

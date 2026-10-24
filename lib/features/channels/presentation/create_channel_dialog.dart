@@ -11,14 +11,17 @@ import '../../../shared/widgets/primary_button.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../contacts/application/user_directory_provider.dart';
+import '../application/conversation_providers.dart';
+import '../application/pending_chat_selection.dart';
 import '../data/group_api.dart';
 
-/// Opens the create-channel dialog/sheet. On success, refreshes the group
-/// directory and navigates to the new channel.
+/// Opens the create-channel dialog/sheet, then opens the created channel in
+/// the current layout: beside the list on wide windows, or on its own on mobile.
 Future<void> showCreateChannelDialog(BuildContext context) async {
   final isWide = MediaQuery.sizeOf(context).width >= 700;
+  final int? gid;
   if (isWide) {
-    await showDialog<void>(
+    gid = await showDialog<int>(
       context: context,
       builder: (ctx) => const Dialog(
         child: SizedBox(
@@ -28,7 +31,7 @@ Future<void> showCreateChannelDialog(BuildContext context) async {
       ),
     );
   } else {
-    await showModalBottomSheet<void>(
+    gid = await showModalBottomSheet<int>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => const FractionallySizedBox(
@@ -36,6 +39,18 @@ Future<void> showCreateChannelDialog(BuildContext context) async {
         child: _CreateChannelForm(),
       ),
     );
+  }
+
+  if (gid == null || !context.mounted) return;
+  // Use the caller's context after the modal closes, and recheck the window
+  // width in case it changed while the form was open.
+  if (MediaQuery.sizeOf(context).width >= 700) {
+    ProviderScope.containerOf(context, listen: false)
+        .read(pendingChatSelectionProvider.notifier)
+        .request('g-$gid');
+    context.go('/home');
+  } else {
+    context.go('/home/chat/g-$gid');
   }
 }
 
@@ -78,11 +93,16 @@ class _CreateChannelFormState extends ConsumerState<_CreateChannelForm> {
         isPublic: _isPublic,
         members: _isPublic ? const [] : _selectedMembers.toList(),
       );
-      // Refresh the group directory so the new channel appears immediately.
+      // Channel metadata and the conversation roster are separate stores.
+      // Insert the confirmed channel directly so an in-flight roster/history
+      // refresh cannot swallow this update or delay showing an empty channel.
+      await ref
+          .read(conversationsProvider.notifier)
+          .addCreatedChannel(gid: gid, name: name);
+      if (!mounted) return;
       await ref.read(groupDirectoryProvider.notifier).refresh();
       if (!mounted) return;
-      Navigator.of(context).pop();
-      context.go('/home/chat/g-$gid');
+      Navigator.of(context).pop(gid);
     } catch (e) {
       String msg = l.createChannelFailed;
       if (e is DioException) {
