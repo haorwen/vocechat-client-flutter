@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../storage/preference_write.dart';
 
 /// App-wide multipliers, applied on top of the system's accessibility scaling.
-const fontSizeScales = [0.85, 0.9, 0.95, 1.0, 1.1, 1.2, 1.3];
+const fontSizeScales = [0.85, 0.9, 0.95, 1.0, 1.1, 1.2, 1.3, 1.4];
 const defaultFontSizeStep = 3;
 const _fontSizeKey = 'app.fontSize.step';
 

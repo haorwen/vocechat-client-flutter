@@ -82,14 +82,14 @@ void main() {
     final gesture = await tester.startGesture(tester.getCenter(slider));
     await gesture.moveTo(tester.getTopRight(slider) + const Offset(-24, 24));
     await tester.pump(const Duration(milliseconds: 100));
-    expect(container.read(fontSizeProvider), 6);
-    expect(renderedSize(tester, preview), closeTo(20.8, 0.001));
-    expect(renderedSize(tester, outside), closeTo(20.8, 0.001));
+    expect(container.read(fontSizeProvider), 7);
+    expect(renderedSize(tester, preview), closeTo(22.4, 0.001));
+    expect(renderedSize(tester, outside), closeTo(22.4, 0.001));
     expect(prefs.containsKey('app.fontSize.step'), isFalse);
     await gesture.up();
     await tester.pumpAndSettle();
-    expect(prefs.getInt('app.fontSize.step'), 6);
-    expect(find.text('130%'), findsOneWidget);
+    expect(prefs.getInt('app.fontSize.step'), 7);
+    expect(find.text('140%'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('font-size-reset')));
     await tester.pumpAndSettle();
@@ -137,11 +137,11 @@ void main() {
     for (final brightness in Brightness.values) {
       testWidgets('Chinese largest size fits at width $width in $brightness',
           (tester) async {
-        SharedPreferences.setMockInitialValues({'app.fontSize.step': 6});
+        SharedPreferences.setMockInitialValues({'app.fontSize.step': 7});
         await mount(tester,
             width: width, locale: const Locale('zh'), brightness: brightness);
         expect(find.text('字体大小'), findsOneWidget);
-        expect(find.text('130%'), findsOneWidget);
+        expect(find.text('140%'), findsOneWidget);
         expect(tester.takeException(), isNull);
         final slider = find.byKey(const Key('font-size-slider'));
         await tester.ensureVisible(slider);

@@ -42,8 +42,8 @@ void main() {
       await tester.ensureVisible(slider);
       await tester.drag(slider, const Offset(500, 0));
       await tester.pumpAndSettle();
-      expect(find.text('130%'), findsOneWidget);
-      expect((await SharedPreferences.getInstance()).getInt('app.fontSize.step'), 6);
+      expect(find.text('140%'), findsOneWidget);
+      expect((await SharedPreferences.getInstance()).getInt('app.fontSize.step'), 7);
       expect(tester.takeException(), isNull);
 
       if (width < 700) {
@@ -56,7 +56,7 @@ void main() {
         await tester.tap(find.text('Appearance'));
       }
       await tester.pumpAndSettle();
-      expect(find.text('130%'), findsOneWidget);
+      expect(find.text('140%'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

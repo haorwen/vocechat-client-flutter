@@ -14,31 +14,36 @@ void main() {
     await Future<void>.delayed(Duration.zero);
   }
 
-  test('restores the saved size in a fresh provider container', () async {
-    final first = ProviderContainer();
-    addTearDown(first.dispose);
-    expect(first.read(fontSizeProvider), defaultFontSizeStep);
-    first.read(fontSizeProvider.notifier).setStep(6);
-    await first.read(fontSizeProvider.notifier).save();
+  for (final step in [6, 7]) {
+    test('restores saved font size step $step in a fresh provider container',
+        () async {
+      final first = ProviderContainer();
+      addTearDown(first.dispose);
+      expect(first.read(fontSizeProvider), defaultFontSizeStep);
+      first.read(fontSizeProvider.notifier).setStep(step);
+      await first.read(fontSizeProvider.notifier).save();
 
-    final second = ProviderContainer();
-    addTearDown(second.dispose);
-    second.read(fontSizeProvider);
-    await load();
-    expect(second.read(fontSizeProvider), 6);
+      final second = ProviderContainer();
+      addTearDown(second.dispose);
+      second.read(fontSizeProvider);
+      await load();
+      expect(second.read(fontSizeProvider), step);
+      expect(
+          fontSizeScales[second.read(fontSizeProvider)], step == 6 ? 1.3 : 1.4);
 
-    second.read(fontSizeProvider.notifier).setStep(defaultFontSizeStep);
-    await second.read(fontSizeProvider.notifier).save();
-    expect(
-        (await SharedPreferences.getInstance())
-            .containsKey('app.fontSize.step'),
-        isFalse);
-    final third = ProviderContainer();
-    addTearDown(third.dispose);
-    third.read(fontSizeProvider);
-    await load();
-    expect(third.read(fontSizeProvider), defaultFontSizeStep);
-  });
+      second.read(fontSizeProvider.notifier).setStep(defaultFontSizeStep);
+      await second.read(fontSizeProvider.notifier).save();
+      expect(
+          (await SharedPreferences.getInstance())
+              .containsKey('app.fontSize.step'),
+          isFalse);
+      final third = ProviderContainer();
+      addTearDown(third.dispose);
+      third.read(fontSizeProvider);
+      await load();
+      expect(third.read(fontSizeProvider), defaultFontSizeStep);
+    });
+  }
 
   for (final saved in [-1, 99, 'large']) {
     test('invalid preference $saved uses the default', () async {
