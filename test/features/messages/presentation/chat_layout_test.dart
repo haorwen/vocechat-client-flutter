@@ -95,11 +95,13 @@ void main() {
       {MessageDetail? detail,
       MessageSendStatus? status,
       bool selecting = false,
+      Brightness brightness = Brightness.light,
       double textScale = 1,
       VoidCallback? onToggleSelect}) async {
     await tester.pumpWidget(UncontrolledProviderScope(
       container: container,
       child: MaterialApp(
+        theme: ThemeData(brightness: brightness),
         locale: const Locale('en'),
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
@@ -133,6 +135,38 @@ void main() {
 
   Finder within(int uid, Finder child) =>
       find.descendant(of: find.byKey(ValueKey(uid)), matching: child);
+
+  for (final brightness in Brightness.values) {
+    for (final reply in [false, true]) {
+      testWidgets(
+          '$brightness expiring ${reply ? 'reply' : 'message'} has no tint',
+          (tester) async {
+        await container.read(chatControllerProvider(_group).future);
+        await pumpRows(tester, _group,
+            brightness: brightness,
+            status: MessageSendStatus.sending,
+            detail: reply
+                ? const MessageDetail.reply(
+                    mid: 8,
+                    contentType: 'text/plain',
+                    content: 'Temporary reply',
+                    expiresIn: 300)
+                : const MessageDetail.normal(
+                    contentType: 'text/plain',
+                    content: 'Temporary message',
+                    expiresIn: 300));
+        for (final uid in [7, 8]) {
+          final row = tester.widget<AnimatedContainer>(
+              within(uid, find.byType(AnimatedContainer)).first);
+          expect((row.decoration! as BoxDecoration).color, Colors.transparent);
+          expect(within(uid, find.byIcon(Icons.schedule_outlined)),
+              findsOneWidget);
+        }
+        expect(find.textContaining('05:00', findRichText: true), findsNothing);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
 
   void expectPlacement(WidgetTester tester, int uid, {required bool right}) {
     final row = tester.getRect(find.byKey(ValueKey(uid)));

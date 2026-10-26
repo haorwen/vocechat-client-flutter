@@ -1952,17 +1952,11 @@ class _MessageRowState extends ConsumerState<MessageRow> {
     final highlighted = widget.highlighted;
     final selecting = widget.selecting;
     final selectable = selecting && msg.mid > 0;
-    // Match the web message's red-200 background (40% in dark mode).
-    final expiryBg = Theme.of(context).brightness == Brightness.dark
-        ? const Color(0x66FECACA)
-        : const Color(0xFFFECACA);
     final rowBg = highlighted
         ? AppTokens.gray200
         : (widget.selected
             ? AppTokens.primary50
-            : (hasExpiry
-                ? expiryBg
-                : (pinned ? AppTokens.primary50 : Colors.transparent)));
+            : (pinned ? AppTokens.primary50 : Colors.transparent));
 
     final mainRow = AnimatedContainer(
       duration: const Duration(milliseconds: 220),

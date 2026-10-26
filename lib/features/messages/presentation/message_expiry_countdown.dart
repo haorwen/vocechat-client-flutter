@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../../../l10n/generated/app_localizations.dart';
 
-/// A message's remaining lifetime, isolated so ticking never rebuilds the
-/// message body, media player, or chat list. Deletion stays in ChatController.
+/// A quiet clock indicator with the remaining lifetime shown on hover or tap.
+/// Ticking never rebuilds the message body, media player, or chat list.
+/// Deletion stays in ChatController.
 class MessageExpiryCountdown extends StatefulWidget {
   const MessageExpiryCountdown({
     super.key,
@@ -29,6 +30,7 @@ class MessageExpiryCountdown extends StatefulWidget {
 
 class _MessageExpiryCountdownState extends State<MessageExpiryCountdown>
     with WidgetsBindingObserver {
+  final _tooltipKey = GlobalKey<TooltipState>();
   Timer? _timer;
   late int _remainingSeconds;
   bool _active = true;
@@ -111,25 +113,26 @@ class _MessageExpiryCountdownState extends State<MessageExpiryCountdown>
       _ => _formatCountdown(widget.durationSeconds),
     };
     final color = Theme.of(context).brightness == Brightness.dark
-        ? const Color(0xFFE5E7EB)
-        : const Color(0xFF475467);
+        ? const Color(0xFF9CA3AF)
+        : const Color(0xFF98A2B3);
     return Tooltip(
-      message: l.chatExpiresTooltip(durationLabel),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.timer_outlined, size: 16, color: color),
-          const SizedBox(width: 4),
-          Text(
-            _formatCountdown(_remainingSeconds),
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              height: 18 / 12,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
+      key: _tooltipKey,
+      message: '${_formatCountdown(_remainingSeconds)}\n'
+          '${l.chatExpiresTooltip(durationLabel)}',
+      // Mouse hover still works in manual mode. Handle taps ourselves so
+      // mouse clicks also show the tooltip immediately, before the hover wait.
+      triggerMode: TooltipTriggerMode.manual,
+      waitDuration: const Duration(milliseconds: 300),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _tooltipKey.currentState?.ensureTooltipVisible(),
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: Icon(Icons.schedule_outlined, size: 16, color: color),
           ),
-        ],
+        ),
       ),
     );
   }
