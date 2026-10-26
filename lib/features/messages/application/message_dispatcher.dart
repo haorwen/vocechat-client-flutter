@@ -41,6 +41,8 @@ part 'message_dispatcher.g.dart';
 @Riverpod(keepAlive: true)
 class MessageDispatcher extends _$MessageDispatcher {
   bool _initialConfig = true;
+  Future<void> _pendingPersistence = Future.value();
+  bool _persistenceFailed = false;
 
   @override
   void build() {
@@ -48,6 +50,9 @@ class MessageDispatcher extends _$MessageDispatcher {
       next.whenData((event) {
         if (event is ChatEventConnectionOpened) {
           _initialConfig = true;
+          _pendingPersistence = _pendingPersistence.then((_) {
+            _persistenceFailed = false;
+          });
           return;
         }
         if (event is ChatEventChat) {
@@ -64,28 +69,22 @@ class MessageDispatcher extends _$MessageDispatcher {
             return;
           }
 
-          // Persist EVERY incoming chat message to the cache the moment it
-          // arrives — not when the user opens the chat screen. This is what
-          // makes "open a chat for the first time and immediately see the
-          // latest messages" work: the cache is the single source of truth
-          // for [ChatController.build], so by the time the user navigates
-          // in, the freshest messages are already on disk.
-          //
-          // Schedule before touching conversations so a build() that races
-          // this microtask still observes the row.
-          //
-          // We also bump the SSE cursor here so a relaunch right after this
-          // call doesn't replay messages we've already durably stored.
-          final cacheAsync = ref.read(messageCacheProvider);
-          final cache = cacheAsync.valueOrNull;
+          final cache = ref.read(messageCacheProvider).valueOrNull;
           if (cache != null) {
-            // Fire-and-forget — appendOne handles its own errors.
-            // Use the peer-resolved target, not the raw server-perspective
-            // `msg.target` — for an incoming DM, `msg.target` is always
-            // ourselves, so caching under it would file the message into a
-            // "chat with self" row instead of the actual peer conversation.
-            cache.appendOne(_conversationTargetFor(msg), msg);
-            if (msg.mid > 0) cache.setCursor(msg.mid);
+            final target = _conversationTargetFor(msg);
+            // Preserve wire order and save the row/cursor atomically. After a
+            // disk failure, later messages must not acknowledge the missing row;
+            // the next connection will replay from the last safe cursor.
+            _pendingPersistence = _pendingPersistence.then((_) async {
+              try {
+                await cache.appendOne(target, msg,
+                    advanceCursor: !_persistenceFailed);
+              } catch (error) {
+                _persistenceFailed = true;
+                AppLog.w(LogTag.sse,
+                    () => 'SSE cache write deferred until replay: $error');
+              }
+            });
           }
 
           // Update the conversation list preview/timestamp.

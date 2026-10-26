@@ -14,6 +14,15 @@ import '../../features/auth/application/auth_controller.dart';
 
 part 'sse_lifecycle.g.dart';
 
+final connectivityChangesProvider = Provider<Stream<List<ConnectivityResult>>>(
+  (ref) => Connectivity().onConnectivityChanged,
+);
+
+int? _authenticatedUid(AsyncValue<AuthState> value) {
+  final auth = value.valueOrNull;
+  return auth is AuthStateAuthenticated ? auth.user.uid : null;
+}
+
 // ---------------------------------------------------------------------------
 // SSE token watcher
 // ---------------------------------------------------------------------------
@@ -40,6 +49,7 @@ class SseTokenWatcher extends _$SseTokenWatcher {
   Timer? _timer;
   String? _lastAccess;
   DateTime? _lastExpiresAt;
+  int _generation = 0;
 
   @override
   void build() {
@@ -52,13 +62,14 @@ class SseTokenWatcher extends _$SseTokenWatcher {
 
     // React to login/logout and account switch by restarting the poll loop
     // against the right token-store key.
-    final authState = ref.watch(authControllerProvider).valueOrNull;
-    if (authState is! AuthStateAuthenticated) {
+    final uid = ref.watch(authControllerProvider.select(_authenticatedUid));
+    if (uid == null) {
       _stop();
       return;
     }
-    final accountState = ref.watch(accountStoreProvider).valueOrNull;
-    final accountId = accountState?.currentAccountId;
+    final accountId = ref.watch(accountStoreProvider.select(
+      (value) => value.valueOrNull?.currentAccountId,
+    ));
     if (accountId == null) {
       _stop();
       return;
@@ -69,10 +80,13 @@ class SseTokenWatcher extends _$SseTokenWatcher {
 
   void _start(String accountId) {
     _stop();
+    final generation = _generation;
     final tokenStore = ref.read(secureTokenStoreProvider(accountId));
     Future<TokenData?> readTokens() async {
       try {
-        return await tokenStore.readTokens();
+        return await tokenStore
+            .readTokens()
+            .timeout(const Duration(seconds: 15));
       } catch (e) {
         // A locked iOS Keychain can recover on the next poll after unlock.
         AppLog.d(LogTag.token, () => 'token polling deferred: $e');
@@ -83,14 +97,19 @@ class SseTokenWatcher extends _$SseTokenWatcher {
     // Seed the baseline so we don't trip an invalidate on first tick.
     Future<void> seed() async {
       final t = await readTokens();
+      if (generation != _generation) return;
       _lastAccess = t?.accessToken;
       _lastExpiresAt = t?.expiresAt;
     }
 
     seed();
+    var polling = false;
     _timer = Timer.periodic(const Duration(seconds: 30), (_) async {
+      if (polling) return;
+      polling = true;
       final t = await readTokens();
-      if (t == null) return;
+      polling = false;
+      if (generation != _generation || t == null) return;
       if (t.accessToken != _lastAccess ||
           (_lastExpiresAt != null && t.expiresAt != _lastExpiresAt)) {
         AppLog.w(LogTag.sse,
@@ -103,6 +122,7 @@ class SseTokenWatcher extends _$SseTokenWatcher {
   }
 
   void _stop() {
+    _generation++;
     _timer?.cancel();
     _timer = null;
     _lastAccess = null;
@@ -118,13 +138,14 @@ class SseTokenWatcher extends _$SseTokenWatcher {
 class SseConnectivityWatcher extends _$SseConnectivityWatcher {
   StreamSubscription<List<ConnectivityResult>>? _sub;
   bool _wasOffline = false;
+  Set<ConnectivityResult>? _interfaces;
 
   @override
   void build() {
     ref.onDispose(_stop);
 
-    final authState = ref.watch(authControllerProvider).valueOrNull;
-    if (authState is! AuthStateAuthenticated) {
+    final uid = ref.watch(authControllerProvider.select(_authenticatedUid));
+    if (uid == null) {
       _stop();
       return;
     }
@@ -134,11 +155,14 @@ class SseConnectivityWatcher extends _$SseConnectivityWatcher {
 
   void _start() {
     _stop();
-    final connectivity = Connectivity();
-    _sub = connectivity.onConnectivityChanged.listen((results) {
+    _sub = ref.read(connectivityChangesProvider).listen((results) {
       // results is a list because devices can have multiple active
       // interfaces (e.g. WiFi + cellular). "online" = anything except `none`.
-      final online = results.any((r) => r != ConnectivityResult.none);
+      final interfaces =
+          results.where((r) => r != ConnectivityResult.none).toSet();
+      final previous = _interfaces;
+      _interfaces = interfaces;
+      final online = interfaces.isNotEmpty;
       if (!online) {
         AppLog.w(LogTag.sse, () => '📵 connectivity lost');
         _wasOffline = true;
@@ -147,7 +171,12 @@ class SseConnectivityWatcher extends _$SseConnectivityWatcher {
             .set(SseStatus.disconnected);
         return;
       }
-      if (_wasOffline) {
+      // Wi-Fi -> cellular can arrive without an intermediate `none` event.
+      // The old socket still belongs to the previous network in that case.
+      final changed = previous != null &&
+          (previous.length != interfaces.length ||
+              !previous.containsAll(interfaces));
+      if (_wasOffline || changed) {
         AppLog.w(
             LogTag.sse, () => '📶 connectivity restored → reconnecting SSE');
         _wasOffline = false;
@@ -181,8 +210,8 @@ class SseLifecycleWatcher extends _$SseLifecycleWatcher {
   void build() {
     ref.onDispose(_stop);
 
-    final authState = ref.watch(authControllerProvider).valueOrNull;
-    if (authState is! AuthStateAuthenticated) {
+    final uid = ref.watch(authControllerProvider.select(_authenticatedUid));
+    if (uid == null) {
       _stop();
       return;
     }

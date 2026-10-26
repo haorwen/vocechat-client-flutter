@@ -6,7 +6,7 @@ part of 'sse_lifecycle.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$sseTokenWatcherHash() => r'95dd16de8b52b5292fbd0dfd9244f97ffeb4271d';
+String _$sseTokenWatcherHash() => r'798f4f540c9fb92bf94bfad4b64123ffea3dbc07';
 
 /// See also [SseTokenWatcher].
 @ProviderFor(SseTokenWatcher)
@@ -23,7 +23,7 @@ final sseTokenWatcherProvider =
 
 typedef _$SseTokenWatcher = Notifier<void>;
 String _$sseConnectivityWatcherHash() =>
-    r'f5ce36b899d385fc0b054b4f1f22506a6feb77e4';
+    r'e3f8aea55cec1f9ea9dd98c2ef427708dda577d9';
 
 /// See also [SseConnectivityWatcher].
 @ProviderFor(SseConnectivityWatcher)
@@ -40,7 +40,7 @@ final sseConnectivityWatcherProvider =
 
 typedef _$SseConnectivityWatcher = Notifier<void>;
 String _$sseLifecycleWatcherHash() =>
-    r'65e6fec3607d7d5bfc3833ed099677e301fd633c';
+    r'22bcdbf546cc5dce99aad24a9c4cf0f0c68c0196';
 
 /// See also [SseLifecycleWatcher].
 @ProviderFor(SseLifecycleWatcher)

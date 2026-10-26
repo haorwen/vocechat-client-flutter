@@ -30,6 +30,10 @@ part 'message_cache.g.dart';
 class MessageCache {
   MessageCache._(this._db, this._dbPath);
 
+  @visibleForTesting
+  factory MessageCache.forTesting(Database database) =>
+      MessageCache._(database, ':memory:');
+
   final Database _db;
 
   /// Absolute path to the SQLite file backing [_db]. Tracked so the settings
@@ -37,7 +41,9 @@ class MessageCache {
   final String _dbPath;
 
   static const int _maxPerConversation = 500;
-  static const String _kCursorMetaKey = 'cursor';
+  // Ignore legacy cursors: older versions advanced them for HTTP sends/history,
+  // which could skip messages that had never arrived on the event stream.
+  static const String _kCursorMetaKey = 'stream_cursor_v2';
   static const String _kConversationsKey = 'conversations';
   static const String _kUserDirectoryKey = 'user_directory';
   static const String _kGroupDirectoryKey = 'group_directory';
@@ -96,7 +102,8 @@ class MessageCache {
     return out;
   }
 
-  /// Highest mid ever observed across any conversation.
+  /// Last durably received event-stream message, independent of HTTP history.
+  /// A missing v2 cursor intentionally replays recent events once on upgrade.
   Future<int?> getCursor() async {
     final rows = await _db.query(
       'meta',
@@ -112,10 +119,17 @@ class MessageCache {
 
   Future<void> setCursor(int mid) async {
     if (mid <= 0) return;
-    final current = await getCursor() ?? 0;
-    if (mid <= current) return;
-    await _db.rawInsert(
-      'INSERT OR REPLACE INTO meta(key, value) VALUES(?, ?)',
+    await _setCursor(_db, mid);
+  }
+
+  Future<void> _setCursor(DatabaseExecutor db, int mid) async {
+    // One SQL statement keeps concurrent/out-of-order writes monotonic.
+    await db.rawInsert(
+      '''
+      INSERT INTO meta(key, value) VALUES(?, ?)
+      ON CONFLICT(key) DO UPDATE SET value =
+        CAST(MAX(CAST(value AS INTEGER), CAST(excluded.value AS INTEGER)) AS TEXT)
+      ''',
       [_kCursorMetaKey, mid.toString()],
     );
   }
@@ -358,26 +372,32 @@ class MessageCache {
   /// The `PRIMARY KEY(target_key, mid)` constraint with `ConflictAlgorithm.
   /// replace` makes this an UPSERT — duplicate SSE echoes and `after_mid`
   /// replay are absorbed without producing extra rows.
-  Future<void> appendOne(MessageTarget target, ChatMessage msg) async {
+  Future<void> appendOne(MessageTarget target, ChatMessage msg,
+      {bool advanceCursor = false}) async {
     if (msg.mid <= 0) return;
     if (msg.detail is ReactionMessageDetail) return;
-    if (msg.isExpiredAt(DateTime.now().millisecondsSinceEpoch)) {
-      await deleteMid(target, msg.mid);
-      return;
-    }
     final key = _keyFor(target);
     try {
-      await _db.insert(
-        'messages',
-        {
-          'target_key': key,
-          'mid': msg.mid,
-          'from_uid': msg.fromUid,
-          'created_at': msg.createdAt,
-          'payload': jsonEncode(msg.toJson()),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await _db.transaction((txn) async {
+        if (msg.isExpiredAt(DateTime.now().millisecondsSinceEpoch)) {
+          await txn.delete('messages',
+              where: 'target_key = ? AND mid = ?', whereArgs: [key, msg.mid]);
+        } else {
+          await txn.insert(
+            'messages',
+            {
+              'target_key': key,
+              'mid': msg.mid,
+              'from_uid': msg.fromUid,
+              'created_at': msg.createdAt,
+              'payload': jsonEncode(msg.toJson()),
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+        // Never acknowledge a message before its row is safely on disk.
+        if (advanceCursor) await _setCursor(txn, msg.mid);
+      });
       // Amortized trim: only run the DELETE every [_trimEvery] inserts per
       // target. A single target can otherwise grow unbounded under SSE
       // burst load.
@@ -390,6 +410,7 @@ class MessageCache {
       }
     } catch (e) {
       AppLog.w(LogTag.chat, () => '⚠️ cache.appendOne failed: $e');
+      rethrow;
     }
   }
 

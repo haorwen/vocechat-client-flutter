@@ -6,7 +6,7 @@ part of 'chat_layout_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$chatLayoutHash() => r'21cf3b7ae112af408735aa265da2aef203bb2db2';
+String _$chatLayoutHash() => r'a91c8e96cb029700005c2057ebb308ad22d9febb';
 
 /// Server-wide message placement, shared with the web client's chat layout.
 /// The dispatcher applies both the initial snapshot and live config changes.

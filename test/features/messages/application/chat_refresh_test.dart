@@ -44,6 +44,7 @@ class _Cache implements MessageCache {
   List<ChatMessage> rows;
   final Completer<List<ChatMessage>>? readGate;
   final deleted = <int>[];
+  final cursorWrites = <int>[];
   @override
   Future<List<ChatMessage>> read(MessageTarget target,
           {int limit = 500}) async =>
@@ -54,7 +55,10 @@ class _Cache implements MessageCache {
   }
 
   @override
-  Future<void> setCursor(int mid) async {}
+  Future<void> setCursor(int mid) async {
+    cursorWrites.add(mid);
+  }
+
   @override
   Future<void> deleteMid(MessageTarget target, int mid) async {
     deleted.add(mid);
@@ -97,12 +101,13 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   Future<ProviderContainer> setup(_Cache cache, _Api api,
-      {bool finishHistory = true}) async {
+      {bool finishHistory = true, Stream<ChatEvent>? events}) async {
     final container = ProviderContainer(overrides: [
       authControllerProvider.overrideWith(_Auth.new),
       messageCacheProvider.overrideWith((ref) async => cache),
       messageApiProvider.overrideWith((ref) => api),
-      sseEventsProvider.overrideWith((ref) => const Stream<ChatEvent>.empty()),
+      sseEventsProvider
+          .overrideWith((ref) => events ?? const Stream<ChatEvent>.empty()),
     ]);
     addTearDown(container.dispose);
     container.listen(authControllerProvider, (_, __) {});
@@ -116,6 +121,78 @@ void main() {
     }
     return container;
   }
+
+  test('HTTP history and sends never acknowledge the event-stream cursor',
+      () async {
+    final api = _Api();
+    final cache = _Cache([_message(20)]);
+    final container = await setup(cache, api);
+    await container.read(_provider.notifier).sendText('own send');
+    expect(cache.cursorWrites, isEmpty);
+  });
+
+  test('ready repairs history without restarting and preserves live deletes',
+      () async {
+    final api = _Api();
+    final events = StreamController<ChatEvent>.broadcast();
+    addTearDown(events.close);
+    final container =
+        await setup(_Cache([_message(20)]), api, events: events.stream);
+    events.add(const ChatEvent.connectionOpened());
+    events.add(const ChatEvent.ready());
+    await _flush();
+    expect(api.requests, hasLength(2));
+    container.read(_provider.notifier).applyDeleteEcho(21);
+    container.read(_provider.notifier).applyIncomingMessage(_message(23));
+    await _flush();
+    api.requests.last.result
+        .complete([_message(23), _message(22), _message(21), _message(20)]);
+    await _flush();
+    expect(
+        container.read(_provider).requireValue.map((m) => m.mid), [23, 22, 20]);
+  });
+
+  test('ready fills gaps spanning more than one history page', () async {
+    final api = _Api();
+    final events = StreamController<ChatEvent>.broadcast();
+    addTearDown(events.close);
+    final container =
+        await setup(_Cache([_message(20)]), api, events: events.stream);
+    events.add(const ChatEvent.connectionOpened());
+    events.add(const ChatEvent.ready());
+    await _flush();
+    api.requests.last.result
+        .complete([for (var mid = 130; mid >= 81; mid--) _message(mid)]);
+    await _flush();
+    expect(api.requests.last.before, 81);
+    api.requests.last.result
+        .complete([for (var mid = 80; mid >= 31; mid--) _message(mid)]);
+    await _flush();
+    expect(api.requests.last.before, 31);
+    api.requests.last.result
+        .complete([for (var mid = 30; mid >= 20; mid--) _message(mid)]);
+    await _flush();
+    expect(container.read(_provider).requireValue.map((m) => m.mid),
+        [for (var mid = 130; mid >= 20; mid--) mid]);
+  });
+
+  test('ready during a history fetch queues one fresh recovery', () async {
+    final api = _Api();
+    final events = StreamController<ChatEvent>.broadcast();
+    addTearDown(events.close);
+    final container = await setup(_Cache([_message(20)]), api,
+        events: events.stream, finishHistory: false);
+    events.add(const ChatEvent.connectionOpened());
+    events.add(const ChatEvent.ready());
+    await _flush();
+    expect(api.requests, hasLength(1));
+    api.requests.first.result.complete([_message(20)]);
+    await _flush();
+    expect(api.requests, hasLength(2));
+    api.requests.last.result.complete([_message(21), _message(20)]);
+    await _flush();
+    expect(container.read(_provider).requireValue.map((m) => m.mid), [21, 20]);
+  });
 
   test('slow pagination retains sends, incoming messages, edits and deletes',
       () async {

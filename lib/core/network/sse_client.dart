@@ -1,4 +1,3 @@
-import '../background/background_lifecycle.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -54,10 +53,12 @@ class VoceSseClient {
     int? initialAfterMid,
     this.refreshToken,
     this.preferInlineParsing,
+    this.onStatus,
   })  : _apiKey = apiKey,
         _highWaterMid = initialAfterMid;
 
   final String baseUrl;
+  final void Function(SseStatus)? onStatus;
 
   /// Small background messages do not need a new isolate for each event.
   final bool Function()? preferInlineParsing;
@@ -84,6 +85,9 @@ class VoceSseClient {
   /// Dead-man's-switch: if no event arrives within [_kSseWatchdog] we
   /// assume the link is dead and force a reconnect.
   Timer? _watchdog;
+  Timer? _reconnectTimer;
+  StreamController<ChatEvent>? _controller;
+  Future<String?>? _tokenRefreshTask;
 
   /// Monotonic connection generation. Bumped on every [_cleanup]. Each
   /// connect attempt captures the generation it was started under; any
@@ -101,11 +105,9 @@ class VoceSseClient {
   /// Returns a broadcast [Stream<ChatEvent>] with auto-reconnect.
   Stream<ChatEvent> events() {
     final controller = StreamController<ChatEvent>.broadcast(
-      onCancel: () {
-        _disposed = true;
-        _cleanup();
-      },
+      onCancel: dispose,
     );
+    _controller = controller;
     _connect(controller, const Duration(seconds: 1));
     return controller.stream;
   }
@@ -129,40 +131,37 @@ class VoceSseClient {
     final myGen = _generation;
     bool isStale() => _disposed || controller.isClosed || myGen != _generation;
 
-    // Renew the access token before every (re)connect so reconnects after
-    // expiry don't loop with a stale key. A null return means "keep current".
-    if (refreshToken != null) {
-      final fresh = await refreshToken!();
-      if (isStale()) return;
-      if (fresh != null && fresh.isNotEmpty) {
-        _apiKey = fresh;
-      }
-    }
-
-    final encodedKey = Uri.encodeComponent(_apiKey);
-    final query = StringBuffer('api-key=$encodedKey');
-    if (_highWaterMid != null) {
-      query.write('&after_mid=${_highWaterMid!}');
-    }
-
-    // Convert https:// → wss:// (and http → ws). Server route is
-    // `/api/user/events_ws`.
-    final wsBase = baseUrl.replaceFirst(RegExp(r'^http'), 'ws');
-    final url = '$wsBase/api/user/events_ws?$query';
-
+    onStatus?.call(SseStatus.connecting);
     WebSocket socket;
     try {
-      // `.timeout` is the critical guard: a silently-dropped idle link makes
-      // the handshake hang indefinitely (no default connect timeout). Bound
-      // it so the hang becomes a normal "connect failed → backoff" instead of
-      // a permanent dead stream.
-      socket = await WebSocket.connect(
-        url,
+      // Credential storage and renewal can fail or hang too. They must share
+      // the handshake's retry path, rather than silently ending the stream.
+      if (refreshToken != null) {
+        final task = _tokenRefreshTask ??= Future<String?>.sync(refreshToken!)
+            .whenComplete(() => _tokenRefreshTask = null);
+        final fresh = await task.timeout(_kConnectTimeout);
+        if (isStale()) return;
+        if (fresh != null && fresh.isNotEmpty) _apiKey = fresh;
+      }
+
+      final query = StringBuffer('api-key=${Uri.encodeComponent(_apiKey)}');
+      if (_highWaterMid != null) query.write('&after_mid=$_highWaterMid');
+      final wsBase = baseUrl.replaceFirst(RegExp(r'^http'), 'ws');
+      final pending = WebSocket.connect(
+        '$wsBase/api/user/events_ws?$query',
         headers: {'X-API-Key': _apiKey},
-      ).timeout(_kConnectTimeout);
+      );
+      socket = await pending.timeout(_kConnectTimeout, onTimeout: () {
+        // Future.timeout cannot cancel a handshake. Close a late connection
+        // so it cannot survive as another session for the same device.
+        unawaited(pending.then<void>((late) async {
+          await late.close();
+        }).catchError((Object _) {}));
+        throw TimeoutException('WebSocket handshake timed out');
+      });
     } catch (e) {
-      AppLog.w(LogTag.sse, () => '⚠️ SSE connect failed: $e');
       if (isStale()) return;
+      AppLog.w(LogTag.sse, () => 'SSE connection preparation failed: $e');
       _scheduleReconnect(controller, currentDelay);
       return;
     }
@@ -214,15 +213,18 @@ class VoceSseClient {
           } else {
             try {
               if (trimmed.length <= 16384 &&
-                  preferInlineParsing?.call() == true) {
+                  (preferInlineParsing?.call() ?? true)) {
                 chatEvent = parseSseEvent(eventType, trimmed);
               } else {
                 chatEvent = await compute(
                   _parseSseEventInIsolate,
                   [eventType, trimmed],
                   debugLabel: 'parseSseEvent',
-                );
+                ).timeout(_kSseWatchdog);
               }
+            } on TimeoutException {
+              // A stalled worker must not block every later chat/heartbeat.
+              chatEvent = parseSseEvent(eventType, trimmed);
             } catch (_) {
               chatEvent = ChatEvent.unknown(type: eventType, raw: trimmed);
             }
@@ -235,6 +237,7 @@ class VoceSseClient {
               _highWaterMid = mid;
             }
           }
+          if (chatEvent is ChatEventReady) onStatus?.call(SseStatus.connected);
           controller.add(chatEvent);
         }).catchError((Object e) {
           AppLog.w(LogTag.sse, () => 'SSE frame failed: $e');
@@ -271,12 +274,23 @@ class VoceSseClient {
       StreamController<ChatEvent> controller, Duration delay) {
     if (_disposed || controller.isClosed) return;
     _cleanup();
-    Future.delayed(delay, () {
-      if (_disposed || controller.isClosed) return;
+    onStatus?.call(SseStatus.reconnecting);
+    final generation = _generation;
+    _reconnectTimer = Timer(delay, () {
+      if (_disposed || controller.isClosed || generation != _generation) return;
       final nextDelay = delay * 2;
       final capped = nextDelay > _maxBackoff ? _maxBackoff : nextDelay;
       _connect(controller, capped);
     });
+  }
+
+  /// Explicit teardown is required on provider rebuild. Cancelling an async*
+  /// wrapper alone can wait forever for the next frame on a dead connection.
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _cleanup();
+    unawaited(_controller?.close());
   }
 
   void _cleanup() {
@@ -284,6 +298,8 @@ class VoceSseClient {
     // any still-queued onDone/onError/listen callback from the socket we're
     // tearing down become no-ops (see isStale() in _connect).
     _generation++;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _watchdog?.cancel();
     _watchdog = null;
     _sub?.cancel();
@@ -324,14 +340,12 @@ class SseConnectionStatus extends _$SseConnectionStatus {
 // This is what makes "refresh → SSE picks up new token automatically" work.
 
 @Riverpod(keepAlive: true)
-Stream<ChatEvent> sseEvents(Ref ref) async* {
-  // Profile/privacy updates must not reopen the connection: its initial
-  // configuration refreshes profiles, which would otherwise reconnect forever.
+Stream<ChatEvent> sseEvents(Ref ref) {
+  // Profile/privacy updates must not reopen the connection.
   final uid = ref.watch(authControllerProvider.select((value) {
     final auth = value.valueOrNull;
     return auth is AuthStateAuthenticated ? auth.user.uid : null;
   }));
-  if (uid == null) return;
   final accountId = ref.watch(accountStoreProvider.select(
     (value) => value.valueOrNull?.currentAccountId,
   ));
@@ -342,68 +356,81 @@ Stream<ChatEvent> sseEvents(Ref ref) async* {
         .firstOrNull
         ?.baseUrl;
   }));
-  if (accountId == null || baseUrl == null) return;
+  if (uid == null || accountId == null || baseUrl == null) {
+    return const Stream.empty();
+  }
 
-  // Token. We READ rather than WATCH here because the token store doesn't
-  // expose a stream; instead we manually invalidate this provider when a
-  // refresh happens (see SseTokenWatcher below).
-  final tokenStore = ref.read(secureTokenStoreProvider(accountId));
-  final tokens = await tokenStore.readTokens();
-  if (tokens == null) return;
+  final events = StreamController<ChatEvent>();
+  final store = ref.read(secureTokenStoreProvider(accountId));
+  VoceSseClient? client;
+  StreamSubscription<ChatEvent>? subscription;
+  Timer? retry;
+  var disposed = false;
+  var retryDelay = const Duration(seconds: 1);
+  ref.onDispose(() {
+    disposed = true;
+    retry?.cancel();
+    client?.dispose();
+    unawaited(subscription?.cancel());
+    unawaited(events.close());
+  });
 
-  final cache = await ref.read(messageCacheProvider.future);
-  final cursor = await cache.getCursor();
+  void setStatus(SseStatus status) {
+    if (!disposed) ref.read(sseConnectionStatusProvider.notifier).set(status);
+  }
 
-  // Callback invoked at the start of every (re)connect. Re-reads the current
-  // token and proactively renews it if it is within 30s of expiry — mirroring
-  // web `useStreaming.ts`'s per-connect renew. Returning null tells the client
-  // to keep its existing key and proceed (preserves backoff/retry behaviour).
-  Future<String?> tokenRefreshCallback() async {
-    final store = ref.read(secureTokenStoreProvider(accountId));
+  Future<String?> refreshToken() async {
     final current = await store.readTokens();
-    if (current == null) return null;
-    final aboutToExpire = current.expiresAt
-        .isBefore(DateTime.now().add(const Duration(seconds: 30)));
-    if (aboutToExpire) {
-      AppLog.w(LogTag.sse,
-          () => '🔑 SSE: token within 30s of expiry, renewing before connect');
+    if (disposed) return null;
+    if (current == null) throw StateError('Session credentials unavailable');
+    if (current.expiresAt
+        .isBefore(DateTime.now().add(const Duration(seconds: 30)))) {
       final renewed =
           await ref.read(authControllerProvider.notifier).renewIfPossible();
-      if (!renewed) {
-        AppLog.w(LogTag.sse,
-            () => '🔑 SSE: token renew failed, proceeding with current key');
-        return null;
-      }
-      final fresh = await store.readTokens();
-      return fresh?.accessToken;
+      if (disposed) return null;
+      if (renewed) return (await store.readTokens())?.accessToken;
     }
     return current.accessToken;
   }
 
-  final client = VoceSseClient(
-    baseUrl: baseUrl,
-    apiKey: tokens.accessToken,
-    initialAfterMid: cursor,
-    refreshToken: tokenRefreshCallback,
-    preferInlineParsing: () => ref.read(androidBackgroundedProvider),
-  );
-
-  // Forward connection-status transitions to the UI provider.
-  ref.read(sseConnectionStatusProvider.notifier).set(SseStatus.connecting);
-
-  // Track first event so we know when "connecting" → "connected".
-  bool sawFirstEvent = false;
-
-  await for (final event in client.events()) {
-    if (!sawFirstEvent) {
-      sawFirstEvent = true;
-      ref.read(sseConnectionStatusProvider.notifier).set(SseStatus.connected);
+  Future<void> start() async {
+    if (disposed) return;
+    setStatus(SseStatus.connecting);
+    try {
+      // Failures before creating the transport used to terminate this provider
+      // permanently. Retry preparation even when the token itself is unchanged.
+      final tokens = await store.readTokens().timeout(_kConnectTimeout);
+      if (disposed) return;
+      if (tokens == null) throw StateError('Session credentials unavailable');
+      if (ref.read(messageCacheProvider).hasError) {
+        ref.invalidate(messageCacheProvider);
+      }
+      final cache =
+          await ref.read(messageCacheProvider.future).timeout(_kConnectTimeout);
+      if (disposed) return;
+      final cursor = await cache.getCursor().timeout(_kConnectTimeout);
+      if (disposed) return;
+      client = VoceSseClient(
+        baseUrl: baseUrl,
+        apiKey: tokens.accessToken,
+        initialAfterMid: cursor,
+        refreshToken: refreshToken,
+        onStatus: setStatus,
+      );
+      subscription = client!.events().listen((event) {
+        if (!disposed) events.add(event);
+      });
+    } catch (error) {
+      if (disposed) return;
+      AppLog.w(LogTag.sse, () => 'SSE initialization will retry: $error');
+      setStatus(SseStatus.reconnecting);
+      retry = Timer(retryDelay, start);
+      retryDelay = Duration(seconds: (retryDelay.inSeconds * 2).clamp(1, 30));
     }
-    yield event;
   }
 
-  // Stream exhausted (consumer cancelled / provider rebuilding).
-  ref.read(sseConnectionStatusProvider.notifier).set(SseStatus.disconnected);
+  unawaited(Future<void>.microtask(start));
+  return events.stream;
 }
 
 /// Top-level (must be top-level for `compute`) parser dispatched to a

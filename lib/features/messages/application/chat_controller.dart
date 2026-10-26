@@ -32,6 +32,11 @@ class ChatController extends _$ChatController {
   static const _initialLimit = 50;
   Timer? _expiryTimer;
   Future<void>? _loadingMoreTask;
+  Future<void>? _refreshTask;
+  bool _refreshAgain = false;
+  bool _refreshAfterBuild = false;
+  int? _recoveryFloorMid;
+  final Set<int> _deletedMids = {};
   bool _hasMore = true;
   int? _historyBeforeMid;
   int _generation = 0;
@@ -301,8 +306,6 @@ class ChatController extends _$ChatController {
     if (listEquals(next, current)) return;
     _publish(next);
     _persist();
-    final maxMid = batch.fold<int>(0, (mid, m) => m.mid > mid ? m.mid : mid);
-    if (maxMid > 0) _cache?.setCursor(maxMid);
   }
 
   List<ChatMessage> _mergeIncoming(
@@ -314,7 +317,9 @@ class ChatController extends _$ChatController {
     // events share the same deduplication and optimistic confirmation rules.
     final updated = List<ChatMessage>.from(current);
     for (final m in batch) {
-      if (m.detail is ReactionMessageDetail) continue;
+      if (m.detail is ReactionMessageDetail || _deletedMids.contains(m.mid)) {
+        continue;
+      }
       final existingIndex = updated.indexWhere((row) => row.mid == m.mid);
       if (m.mid > 0 && existingIndex >= 0) {
         // HTTP acknowledgements only return a mid. Keep the authoritative
@@ -420,6 +425,11 @@ class ChatController extends _$ChatController {
     _cache = null;
     _messages = null;
     _loadingMoreTask = null;
+    _refreshTask = null;
+    _refreshAgain = false;
+    _refreshAfterBuild = false;
+    _recoveryFloorMid = null;
+    _deletedMids.clear();
     _hasMore = true;
     _historyBeforeMid = null;
     // The cache dependency changes when switching accounts. Previous rows
@@ -452,7 +462,17 @@ class ChatController extends _$ChatController {
     // Subscribe to SSE for live updates.
     ref.listen(sseEventsProvider, (_, next) {
       next.whenData((event) {
-        if (event is ChatEventChat && !ref.read(androidBackgroundedProvider)) {
+        if (ref.read(androidBackgroundedProvider)) return;
+        if (event is ChatEventConnectionOpened) {
+          _recoveryFloorMid = _recentHistoryFloor(_messages);
+        } else if (event is ChatEventReady) {
+          final cache = _cache;
+          if (cache == null || _messages == null) {
+            _refreshAfterBuild = true;
+          } else {
+            unawaited(_backgroundRefresh(cache, recoverGap: true));
+          }
+        } else if (event is ChatEventChat) {
           applyIncomingMessage(event.message);
         }
       });
@@ -481,8 +501,10 @@ class ChatController extends _$ChatController {
       // right away; the network fetch will overlay newer items via SSE +
       // pagination as needed.
       final drained = _drainPending(cached);
+      _recoveryFloorMid ??= _recentHistoryFloor(cached);
       _publish(drained);
-      _backgroundRefresh(cache);
+      unawaited(_backgroundRefresh(cache, recoverGap: _refreshAfterBuild));
+      _refreshAfterBuild = false;
       // Persist restored anchors and remove filtered rows from the snapshot.
       if (!listEquals(cachedRaw, _messages)) {
         _persist();
@@ -502,41 +524,82 @@ class ChatController extends _$ChatController {
     final merged = _drainPending(messages);
     _messages = _withLocalOrderAnchors(merged);
     if (merged.isNotEmpty) _persist();
+    if (_refreshAfterBuild) {
+      _refreshAfterBuild = false;
+      unawaited(_backgroundRefresh(cache, recoverGap: true));
+    }
     return _messages!;
   }
 
-  /// Best-effort refresh after we already painted from cache. We only need
-  /// the head of the history (anything newer than what we have); SSE
-  /// `after_mid` already covers most of this, so this is purely a safety
-  /// net for missed deltas.
-  Future<void> _backgroundRefresh(MessageCache cache) async {
-    final generation = _generation;
-    try {
-      final freshRaw = await ref
-          .read(messageApiProvider)
-          .getHistory(target, limit: _initialLimit);
-      if (generation != _generation) return;
-      if (freshRaw.isEmpty) return;
-      // Strip reaction rows: they're sidecar events, not displayable history.
-      // The dispatcher applies their effect (edit content / delete row) via
-      // applyEditEcho/applyDeleteEcho instead.
-      final fresh = freshRaw
-          .where((m) => m.detail is! ReactionMessageDetail)
-          .toList(growable: false);
-      if (fresh.isEmpty) return;
+  int? _recentHistoryFloor(List<ChatMessage>? rows) {
+    int? floor;
+    for (final row in (rows ?? const <ChatMessage>[])
+        .where((row) => row.mid > 0)
+        .take(_initialLimit)) {
+      if (floor == null || row.mid < floor) floor = row.mid;
+    }
+    return floor;
+  }
 
-      final current = _messages ?? const <ChatMessage>[];
-      final next = _mergeIncoming(current, fresh, matchOptimistic: false);
-      if (listEquals(next, current)) return;
-      _publish(next);
-      _persist();
-      final maxMid = fresh
-          .map((m) => m.mid)
-          .where((m) => m > 0)
-          .fold<int>(0, (a, b) => a > b ? a : b);
-      if (maxMid > 0) cache.setCursor(maxMid);
-    } catch (_) {
-      // ignore — cache is still valid
+  /// Repair the visible history after ready, including gaps left by older
+  /// clients' send-driven cursors or a bounded server replay. Coalesce requests
+  /// but run again if another connection becomes ready during an older fetch.
+  Future<void> _backgroundRefresh(MessageCache cache,
+      {bool recoverGap = false}) {
+    final active = _refreshTask;
+    if (active != null) {
+      if (recoverGap) _refreshAgain = true;
+      return active;
+    }
+    final generation = _generation;
+    final task = _refreshHistory(generation, recoverGap: recoverGap);
+    _refreshTask = task;
+    return task.whenComplete(() {
+      if (generation != _generation) return;
+      _refreshTask = null;
+      if (_refreshAgain) {
+        _refreshAgain = false;
+        unawaited(_backgroundRefresh(cache, recoverGap: true));
+      }
+    });
+  }
+
+  Future<void> _refreshHistory(int generation,
+      {required bool recoverGap}) async {
+    final floor = recoverGap
+        ? (_recoveryFloorMid ?? _recentHistoryFloor(_messages))
+        : null;
+    int? beforeMid;
+    try {
+      while (generation == _generation) {
+        final freshRaw = await ref
+            .read(messageApiProvider)
+            .getHistory(target, beforeMid: beforeMid, limit: _initialLimit);
+        if (generation != _generation || freshRaw.isEmpty) return;
+        final fresh = freshRaw
+            .where((m) => m.detail is! ReactionMessageDetail)
+            .toList(growable: false);
+        final current = _messages ?? const <ChatMessage>[];
+        final next = _mergeIncoming(current, fresh, matchOptimistic: false);
+        if (!listEquals(next, current)) {
+          _publish(next);
+          _persist();
+        }
+        final mids = freshRaw.map((m) => m.mid).where((mid) => mid > 0);
+        if (mids.isEmpty) return;
+        final oldest = mids.reduce((a, b) => a < b ? a : b);
+        if (!recoverGap ||
+            floor == null ||
+            oldest <= floor ||
+            freshRaw.length < _initialLimit ||
+            (beforeMid != null && oldest >= beforeMid)) {
+          return;
+        }
+        beforeMid = oldest;
+      }
+    } catch (error) {
+      if (generation != _generation) return;
+      AppLog.w(LogTag.chat, () => 'History recovery deferred: $error');
     }
   }
 
@@ -666,6 +729,7 @@ class ChatController extends _$ChatController {
 
   /// Apply a delete echo (from SSE or local optimistic). Idempotent.
   void applyDeleteEcho(int targetMid) {
+    _deletedMids.add(targetMid);
     final current = _messages;
     if (current == null) return;
     final idx = current.indexWhere((m) => m.mid == targetMid);
@@ -771,7 +835,6 @@ class ChatController extends _$ChatController {
     _publish(next);
     _persist();
     _cache?.deleteMid(target, tempMid);
-    _cache?.setCursor(confirmed.mid);
   }
 
   void _persist() {

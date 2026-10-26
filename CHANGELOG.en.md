@@ -1,6 +1,12 @@
 # VoceChat Changelog
 
-Changes since 0.3.29+29, through 0.3.33+33. Dates reflect version commits (UTC+8).
+Changes since 0.3.29+29, through 0.3.36+36. Dates reflect version commits (UTC+8).
+
+## 0.3.36 (2026-10-27)
+
+- Fix missed incoming messages when sending during a connection gap, and recover recent conversation history after reconnecting.
+- Improve reconnection after credential errors, app resume, and network changes, including Wi-Fi to cellular transitions.
+- Restore the last server chat layout on startup while waiting for live settings.
 
 ## 0.3.33 (2026-10-20)
 
