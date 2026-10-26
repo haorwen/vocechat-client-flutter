@@ -98,6 +98,7 @@ class GroupSummary {
     this.isPublic = false,
     this.members = const [],
     this.pinnedMessages = const [],
+    this.autoDeleteAfter,
   });
 
   final int gid;
@@ -109,9 +110,13 @@ class GroupSummary {
   final List<int> members;
   final List<PinnedMessageSummary> pinnedMessages;
 
+  /// Null means the server does not support channel-wide auto-delete.
+  final int? autoDeleteAfter;
+
   GroupSummary copyWith({
     List<PinnedMessageSummary>? pinnedMessages,
     List<int>? members,
+    int? autoDeleteAfter,
   }) =>
       GroupSummary(
         gid: gid,
@@ -122,11 +127,13 @@ class GroupSummary {
         isPublic: isPublic,
         members: members ?? this.members,
         pinnedMessages: pinnedMessages ?? this.pinnedMessages,
+        autoDeleteAfter: autoDeleteAfter ?? this.autoDeleteAfter,
       );
 
   factory GroupSummary.fromJson(Map<String, dynamic> j) => GroupSummary(
         gid: (j['gid'] as num).toInt(),
         name: j['name'] as String? ?? 'Group',
+        autoDeleteAfter: (j['auto_delete_after'] as num?)?.toInt(),
         avatarUpdatedAt: (j['avatar_updated_at'] as num?)?.toInt(),
         owner: (j['owner'] as num?)?.toInt() ?? 0,
         description: j['description'] as String? ?? '',
@@ -144,6 +151,7 @@ class GroupSummary {
 
   Map<String, dynamic> toJson() => {
         'gid': gid,
+        if (autoDeleteAfter != null) 'auto_delete_after': autoDeleteAfter,
         'name': name,
         if (avatarUpdatedAt != null) 'avatar_updated_at': avatarUpdatedAt,
         'owner': owner,
@@ -329,7 +337,8 @@ class GroupDirectory extends _$GroupDirectory {
     await _refresh(cache);
   }
 
-  Future<void> applyGroupUpdate(Map<String, dynamic> data) async {
+  Future<void> applyGroupUpdate(Map<String, dynamic> data,
+      {bool replace = false}) async {
     await future;
     final gid = (data['gid'] as num?)?.toInt();
     final current = state.valueOrNull;
@@ -339,7 +348,7 @@ class GroupDirectory extends _$GroupDirectory {
     state = AsyncData({
       ...current,
       group.gid: GroupSummary.fromJson({
-        ...group.toJson(),
+        if (!replace) ...group.toJson(),
         for (final entry in data.entries)
           if (entry.value != null) entry.key: entry.value,
       }),

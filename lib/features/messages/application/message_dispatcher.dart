@@ -316,7 +316,12 @@ class MessageDispatcher extends _$MessageDispatcher {
         _parseBurnAfterReading(data['burn_after_reading_users'], 'uid');
     final groups =
         _parseBurnAfterReading(data['burn_after_reading_groups'], 'gid');
-    ref.read(burnAfterReadProvider.notifier).applySnapshot(users, groups);
+    ref.read(burnAfterReadProvider.notifier).applySnapshot(
+          users,
+          groups,
+          supportsUsers: data['burn_after_reading_users'] is List,
+          supportsGroups: data['burn_after_reading_groups'] is List,
+        );
   }
 
   /// Burn-after-read delta from `user_settings_changed` (e.g. changed on

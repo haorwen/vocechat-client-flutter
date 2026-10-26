@@ -1790,8 +1790,8 @@ class _MessageRowState extends ConsumerState<MessageRow> {
     final displayContentType =
         msg.displayContentType.split(';').first.trim().toLowerCase();
     // Burn-after-read: server stamps `expires_in` (seconds) onto normal/reply
-    // messages based on the sender's own auto-delete setting for this
-    // target. ChatController removes rows at their absolute expiry.
+    // messages based on the channel policy and the sender's personal setting.
+    // ChatController removes rows at their absolute expiry.
     final expiresIn = switch (detail) {
       NormalMessageDetail() => detail.expiresIn,
       ReplyMessageDetail() => detail.expiresIn,

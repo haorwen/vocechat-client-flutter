@@ -110,6 +110,7 @@ class _MessageExpiryCountdownState extends State<MessageExpiryCountdown>
       3600 => l.chatAutoDelete1Hour,
       86400 => l.chatAutoDelete1Day,
       604800 => l.chatAutoDelete1Week,
+      2592000 => l.chatAutoDelete1Month,
       _ => _formatCountdown(widget.durationSeconds),
     };
     final color = Theme.of(context).brightness == Brightness.dark

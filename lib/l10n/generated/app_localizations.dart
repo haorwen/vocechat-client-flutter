@@ -2057,6 +2057,48 @@ abstract class AppL10n {
   /// **'[Forwarded message]'**
   String get chatForwardedMessagePreview;
 
+  /// No description provided for @chatAutoDelete1Month.
+  ///
+  /// In en, this message translates to:
+  /// **'1 month (30 days)'**
+  String get chatAutoDelete1Month;
+
+  /// No description provided for @chatAutoDeleteWholeChannel.
+  ///
+  /// In en, this message translates to:
+  /// **'Entire channel'**
+  String get chatAutoDeleteWholeChannel;
+
+  /// No description provided for @chatAutoDeleteChannelDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically delete new messages from every sender after the selected time.'**
+  String get chatAutoDeleteChannelDescription;
+
+  /// No description provided for @chatAutoDeletePersonalDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Only delete messages sent by me after the selected time.'**
+  String get chatAutoDeletePersonalDescription;
+
+  /// No description provided for @chatAutoDeletePolicyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The channel limit applies to everyone. Personal settings can delete your messages sooner. Existing messages keep their original expiry.'**
+  String get chatAutoDeletePolicyDescription;
+
+  /// No description provided for @chatAutoDeleteUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'The server does not support this option. Upgrade the server to enable it.'**
+  String get chatAutoDeleteUnsupported;
+
+  /// No description provided for @chatAutoDeleteCheckingSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking server support…'**
+  String get chatAutoDeleteCheckingSupport;
+
   /// No description provided for @chatAutoDeleteTitle.
   ///
   /// In en, this message translates to:

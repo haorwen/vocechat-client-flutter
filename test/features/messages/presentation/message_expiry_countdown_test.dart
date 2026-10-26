@@ -183,4 +183,14 @@ void main() {
         _countdown('168:00:00', description: '发送后 1 周 自动删除'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('one month has a localized label and a full 30 day countdown',
+      (tester) async {
+    await tester.pumpWidget(_app(
+      const MessageExpiryCountdown(durationSeconds: 2592000, expiresAt: null),
+      locale: const Locale('zh'),
+    ));
+    await _showCountdown(tester);
+    expect(_countdown('720:00:00', description: '发送后 1 个月（30 天） 自动删除'),
+        findsOneWidget);
+  });
 }

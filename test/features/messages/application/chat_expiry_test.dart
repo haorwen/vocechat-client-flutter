@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vocechat_client/core/network/sse_client.dart';
 import 'package:vocechat_client/features/auth/application/auth_controller.dart';
+import 'package:vocechat_client/features/contacts/application/user_directory_provider.dart';
 import 'package:vocechat_client/features/messages/application/burn_after_read_provider.dart';
 import 'package:vocechat_client/features/messages/application/chat_controller.dart';
 import 'package:vocechat_client/features/messages/data/message_api.dart';
@@ -60,11 +61,20 @@ class OfflineAuth extends AuthController {
   Future<AuthState> build() async => const AuthState.unauthenticated();
 }
 
+class _Groups extends GroupDirectory {
+  _Groups(this.seconds);
+  final int? seconds;
+  @override
+  Future<Map<int, GroupSummary>> build() async => {
+        42: GroupSummary(gid: 42, name: 'Channel', autoDeleteAfter: seconds),
+      };
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   Future<ProviderContainer> setup(MemoryCache cache,
-      {List<ChatMessage> history = const []}) async {
+      {List<ChatMessage> history = const [], int? channelSeconds}) async {
     final dio = Dio();
     dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
       handler.resolve(Response<dynamic>(
@@ -78,12 +88,36 @@ void main() {
       messageApiProvider.overrideWith((ref) => MessageApi(dio)),
       sseEventsProvider.overrideWith((ref) => const Stream<ChatEvent>.empty()),
       authControllerProvider.overrideWith(OfflineAuth.new),
+      groupDirectoryProvider.overrideWith(() => _Groups(channelSeconds)),
     ]);
     addTearDown(container.dispose);
     await container.read(authControllerProvider.future);
+    await container.read(groupDirectoryProvider.future);
     await container.read(chatControllerProvider(target).future);
     return container;
   }
+
+  test('outgoing messages use the shorter channel or personal lifetime',
+      () async {
+    for (final sample in [
+      (channel: 2592000, personal: 0, expected: 2592000),
+      (channel: 2592000, personal: 300, expected: 300),
+      (channel: 300, personal: 2592000, expected: 300),
+      (channel: 0, personal: 2592000, expected: 2592000),
+    ]) {
+      final container =
+          await setup(MemoryCache([]), channelSeconds: sample.channel);
+      container
+          .read(burnAfterReadProvider.notifier)
+          .applySnapshot({}, {42: sample.personal});
+      await container
+          .read(chatControllerProvider(target).notifier)
+          .sendText('expiry');
+      final sent =
+          container.read(chatControllerProvider(target)).requireValue.first;
+      expect((sent.detail as NormalMessageDetail).expiresIn, sample.expected);
+    }
+  });
 
   test('received normal and reply messages expire without another event',
       () async {

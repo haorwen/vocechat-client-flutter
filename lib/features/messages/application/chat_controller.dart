@@ -14,6 +14,7 @@ import '../../../core/network/sse_client.dart';
 import '../../../core/utils/app_log.dart';
 import '../../../features/auth/application/auth_controller.dart';
 import 'burn_after_read_provider.dart';
+import '../../contacts/application/user_directory_provider.dart';
 import '../data/message_api.dart';
 import '../data/attachment_preparer.dart';
 import '../data/message_cache.dart';
@@ -106,7 +107,18 @@ class ChatController extends _$ChatController {
     final settings = ref.read(burnAfterReadProvider);
     final seconds = target.map(
       user: (t) => settings.userExpiresIn(t.uid),
-      group: (t) => settings.groupExpiresIn(t.gid),
+      group: (t) {
+        final personal = settings.groupExpiresIn(t.gid);
+        final channel = ref
+                .read(groupDirectoryProvider)
+                .valueOrNull?[t.gid]
+                ?.autoDeleteAfter ??
+            0;
+        if (personal > 0 && channel > 0) {
+          return personal < channel ? personal : channel;
+        }
+        return personal > 0 ? personal : channel;
+      },
     );
     return seconds > 0 ? seconds : null;
   }

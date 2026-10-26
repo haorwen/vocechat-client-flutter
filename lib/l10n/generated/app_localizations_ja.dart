@@ -1034,6 +1034,27 @@ class AppL10nJa extends AppL10n {
   String get chatForwardedMessagePreview => '[転送されたメッセージ]';
 
   @override
+  String get chatAutoDelete1Month => '1か月（30日）';
+
+  @override
+  String get chatAutoDeleteWholeChannel => 'チャンネル全体';
+
+  @override
+  String get chatAutoDeleteChannelDescription => '設定後に全員が送信した新しいメッセージを指定時間後に削除します。';
+
+  @override
+  String get chatAutoDeletePersonalDescription => '自分が送信したメッセージのみ指定時間後に削除します。';
+
+  @override
+  String get chatAutoDeletePolicyDescription => 'チャンネルの期限は全員に適用されます。個人設定で自分のメッセージを早く削除できます。既存の期限は変わりません。';
+
+  @override
+  String get chatAutoDeleteUnsupported => 'サーバーはこの設定に対応していません。サーバーを更新してください。';
+
+  @override
+  String get chatAutoDeleteCheckingSupport => 'サーバーの対応状況を確認中…';
+
+  @override
   String get chatAutoDeleteTitle => 'メッセージの自動削除';
 
   @override

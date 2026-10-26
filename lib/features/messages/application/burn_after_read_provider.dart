@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/utils/app_log.dart';
+import '../../channels/data/group_api.dart';
+import '../../contacts/application/user_directory_provider.dart';
 import '../data/message_api.dart';
 
 part 'burn_after_read_provider.g.dart';
@@ -21,7 +23,16 @@ part 'burn_after_read_provider.g.dart';
 ///
 /// Kept alive for the whole app lifetime, matching `ReadIndex`/`MutedChats`.
 class BurnAfterReadState {
-  const BurnAfterReadState({this.users = const {}, this.groups = const {}});
+  const BurnAfterReadState({
+    this.users = const {},
+    this.groups = const {},
+    this.supportsUsers,
+    this.supportsGroups,
+  });
+
+  /// Unknown until the authoritative user_settings snapshot arrives.
+  final bool? supportsUsers;
+  final bool? supportsGroups;
 
   /// peer uid -> expires_in seconds (only present when > 0)
   final Map<int, int> users;
@@ -36,6 +47,8 @@ class BurnAfterReadState {
       BurnAfterReadState(
         users: users ?? this.users,
         groups: groups ?? this.groups,
+        supportsUsers: supportsUsers,
+        supportsGroups: supportsGroups,
       );
 }
 
@@ -45,8 +58,17 @@ class BurnAfterRead extends _$BurnAfterRead {
   BurnAfterReadState build() => const BurnAfterReadState();
 
   /// Authoritative snapshot from `user_settings`: replace wholesale.
-  void applySnapshot(Map<int, int> users, Map<int, int> groups) {
-    state = BurnAfterReadState(users: users, groups: groups);
+  void applySnapshot(
+    Map<int, int> users,
+    Map<int, int> groups, {
+    bool supportsUsers = true,
+    bool supportsGroups = true,
+  }) {
+    state = BurnAfterReadState(
+        users: users,
+        groups: groups,
+        supportsUsers: supportsUsers,
+        supportsGroups: supportsGroups);
   }
 
   /// Delta from `user_settings_changed`: `expiresIn > 0` upserts, `<= 0`
@@ -69,7 +91,7 @@ class BurnAfterRead extends _$BurnAfterRead {
         mergedGroups.remove(k);
       }
     });
-    state = BurnAfterReadState(users: mergedUsers, groups: mergedGroups);
+    state = state.copyWith(users: mergedUsers, groups: mergedGroups);
   }
 
   /// Save a DM's setting. Optimistically updates local state, then persists
@@ -95,7 +117,27 @@ class BurnAfterRead extends _$BurnAfterRead {
     }
   }
 
-  /// Save a channel's setting. Same shape as [setUser].
+  /// Save a policy for all senders; independent of this user's personal setting.
+  Future<bool> setChannel(int gid, int expiresIn) async {
+    final group = ref.read(groupDirectoryProvider).valueOrNull?[gid];
+    if (group?.autoDeleteAfter == null) return false;
+    try {
+      await ref
+          .read(groupApiProvider)
+          .updateChannel(gid, autoDeleteAfter: expiresIn);
+      await ref.read(groupDirectoryProvider.notifier).applyGroupUpdate({
+        'gid': gid,
+        'auto_delete_after': expiresIn,
+      });
+      return true;
+    } catch (e) {
+      AppLog.w(
+          LogTag.chat, () => '[burnAfterRead] setChannel($gid) failed: $e');
+      return false;
+    }
+  }
+
+  /// Save this sender's own setting in a channel. Same shape as [setUser].
   Future<bool> setGroup(int gid, int expiresIn) async {
     final api = ref.read(messageApiProvider);
     try {

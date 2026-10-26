@@ -8,6 +8,7 @@ import '../../../core/utils/safe_text.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/voce_avatar.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../channels/data/group_api.dart';
 import '../../contacts/application/user_directory_provider.dart';
 import '../../profile/presentation/user_profile_card.dart';
 import '../application/burn_after_read_provider.dart';
@@ -672,11 +673,8 @@ class _MembersListPanel extends ConsumerWidget {
 //
 // Server contract: POST /api/user/burn-after-reading with
 // {"users":[{"uid","expires_in"}]} or {"groups":[{"gid","expires_in"}]}.
-// Options mirror the web reference's AutoDeleteMessages.tsx exactly: Off (0),
-// 5 min (300), 10 min (600), 1 hour (3600), 1 day (86400), 1 week (604800).
-// This panel sets the sender-side setting, which the server stamps onto
-// subsequently-sent messages' `expires_in`. Message rows display the countdown;
-// ChatController handles deletion at the absolute expiry.
+// Personal and channel policies are saved separately. The channel limit applies
+// to everyone; a personal setting may delete the sender's messages sooner.
 // ---------------------------------------------------------------------------
 
 class _AutoDeletePanel extends ConsumerStatefulWidget {
@@ -689,42 +687,72 @@ class _AutoDeletePanel extends ConsumerStatefulWidget {
 }
 
 class _AutoDeletePanelState extends ConsumerState<_AutoDeletePanel> {
-  static const _options = <int>[0, 300, 600, 3600, 86400, 604800];
+  static const _options = <int>[0, 300, 600, 3600, 86400, 604800, 2592000];
 
-  String _labelFor(AppL10n l, int value) {
-    return switch (value) {
-      0 => l.chatAutoDeleteOff,
-      300 => l.chatAutoDelete5Min,
-      600 => l.chatAutoDelete10Min,
-      3600 => l.chatAutoDelete1Hour,
-      86400 => l.chatAutoDelete1Day,
-      604800 => l.chatAutoDelete1Week,
-      _ => '$value',
-    };
-  }
+  String _labelFor(AppL10n l, int value) => switch (value) {
+        0 => l.chatAutoDeleteOff,
+        300 => l.chatAutoDelete5Min,
+        600 => l.chatAutoDelete10Min,
+        3600 => l.chatAutoDelete1Hour,
+        86400 => l.chatAutoDelete1Day,
+        604800 => l.chatAutoDelete1Week,
+        2592000 => l.chatAutoDelete1Month,
+        _ => '$value',
+      };
 
-  late int _selected;
+  int? _personalDraft;
+  int? _channelDraft;
+  bool _wholeChannel = true;
   bool _saving = false;
+  bool _channelChecked = false;
+  bool _supportsChannel = false;
 
   @override
   void initState() {
     super.initState();
-    final state = ref.read(burnAfterReadProvider);
-    _selected = widget.isChannel
-        ? state.groupExpiresIn(widget.targetId)
-        : state.userExpiresIn(widget.targetId);
-    if (!_options.contains(_selected)) _selected = 0;
+    if (widget.isChannel) _checkChannelSupport();
   }
 
-  Future<void> _save() async {
+  Future<void> _checkChannelSupport() async {
+    var supported = false;
+    try {
+      final data = await ref.read(groupApiProvider).getChannel(widget.targetId);
+      supported = data['auto_delete_after'] is num;
+      if (!mounted) return;
+      await ref
+          .read(groupDirectoryProvider.notifier)
+          .applyGroupUpdate(data, replace: true);
+    } catch (_) {
+      // Without a current response, do not enable a capability from cache.
+    }
+    if (!mounted) return;
+    setState(() {
+      _channelChecked = true;
+      _supportsChannel = supported;
+    });
+  }
+
+  Future<void> _save(bool channelScope, int value) async {
+    if (_saving) return;
     setState(() => _saving = true);
     final notifier = ref.read(burnAfterReadProvider.notifier);
-    final ok = widget.isChannel
-        ? await notifier.setGroup(widget.targetId, _selected)
-        : await notifier.setUser(widget.targetId, _selected);
+    final ok = channelScope
+        ? await notifier.setChannel(widget.targetId, value)
+        : widget.isChannel
+            ? await notifier.setGroup(widget.targetId, value)
+            : await notifier.setUser(widget.targetId, value);
     if (!mounted) return;
     final l = AppL10n.of(context);
-    setState(() => _saving = false);
+    setState(() {
+      _saving = false;
+      if (ok) {
+        if (channelScope) {
+          _channelDraft = null;
+        } else {
+          _personalDraft = null;
+        }
+      }
+    });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(ok ? l.chatAutoDeleteSaved : l.chatAutoDeleteSaveFailed),
     ));
@@ -733,44 +761,111 @@ class _AutoDeletePanelState extends ConsumerState<_AutoDeletePanel> {
   @override
   Widget build(BuildContext context) {
     final l = AppL10n.of(context);
+    final settings = ref.watch(burnAfterReadProvider);
+    final group = widget.isChannel
+        ? (ref.watch(groupDirectoryProvider).valueOrNull?[widget.targetId])
+        : null;
+    final auth = ref.watch(authControllerProvider).valueOrNull;
+    final canManage = widget.isChannel &&
+        auth is AuthStateAuthenticated &&
+        (auth.user.isAdmin || group?.owner == auth.user.uid);
+    final supportsChannel = _supportsChannel && group?.autoDeleteAfter != null;
+    final loadingChannel = widget.isChannel && !_channelChecked;
+    final channelScope = canManage && supportsChannel && _wholeChannel;
+    final personalSupport =
+        widget.isChannel ? settings.supportsGroups : settings.supportsUsers;
+    final supported =
+        !loadingChannel && (channelScope || personalSupport == true);
+    final pending =
+        loadingChannel || (!channelScope && personalSupport == null);
+    final unsupportedText =
+        pending ? l.chatAutoDeleteCheckingSupport : l.chatAutoDeleteUnsupported;
+    final selected = channelScope
+        ? _channelDraft ?? group?.autoDeleteAfter ?? 0
+        : _personalDraft ??
+            (widget.isChannel
+                ? settings.groupExpiresIn(widget.targetId)
+                : settings.userExpiresIn(widget.targetId));
+
     return Column(
       children: [
+        if (canManage)
+          Tooltip(
+            message: supportsChannel
+                ? ''
+                : (loadingChannel
+                    ? l.chatAutoDeleteCheckingSupport
+                    : l.chatAutoDeleteUnsupported),
+            child: SwitchListTile.adaptive(
+              title: Text(l.chatAutoDeleteWholeChannel),
+              subtitle: supportsChannel
+                  ? null
+                  : Text(loadingChannel
+                      ? l.chatAutoDeleteCheckingSupport
+                      : l.chatAutoDeleteUnsupported),
+              value: channelScope,
+              onChanged: supportsChannel && !_saving
+                  ? (value) => setState(() => _wholeChannel = value)
+                  : null,
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              l.chatExpiresTooltip(l.chatAutoDelete5Min),
+              channelScope
+                  ? l.chatAutoDeleteChannelDescription
+                  : l.chatAutoDeletePersonalDescription,
               style: TextStyle(
-                fontSize: 13,
-                height: 1.4,
-                color: AppTokens.gray500,
-              ),
+                  fontSize: 13, height: 1.4, color: AppTokens.gray500),
             ),
           ),
         ),
+        if (widget.isChannel)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(l.chatAutoDeletePolicyDescription,
+                style: TextStyle(fontSize: 12, color: AppTokens.gray500)),
+          ),
+        if (!supported)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Text(unsupportedText,
+                style: TextStyle(fontSize: 12, color: AppTokens.gray500)),
+          ),
         Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            itemCount: _options.length,
-            separatorBuilder: (_, __) =>
-                Divider(height: 1, color: AppTokens.gray200),
-            itemBuilder: (ctx, i) {
-              final value = _options[i];
-              return RadioListTile<int>(
-                value: value,
-                groupValue: _selected,
-                onChanged: (v) => setState(() => _selected = v ?? 0),
-                activeColor: AppTokens.primary400,
-                title: Text(
-                  _labelFor(l, value),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppTokens.textHeading,
-                  ),
-                ),
-              );
-            },
+          child: Tooltip(
+            message: supported ? '' : unsupportedText,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              itemCount: _options.length,
+              separatorBuilder: (_, __) =>
+                  Divider(height: 1, color: AppTokens.gray200),
+              itemBuilder: (ctx, i) {
+                final value = _options[i];
+                return RadioListTile<int>(
+                  value: value,
+                  groupValue: selected,
+                  onChanged: supported && !_saving
+                      ? (value) => setState(() {
+                            if (channelScope) {
+                              _channelDraft = value;
+                            } else {
+                              _personalDraft = value;
+                            }
+                          })
+                      : null,
+                  activeColor: AppTokens.primary400,
+                  title: Text(_labelFor(l, value),
+                      style: TextStyle(
+                          fontSize: 14,
+                          color: supported
+                              ? AppTokens.textHeading
+                              : AppTokens.gray500)),
+                );
+              },
+            ),
           ),
         ),
         Divider(height: 1, color: AppTokens.gray200),
@@ -779,16 +874,15 @@ class _AutoDeletePanelState extends ConsumerState<_AutoDeletePanel> {
           child: SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: _saving ? null : _save,
+              onPressed: _saving || !supported
+                  ? null
+                  : () => _save(channelScope, selected),
               child: _saving
                   ? const SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
+                          strokeWidth: 2, color: Colors.white))
                   : Text(l.chatEditSave),
             ),
           ),

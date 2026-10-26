@@ -1034,6 +1034,27 @@ class AppL10nPt extends AppL10n {
   String get chatForwardedMessagePreview => '[Mensagem encaminhada]';
 
   @override
+  String get chatAutoDelete1Month => '1 mês (30 dias)';
+
+  @override
+  String get chatAutoDeleteWholeChannel => 'Canal inteiro';
+
+  @override
+  String get chatAutoDeleteChannelDescription => 'Excluir automaticamente as novas mensagens de todos após o tempo selecionado.';
+
+  @override
+  String get chatAutoDeletePersonalDescription => 'Excluir apenas minhas mensagens após o tempo selecionado.';
+
+  @override
+  String get chatAutoDeletePolicyDescription => 'O limite do canal vale para todos. A configuração pessoal pode excluir suas mensagens antes. Mensagens existentes mantêm o prazo original.';
+
+  @override
+  String get chatAutoDeleteUnsupported => 'O servidor não suporta esta opção. Atualize o servidor.';
+
+  @override
+  String get chatAutoDeleteCheckingSupport => 'Verificando suporte do servidor…';
+
+  @override
   String get chatAutoDeleteTitle => 'Exclusão automática de mensagens';
 
   @override
