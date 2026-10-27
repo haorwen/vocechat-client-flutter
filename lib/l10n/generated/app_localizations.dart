@@ -1265,6 +1265,24 @@ abstract class AppL10n {
   /// **'Use invitation link'**
   String get serverPickerUseInviteLink;
 
+  /// No description provided for @serverRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove server'**
+  String get serverRemove;
+
+  /// No description provided for @serverRemoveConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this server?'**
+  String get serverRemoveConfirmTitle;
+
+  /// No description provided for @serverRemoveConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name} ({url}) and its saved accounts and sign-in details from this device? You can add the server again later.'**
+  String serverRemoveConfirmBody(String name, String url);
+
   /// No description provided for @serverAddTitle.
   ///
   /// In en, this message translates to:

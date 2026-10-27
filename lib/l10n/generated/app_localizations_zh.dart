@@ -602,6 +602,17 @@ class AppL10nZh extends AppL10n {
   String get serverPickerUseInviteLink => '使用邀请链接';
 
   @override
+  String get serverRemove => '删除服务器';
+
+  @override
+  String get serverRemoveConfirmTitle => '删除该服务器？';
+
+  @override
+  String serverRemoveConfirmBody(String name, String url) {
+    return '要从本设备删除“$name”（$url）及其保存的账户和登录信息吗？之后可以重新添加该服务器。';
+  }
+
+  @override
   String get serverAddTitle => '添加服务器';
 
   @override

@@ -602,6 +602,17 @@ class AppL10nEs extends AppL10n {
   String get serverPickerUseInviteLink => 'Use invitation link';
 
   @override
+  String get serverRemove => 'Remove server';
+
+  @override
+  String get serverRemoveConfirmTitle => 'Remove this server?';
+
+  @override
+  String serverRemoveConfirmBody(String name, String url) {
+    return 'Remove $name ($url) and its saved accounts and sign-in details from this device? You can add the server again later.';
+  }
+
+  @override
   String get serverAddTitle => 'Agregar servidor';
 
   @override

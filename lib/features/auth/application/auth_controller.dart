@@ -729,6 +729,41 @@ class AuthController extends _$AuthController {
     }
   }
 
+  /// Forget a server and all of its saved sign-ins on this device. This is
+  /// entirely local, so an unreachable server can still be removed.
+  Future<void> removeServer(String serverId) async {
+    final accounts = await ref.read(accountStoreProvider.future);
+    final serverAccounts = accounts.accounts
+        .where((account) => account.serverId == serverId)
+        .toList();
+    final removesCurrentAccount = serverAccounts
+        .any((account) => account.accountId == accounts.currentAccountId);
+
+    _suppressStoreReact = true;
+    try {
+      for (final account in serverAccounts) {
+        await ref.read(secureTokenStoreProvider(account.accountId)).clear();
+      }
+      final serverTokens = ref.read(secureTokenStoreProvider(serverId));
+      await serverTokens.clear();
+      await serverTokens.clearRememberedCredential();
+      // Remove accounts first so bootstrap cannot select the forgotten server
+      // again through a saved current-account pointer.
+      await ref
+          .read(accountStoreProvider.notifier)
+          .removeAccountsForServer(serverId);
+      await ref.read(serverStoreProvider.notifier).removeServer(serverId);
+    } finally {
+      _suppressStoreReact = false;
+      if (removesCurrentAccount && _currentAccount() == null) {
+        _authOperation = Object();
+        _profileRequest = Object();
+        ref.read(authRestoreFailureProvider.notifier).state = null;
+        state = const AsyncData(AuthState.unauthenticated());
+      }
+    }
+  }
+
   /// Switch to a different saved account (same or different server) without
   /// requiring the user to log out first. Attempts a silent token
   /// revalidation/refresh against the target account; if that fails (expired

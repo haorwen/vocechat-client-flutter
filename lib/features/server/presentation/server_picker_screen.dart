@@ -12,6 +12,7 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/utils/server_url_validator.dart';
 import '../../../shared/widgets/empty_state_view.dart';
 import '../../../shared/widgets/primary_button.dart';
+import '../../../shared/widgets/voce_dialog.dart';
 import '../data/invite_link_api.dart';
 import '../domain/invite_link.dart';
 
@@ -25,11 +26,15 @@ class ServerPickerScreen extends ConsumerStatefulWidget {
 class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
   String? _selectedId;
   bool _switching = false;
+  String? _removingId;
+
+  bool get _busy => _switching || _removingId != null;
 
   Future<void> _continueWithSelected(
       List<ServerConfig> servers, String? currentServerId) async {
-    final id = _selectedId ??
-        (servers.any((s) => s.id == currentServerId)
+    final id = servers.any((s) => s.id == _selectedId)
+        ? _selectedId
+        : (servers.any((s) => s.id == currentServerId)
             ? currentServerId
             : (servers.isNotEmpty ? servers.first.id : null));
     if (id == null) return;
@@ -50,6 +55,35 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
     // Wait for auth controller to re-bootstrap with new server
     await ref.read(authControllerProvider.future);
     if (mounted) context.go('/login');
+  }
+
+  Future<void> _removeServer(ServerConfig server) async {
+    if (_busy) return;
+    final l = AppL10n.of(context);
+    try {
+      final confirmed = await showVoceConfirm(
+        context: context,
+        title: l.serverRemoveConfirmTitle,
+        body: l.serverRemoveConfirmBody(server.name, server.baseUrl),
+        confirmLabel: l.serverRemove,
+        cancelLabel: l.actionCancel,
+        danger: true,
+      );
+      if (confirmed != true || !mounted) return;
+      setState(() => _removingId = server.id);
+      await ref.read(authControllerProvider.notifier).removeServer(server.id);
+      if (mounted && _selectedId == server.id) {
+        setState(() => _selectedId = null);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(safeText(l.errorPrefix(e.toString())))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _removingId = null);
+    }
   }
 
   void _showAddSheet() {
@@ -146,11 +180,11 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                         const SizedBox(height: 8),
                         PrimaryButton(
                           label: l.serverPickerAddFirst,
-                          onPressed: _showAddSheet,
+                          onPressed: _busy ? null : _showAddSheet,
                         ),
                         const SizedBox(height: 12),
                         OutlinedButton.icon(
-                          onPressed: _showInviteLinkSheet,
+                          onPressed: _busy ? null : _showInviteLinkSheet,
                           icon: const Icon(Icons.link, size: 18),
                           label: Text(l.serverPickerUseInviteLink),
                           style: OutlinedButton.styleFrom(
@@ -178,7 +212,9 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                         borderRadius: BorderRadius.circular(16),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(16),
-                          onTap: () => setState(() => _selectedId = server.id),
+                          onTap: _busy
+                              ? null
+                              : () => setState(() => _selectedId = server.id),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 14),
@@ -236,11 +272,29 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                                 Radio<int>(
                                   value: i,
                                   groupValue: effectiveIndex,
-                                  onChanged: (v) {
-                                    if (v != null)
-                                      setState(
-                                          () => _selectedId = servers[v].id);
-                                  },
+                                  onChanged: _busy
+                                      ? null
+                                      : (v) {
+                                          if (v != null) {
+                                            setState(() =>
+                                                _selectedId = servers[v].id);
+                                          }
+                                        },
+                                ),
+                                IconButton(
+                                  tooltip: l.serverRemove,
+                                  onPressed: _busy
+                                      ? null
+                                      : () => _removeServer(server),
+                                  color: theme.colorScheme.error,
+                                  icon: _removingId == server.id
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2),
+                                        )
+                                      : const Icon(Icons.delete_outline),
                                 ),
                               ],
                             ),
@@ -251,7 +305,7 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                   },
                 ),
           floatingActionButton: FloatingActionButton.extended(
-            onPressed: _showAddSheet,
+            onPressed: _busy ? null : _showAddSheet,
             icon: const Icon(Icons.add),
             label: Text(l.serverPickerAdd),
           ),
@@ -265,13 +319,13 @@ class _ServerPickerScreenState extends ConsumerState<ServerPickerScreen> {
                       PrimaryButton(
                         label: l.serverPickerContinue,
                         isLoading: _switching,
-                        onPressed: _switching
+                        onPressed: _busy
                             ? null
                             : () => _continueWithSelected(
                                 servers, state.currentServerId),
                       ),
                       TextButton.icon(
-                        onPressed: _showInviteLinkSheet,
+                        onPressed: _busy ? null : _showInviteLinkSheet,
                         icon: const Icon(Icons.link, size: 18),
                         label: Text(l.serverPickerUseInviteLink),
                       ),

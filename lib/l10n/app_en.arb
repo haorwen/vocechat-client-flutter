@@ -239,6 +239,15 @@
   "serverPickerAdd": "Add server",
   "serverPickerContinue": "Continue",
   "serverPickerUseInviteLink": "Use invitation link",
+  "serverRemove": "Remove server",
+  "serverRemoveConfirmTitle": "Remove this server?",
+  "serverRemoveConfirmBody": "Remove {name} ({url}) and its saved accounts and sign-in details from this device? You can add the server again later.",
+  "@serverRemoveConfirmBody": {
+    "placeholders": {
+      "name": { "type": "String" },
+      "url": { "type": "String" }
+    }
+  },
   "serverAddTitle": "Add Server",
   "serverUrl": "Server URL",
   "serverUrlHint": "https://chat.example.com",
