@@ -1,6 +1,12 @@
 # VoceChat Changelog
 
-Changes since 0.3.29+29, through 0.3.36+36. Dates reflect version commits (UTC+8).
+Changes since 0.3.29+29, through 0.3.37+37. Dates reflect version commits (UTC+8).
+
+## 0.3.37 (2026-10-28)
+
+- Retry push registration after temporary failures and resync after notification permission is granted or the app returns to the foreground.
+- Enable iOS notification banners and sounds while the app is open.
+- Allow removing saved servers and their stored sign-ins from this device, including when the server is unreachable.
 
 ## 0.3.36 (2026-10-27)
 
@@ -8,14 +14,20 @@ Changes since 0.3.29+29, through 0.3.36+36. Dates reflect version commits (UTC+8
 - Improve reconnection after credential errors, app resume, and network changes, including Wi-Fi to cellular transitions.
 - Restore the last server chat layout on startup while waiting for live settings.
 
+## 0.3.35 (2026-10-24)
+
+- Respect server email privacy settings and keep account and contact details in sync. Fix empty-email displays and bot grouping.
+- Fix the desktop sidebar disappearing after creating a channel.
+
+## 0.3.34 (2026-10-24)
+
+- Add adjustable text size with a live preview in Settings → Appearance.
+- Improve chat layout and text wrapping for easier reading at larger text sizes.
+
 ## 0.3.33 (2026-10-20)
 
-- **Fixed the unresponsive emoji button**: Open the emoji picker and insert an emoji at the cursor, or replace selected text.
-- **Improved long group names**: Group names use a slightly smaller font and wrap to two lines. The description appears below the name to give both more room.
-- **Added full group details**: Tap the header to read and copy the complete group name and description. Empty descriptions no longer show a row or placeholder text.
-- **Prevented accidental loss of group descriptions**: Settings now load the existing description correctly, so renaming a group preserves it.
-- **Added a pinned-message bar below the chat header**: Tap to jump to and highlight the original message. Older messages load automatically, and multiple pins can be cycled through.
-- **Improved pinned-message controls and live updates**: View all pins, jump to a message, or unpin it. Group details and pinned-message changes from other devices update in real time, with feedback when a message cannot be loaded.
+- Fix the emoji button, improve long group names and group details, and preserve descriptions when renaming groups.
+- Add a pinned-message bar with quick navigation to the original message and access to all pins.
 
 ## 0.3.32 (2026-10-08)
 
